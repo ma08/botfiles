@@ -1,0 +1,9 @@
+# Claude hooks - secrets and generated files
+claude/hooks/.env
+claude/hooks/.venv/
+claude/hooks/__pycache__/
+claude/hooks/*.py[oc]
+claude/hooks/hooks.log
+
+# OS files
+.DS_Store
