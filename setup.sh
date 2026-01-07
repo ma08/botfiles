@@ -54,6 +54,11 @@ backup_existing() {
         mv "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/hooks.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -d "$CLAUDE_DIR/skills" ] && [ ! -L "$CLAUDE_DIR/skills" ]; then
+        echo "  Backing up skills directory"
+        mv "$CLAUDE_DIR/skills" "$CLAUDE_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -68,6 +73,7 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/settings.json" ] && rm "$CLAUDE_DIR/settings.json"
     [ -L "$CLAUDE_DIR/statusline-simple.sh" ] && rm "$CLAUDE_DIR/statusline-simple.sh"
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
+    [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -78,6 +84,9 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/claude/hooks" "$CLAUDE_DIR/hooks"
     echo "  hooks/ -> $SCRIPT_DIR/claude/hooks"
+
+    ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
+    echo "  skills/ -> $SCRIPT_DIR/claude/skills"
 
     echo ""
 }

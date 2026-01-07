@@ -10,6 +10,8 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude finishes responding
   - Sends notifications when Claude needs permission
   - Sends notifications when Claude asks a question
+- **skills/** - Claude Code skills for extended capabilities
+  - **notion/** - Notion workspace integration
 
 ## Prerequisites
 
@@ -81,6 +83,42 @@ You'll need a [Meta WhatsApp Business API](https://developers.facebook.com/docs/
 
 The `SYSTEM_NAME` is included in WhatsApp notifications to identify which machine sent the alert. If not set, it defaults to the hostname.
 
+## Skills
+
+Skills extend Claude Code with specialized capabilities. After running `setup.sh`, skills are available at `~/.claude/skills/`.
+
+### Notion Skill
+
+Integrates with Notion workspaces for reading/writing pages, searching, and managing databases.
+I created this myself to have a skill-only Notion-Claude Code integration that avoids MCPs which were causing [context bloating](https://x.com/curious_queue/status/2008612572992315850?s=20).
+
+**Setup:**
+
+1. Install the Notion SDK:
+   ```bash
+   npm install -g @notionhq/client
+   ```
+
+2. Create a [Notion Integration](https://www.notion.so/my-integrations):
+   - Go to https://www.notion.so/my-integrations
+   - Create a new integration
+   - Copy the "Internal Integration Token" (starts with `ntn_`)
+
+3. Set environment variables (either in ~/.zshrc or ~/.bashrc or have a start session hook load them up):
+   ```bash
+   export NOTION_API_KEY="ntn_your_token_here" #Make sure that API key has read/write permissions to the pages/databases you want to access
+   export NOTION_UPDATES_DB_ID="your_database_id"  # Optional
+   ```
+
+4. Share pages/databases with your integration in Notion
+
+**Test the connection:**
+```bash
+node ~/.claude/skills/notion/examples/test-connection.js
+```
+
+See `claude/skills/notion/README.md` for detailed usage.
+
 ## Directory Structure
 
 ```
@@ -91,15 +129,20 @@ botfiles/
 └── claude/
     ├── settings.json
     ├── statusline-simple.sh
-    └── hooks/
-        ├── .env.example
-        ├── .gitignore
-        ├── pyproject.toml
-        ├── notification.py
-        ├── stop.py
-        ├── pretooluse_notification.py
-        ├── utils.py
-        └── whatsapp.py
+    ├── hooks/
+    │   ├── .env.example
+    │   ├── .gitignore
+    │   ├── pyproject.toml
+    │   ├── notification.py
+    │   ├── stop.py
+    │   ├── pretooluse_notification.py
+    │   ├── utils.py
+    │   └── whatsapp.py
+    └── skills/
+        └── notion/
+            ├── README.md
+            ├── SKILL.md
+            └── examples/
 ```
 
 ## Updating
