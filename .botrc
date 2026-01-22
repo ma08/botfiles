@@ -1,0 +1,26 @@
+# Botfiles environment loader for shells (zsh/bash).
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _botrc_source="${BASH_SOURCE[0]}"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  _botrc_source="${(%):-%x}"
+else
+  _botrc_source="$0"
+fi
+
+BOTFILES_ROOT="$(cd "$(dirname "$_botrc_source")" && pwd)"
+export BOTFILES_ROOT
+
+[ -f "$BOTFILES_ROOT/claude/.vertex_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.vertex_claude_config_rc"
+[ -f "$BOTFILES_ROOT/codex/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.azure_codex_config_rc"
+
+# Claude Code aliases
+alias cc="claude"                                        # normal start
+alias ccc="claude --continue"                            # continue last session
+alias ccy="claude --dangerously-skip-permissions"        # skip all permission prompts
+alias ccyc="claude --dangerously-skip-permissions -c"    # skip permissions + continue
+
+# Zellij aliases (mobile-friendly session management)
+alias zj="zellij"                    # quick start
+alias zjs="zellij list-sessions"     # list active sessions
+alias zja="zellij attach -c"         # attach to session (create if missing)
+alias zjk="zellij kill-session"      # kill a specific session

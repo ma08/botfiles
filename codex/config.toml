@@ -1,0 +1,47 @@
+model = "gpt-5.2-codex"
+model_provider = "azure"
+model_reasoning_effort = "high"
+
+[features]
+web_search_request = true
+
+[projects."/Users/sourya4/pro/ladduu_agent_stack"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/smart-sync-chat"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/hackathons/vibecon_hackathon"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/django-whatsapp-bot"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/soniox-compare"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/personal_os"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/gcloud_installation"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/botfiles"]
+trust_level = "trusted"
+
+[notice]
+"hide_gpt-5.1-codex-max_migration_prompt" = true
+
+[notice.model_migrations]
+"gpt-5.1-codex-max" = "gpt-5.2-codex"
+
+
+[model_providers.azure]
+name = "Azure OpenAI"
+# Replace YOUR_RESOURCE_NAME with your Azure OpenAI resource name
+# base_url = "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/v1"
+base_url = "https://ladduu-dev-openai.openai.azure.com/openai/v1"
+# This points to the environment variable name you will set in the next step
+env_key = "AZURE_OPENAI_API_KEY"
+wire_api = "responses"
+

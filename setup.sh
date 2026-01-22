@@ -8,10 +8,12 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
+CODEX_DIR="$HOME/.codex"
 
 echo "=== Botfiles Setup ==="
 echo "Script directory: $SCRIPT_DIR"
 echo "Claude directory: $CLAUDE_DIR"
+echo "Codex directory: $CODEX_DIR"
 echo ""
 
 # Check prerequisites
@@ -59,6 +61,11 @@ backup_existing() {
         mv "$CLAUDE_DIR/skills" "$CLAUDE_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -f "$CODEX_DIR/config.toml" ] && [ ! -L "$CODEX_DIR/config.toml" ]; then
+        echo "  Backing up codex config.toml"
+        mv "$CODEX_DIR/config.toml" "$CODEX_DIR/config.toml.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -68,12 +75,14 @@ create_symlinks() {
 
     # Ensure .claude directory exists
     mkdir -p "$CLAUDE_DIR"
+    mkdir -p "$CODEX_DIR"
 
     # Remove existing symlinks if they exist
     [ -L "$CLAUDE_DIR/settings.json" ] && rm "$CLAUDE_DIR/settings.json"
     [ -L "$CLAUDE_DIR/statusline-simple.sh" ] && rm "$CLAUDE_DIR/statusline-simple.sh"
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
+    [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -87,6 +96,9 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
     echo "  skills/ -> $SCRIPT_DIR/claude/skills"
+
+    ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
+    echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
 
     echo ""
 }

@@ -5,5 +5,8 @@ claude/hooks/__pycache__/
 claude/hooks/*.py[oc]
 claude/hooks/hooks.log
 
+# Codex secrets
+codex/.azure_codex_config_rc
+
 # OS files
 .DS_Store

@@ -12,6 +12,8 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
+- **codex/** - Codex CLI config and provider environment templates
+- **.botrc** - Shell loader that sources Claude/Codex env configs
 
 ## Prerequisites
 
@@ -46,7 +48,19 @@ brew install terminal-notifier
    # Edit .env with your WhatsApp credentials
    ```
 
-4. **Restart Claude Code**
+4. **Configure Codex Azure credentials**
+   ```bash
+   cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc
+   # Edit .azure_codex_config_rc with your API key
+   ```
+
+5. **Load shared env config**
+   ```bash
+   echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+6. **Restart Claude Code**
 
 ## Manual Setup
 
@@ -57,6 +71,7 @@ If you prefer manual setup:
 ln -sf ~/pro/botfiles/claude/settings.json ~/.claude/settings.json
 ln -sf ~/pro/botfiles/claude/statusline-simple.sh ~/.claude/statusline-simple.sh
 ln -sf ~/pro/botfiles/claude/hooks ~/.claude/hooks
+ln -sf ~/pro/botfiles/codex/config.toml ~/.codex/config.toml
 
 # Install Python dependencies
 cd ~/pro/botfiles/claude/hooks
@@ -64,6 +79,15 @@ uv sync
 ```
 
 ## Configuration
+
+### Shell Environment (.botrc)
+
+`.botrc` sources `claude/.vertex_claude_config_rc` and `codex/.azure_codex_config_rc` if present.
+Add it to your shell startup file:
+
+```bash
+source ~/pro/botfiles/.botrc
+```
 
 ### WhatsApp Notifications
 
@@ -82,6 +106,16 @@ You'll need a [Meta WhatsApp Business API](https://developers.facebook.com/docs/
 ### System Name
 
 The `SYSTEM_NAME` is included in WhatsApp notifications to identify which machine sent the alert. If not set, it defaults to the hostname.
+
+### Codex Provider Credentials
+
+Create `codex/.azure_codex_config_rc` from the template:
+
+```bash
+cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc
+```
+
+This file is ignored by git and sourced via `.botrc`.
 
 ## Skills
 
@@ -123,9 +157,13 @@ See `claude/skills/notion/README.md` for detailed usage.
 
 ```
 botfiles/
+├── .botrc
 ├── README.md
 ├── .gitignore
 ├── setup.sh
+├── codex/
+│   ├── config.toml
+│   └── .azure_codex_config_rc.example
 └── claude/
     ├── settings.json
     ├── statusline-simple.sh
