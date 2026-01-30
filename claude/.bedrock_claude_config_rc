@@ -1,0 +1,4 @@
+# Refer to https://code.claude.com/docs/en/amazon-bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+# Temporarily setting to 0 to use the $20/month pro subscription based login. Will use bedrock only when usage limit is reached.
+# export CLAUDE_CODE_USE_BEDROCK=0

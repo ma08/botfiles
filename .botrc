@@ -10,8 +10,15 @@ fi
 BOTFILES_ROOT="$(cd "$(dirname "$_botrc_source")" && pwd)"
 export BOTFILES_ROOT
 
-[ -f "$BOTFILES_ROOT/claude/.vertex_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.vertex_claude_config_rc"
+# Disabling temporarly as vertex models getting billed and not using startup credits
+# [ -f "$BOTFILES_ROOT/claude/.vertex_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.vertex_claude_config_rc"
+
+# using bedrock instead of vertex as startup credits in AWS can be used for claude models in bedrock
+[ -f "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc"
+
 [ -f "$BOTFILES_ROOT/codex/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.azure_codex_config_rc"
+
+[ -f "$BOTFILES_ROOT/opencode/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/opencode/.azure_codex_config_rc"
 
 # Claude Code aliases
 alias cc="claude"                                        # normal start
