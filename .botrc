@@ -48,6 +48,10 @@ alias zj="zellij"                    # quick start
 alias zjs="zellij list-sessions"     # list active sessions
 alias zja="zellij attach -c"         # attach to session (create if missing)
 alias zjk="zellij kill-session"      # kill a specific session
+
+# Shell: list current dir entries with full paths
+alias lsf='ls -ld $(pwd)/*'
+
 # Default editor for Codex and other CLI tools
 export EDITOR=vim
 export VISUAL=vim
