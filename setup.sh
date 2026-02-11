@@ -61,6 +61,11 @@ backup_existing() {
         mv "$CLAUDE_DIR/skills" "$CLAUDE_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -f "$CLAUDE_DIR/CLAUDE.md" ] && [ ! -L "$CLAUDE_DIR/CLAUDE.md" ]; then
+        echo "  Backing up CLAUDE.md"
+        mv "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     if [ -f "$CODEX_DIR/config.toml" ] && [ ! -L "$CODEX_DIR/config.toml" ]; then
         echo "  Backing up codex config.toml"
         mv "$CODEX_DIR/config.toml" "$CODEX_DIR/config.toml.bak.$(date +%Y%m%d%H%M%S)"
@@ -96,6 +101,11 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
     echo "  skills/ -> $SCRIPT_DIR/claude/skills"
+
+    [ -L "$CLAUDE_DIR/CLAUDE.md" ] && rm "$CLAUDE_DIR/CLAUDE.md"
+
+    ln -sf "$SCRIPT_DIR/claude/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
+    echo "  CLAUDE.md -> $SCRIPT_DIR/claude/CLAUDE.md"
 
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
