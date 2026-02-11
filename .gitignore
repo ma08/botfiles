@@ -7,6 +7,13 @@ claude/hooks/hooks.log
 
 # Codex secrets
 codex/.azure_codex_config_rc
+codex/.openai_codex_config_rc
+
+# LiteLLM secrets and logs
+litellm/.env
+litellm/.proxy.pid
+litellm/proxy.log
 
 # OS files
 .DS_Store
+claude/.bedrock_claude_env_secrets

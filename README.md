@@ -153,6 +153,25 @@ node ~/.claude/skills/notion/examples/test-connection.js
 
 See `claude/skills/notion/README.md` for detailed usage.
 
+## Web Search (via LiteLLM Proxy)
+
+When using Claude Code with AWS Bedrock, web search is not natively supported.
+The LiteLLM proxy enables web search by intercepting search requests and routing them to Exa AI.
+
+**Quick usage:**
+```bash
+ccws-start    # Start the proxy (background)
+ccws          # Run Claude Code with web search
+ccws-stop     # Stop the proxy when done
+```
+
+**First-time setup:**
+1. Install litellm: `uv tool install 'litellm[proxy]'`
+2. Copy API key: `cp litellm/.env.example litellm/.env`
+3. Edit `litellm/.env` with your Exa AI API key
+
+See `litellm/README.md` for detailed setup and troubleshooting.
+
 ## Directory Structure
 
 ```
@@ -164,6 +183,11 @@ botfiles/
 ├── codex/
 │   ├── config.toml
 │   └── .azure_codex_config_rc.example
+├── litellm/
+│   ├── config.yaml
+│   ├── .env.example
+│   ├── start-proxy.sh
+│   └── README.md
 └── claude/
     ├── settings.json
     ├── statusline-simple.sh

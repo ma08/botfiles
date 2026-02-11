@@ -17,8 +17,14 @@ export BOTFILES_ROOT
 [ -f "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc"
 
 [ -f "$BOTFILES_ROOT/codex/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.azure_codex_config_rc"
+[ -f "$BOTFILES_ROOT/codex/.openai_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.openai_codex_config_rc"
 
 [ -f "$BOTFILES_ROOT/opencode/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/opencode/.azure_codex_config_rc"
+
+# Codex CLI profile shortcuts
+alias codex-azure="codex --profile azure"
+alias codex-openai="codex --profile openai_api"
+alias codex-chatgpt="codex --profile chatgpt"
 
 # Claude Code aliases
 alias cc="claude"                                        # normal start
@@ -26,8 +32,22 @@ alias ccc="claude --continue"                            # continue last session
 alias ccy="claude --dangerously-skip-permissions"        # skip all permission prompts
 alias ccyc="claude --dangerously-skip-permissions -c"    # skip permissions + continue
 
+alias bedcc="export CLAUDE_CODE_USE_BEDROCK=1; claude"  # use bedrock
+alias bedccc="export CLAUDE_CODE_USE_BEDROCK=1; claude --continue"  # use bedrock and continue last session
+alias bedccy="export CLAUDE_CODE_USE_BEDROCK=1; claude --dangerously-skip-permissions"  # use bedrock and skip all permission prompts
+alias bedccyc="export CLAUDE_CODE_USE_BEDROCK=1; claude --dangerously-skip-permissions -c"  # use bedrock and skip all permission prompts and continue last session
+
+# LiteLLM Web Search Proxy aliases (for Bedrock web search via Exa AI)
+alias ccws-start="$BOTFILES_ROOT/litellm/start-proxy.sh --bg"
+alias ccws-stop="$BOTFILES_ROOT/litellm/start-proxy.sh --stop"
+alias ccws="$BOTFILES_ROOT/litellm/ccws.sh"
+alias ccwsc="$BOTFILES_ROOT/litellm/ccws.sh --continue"
+
 # Zellij aliases (mobile-friendly session management)
 alias zj="zellij"                    # quick start
 alias zjs="zellij list-sessions"     # list active sessions
 alias zja="zellij attach -c"         # attach to session (create if missing)
 alias zjk="zellij kill-session"      # kill a specific session
+# Default editor for Codex and other CLI tools
+export EDITOR=vim
+export VISUAL=vim

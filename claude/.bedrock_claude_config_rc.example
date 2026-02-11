@@ -1,0 +1,5 @@
+# AWS Bedrock for Claude Code
+# Requires AWS CLI configured: aws configure
+# Docs: https://code.claude.com/docs/en/amazon-bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_BEARER_TOKEN_BEDROCK=<key>

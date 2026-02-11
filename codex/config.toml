@@ -1,9 +1,29 @@
 model = "gpt-5.2-codex"
 model_provider = "azure"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
+web_search = "live"
+personality = "pragmatic"
 
-[features]
-web_search_request = true
+[profiles.azure]
+model = "gpt-5.2-codex"
+model_provider = "azure"
+model_reasoning_effort = "xhigh"
+
+[profiles.openai_api]
+model = "gpt-5.3-codex"
+model_provider = "openai"
+model_reasoning_effort = "xhigh"
+forced_login_method = "api"
+
+[profiles.chatgpt]
+model = "gpt-5.3-codex"
+model_provider = "openai"
+model_reasoning_effort = "xhigh"
+forced_login_method = "chatgpt"
+
+[profiles.v0]
+model = "v0-1.5-md"
+model_provider = "v0"
 
 [projects."/Users/sourya4/pro/ladduu_agent_stack"]
 trust_level = "trusted"
@@ -29,6 +49,18 @@ trust_level = "trusted"
 [projects."/Users/sourya4/pro/botfiles"]
 trust_level = "trusted"
 
+[projects."/Users/sourya4/pro/local_machine"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/gastown-dashboard"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/.codex"]
+trust_level = "trusted"
+
+[projects."/Users/sourya4/pro/new-smv"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 
@@ -45,3 +77,24 @@ base_url = "https://ladduu-dev-openai.openai.azure.com/openai/v1"
 env_key = "AZURE_OPENAI_API_KEY"
 wire_api = "responses"
 
+[model_providers.v0]
+name = "v0"
+base_url = "https://api.v0.dev/v1"
+env_key = "V0_API_KEY"
+wire_api = "responses"
+
+[mcp_servers.notion]
+url = "https://mcp.notion.com/mcp"
+
+[mcp_servers.exa]
+url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_code_context_exa,crawling_exa,company_research_exa,people_search_exa,deep_researcher_start,deep_researcher_check"
+
+[mcp_servers.vibe-kanban]
+command = "npx"
+args = ["-y", "vibe-kanban@latest", "--mcp"]
+
+[features]
+steer = true
+shell_snapshot = true
+collab = true
+apps = true

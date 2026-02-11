@@ -1,0 +1,2 @@
+# OpenAI API for Codex (copy to .openai_codex_config_rc and fill in).
+export OPENAI_API_KEY=""
