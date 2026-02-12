@@ -79,10 +79,26 @@ Collect from the session:
 ### Step 4: Write or Update the Status File
 Use the template below. Include only sections relevant to the current situation — omit sections that don't apply. The goal is a useful document for resuming work, not bureaucratic completeness.
 
-### Step 5: Save Artifacts
-If there are relevant artifacts (screenshots, exports, etc.):
-- Save to `task-progress-artifacts/` subfolder
-- Reference in the status file
+### Step 5: Save Artifacts (Non-Optional)
+**Always** actively collect and save artifacts to `task-progress-artifacts/`. Don't wait until the end — save artifacts as they're created during the session.
+
+**What to save** (any of these encountered during work):
+- **Log snippets**: Copy relevant log output into `.log` or `.txt` files (don't just reference `/tmp/` paths that will disappear)
+- **Screenshots**: UI states, error dialogs, terminal output captures
+- **Adhoc scripts**: Any one-off scripts written during the task (bash, python, etc.)
+- **Config snapshots**: `.env` excerpts (redacted), config diffs, docker-compose overrides
+- **Command outputs**: `curl` responses, test results, benchmark data, `git diff` outputs
+- **Error traces**: Stack traces, build errors, crash logs
+- **Architecture diagrams**: ASCII diagrams, mermaid files, HTML visualizations
+
+**Naming convention**: Use descriptive filenames with context, e.g.:
+- `server-startup-error.log` (not `error.log`)
+- `tailscale-ping-benchmark.txt` (not `output.txt`)
+- `fix-auth-retry-logic.py` (not `script.py`)
+
+**Key principle**: Artifacts should be **self-contained**. Copy content into the task folder rather than just referencing external paths (like `/tmp/` logs or remote URLs) that may be unavailable later. The task folder should be a complete package that can be shared, referenced from Notion, or used to onboard a fresh agent session.
+
+After saving, reference each artifact in the status file's Artifacts section.
 
 ## Status File Template
 
@@ -127,6 +143,12 @@ If there are relevant artifacts (screenshots, exports, etc.):
 
 <Current blockers, if any>
 
+## Artifacts
+
+| File | Description |
+|------|-------------|
+| `task-progress-artifacts/<filename>` | <what it contains and why it's useful> |
+
 ## Next Steps
 
 - [ ] Immediate next action 1
@@ -147,7 +169,13 @@ If there are relevant artifacts (screenshots, exports, etc.):
 - Be specific about component states (daemon PIDs, container status, iteration counts)
 - Include exact commands to resume or check status
 - Note any blockers or pending decisions
-- Reference file paths for key artifacts
 - For bugs, include reproduction steps, root cause analysis, and attempted fixes
 - For plans, include implementation approach, technical decisions, and testing checklist
 - Adapt the template — omit sections that don't apply
+
+### Artifact Hygiene
+- **Save early, save often** — don't accumulate artifacts mentally; write them to disk as you go
+- **Copy, don't reference** — save log content into the task folder, don't just note "see /tmp/foo.log"
+- **Use descriptive filenames** — future-you should understand the artifact from its name alone
+- **Keep artifacts small and focused** — extract the relevant 50 lines from a 10,000-line log
+- **Redact secrets** — strip API keys, tokens, passwords before saving config/env snapshots
