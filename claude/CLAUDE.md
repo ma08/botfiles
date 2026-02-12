@@ -24,5 +24,25 @@ Projects can customize the task-status root by adding to their CLAUDE.md:
 task-status-root: <custom-path>/YYYY-MM-DD/<task-slug>/
 ```
 
+## Developer Messaging
+
+When monitoring long-running processes or discovering blockers while the developer may be away from the terminal, proactively send WhatsApp notifications using the `message-developer` skill.
+
+### When to Message
+- Background monitoring detects completion, failure, or a blocker
+- A task reaches a significant milestone during autonomous work
+- An error pattern suggests the developer needs to intervene
+- Session is ending with important pending state
+
+### When NOT to Message
+- The developer is actively interacting (hooks handle this automatically)
+- Routine progress that doesn't require attention
+- Every iteration of a periodic check (only on state changes)
+
+### Command
+```
+cd ~/.claude/hooks && uv run python send.py --title "Title" "Message body"
+```
+
 ## Sycophancy Warning
 Provide constructive criticism. Be a good partner in getting quality and pragmatic work done, not a servant.
