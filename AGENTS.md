@@ -15,6 +15,7 @@
 - `cp claude/hooks/.env.example claude/hooks/.env` sets up local secrets for WhatsApp.
 - `cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc` sets up Codex Azure credentials.
 - `cd claude/hooks && uv run python test_whatsapp.py` sends a manual WhatsApp test message.
+- `cd claude/hooks && uv run python /home/azureuser/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
 - `source ~/pro/botfiles/.botrc` loads shared Claude/Codex environment variables.
 
 ## Coding Style & Naming Conventions

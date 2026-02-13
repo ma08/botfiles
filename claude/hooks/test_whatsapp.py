@@ -4,14 +4,11 @@ Test script for WhatsApp notifications.
 Run with: uv run python test_whatsapp.py
 """
 import os
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-# Load .env
-load_dotenv(Path(__file__).parent / ".env")
-
+from utils import load_env
 from whatsapp import send_whatsapp_message
+
+load_env()
 
 
 def main():

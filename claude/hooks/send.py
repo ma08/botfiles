@@ -11,13 +11,11 @@ Usage:
 import argparse
 import os
 import sys
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).parent / ".env")
-
+from utils import load_env
 from whatsapp import send_whatsapp_message
+
+load_env()
 
 
 def main():

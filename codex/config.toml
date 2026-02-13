@@ -1,8 +1,17 @@
-model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
 web_search = "live"
 personality = "pragmatic"
+notify = [
+  "/home/azureuser/.local/bin/uv",
+  "run",
+  "--project",
+  "/home/azureuser/pro/botfiles/claude/hooks",
+  "python",
+  "/home/azureuser/pro/botfiles/codex/hooks/codex_notification.py",
+]
+profile = "chatgpt"
 
 [profiles.azure]
 model = "gpt-5.2-codex"
@@ -16,7 +25,7 @@ model_reasoning_effort = "xhigh"
 forced_login_method = "api"
 
 [profiles.chatgpt]
-model = "gpt-5.3-codex"
+model = "gpt-5.2-codex"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "chatgpt"
@@ -62,6 +71,15 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/Users/sourya4/pro/opencode_experiments"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/openclaw-setup"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/smv"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/botfiles"]
 trust_level = "trusted"
 
 [notice]

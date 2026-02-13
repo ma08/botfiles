@@ -1,3 +1,6 @@
+# Python cache files
+**/__pycache__/
+
 # Claude hooks - secrets and generated files
 claude/hooks/.env
 claude/hooks/.venv/
