@@ -71,6 +71,16 @@ backup_existing() {
         mv "$CODEX_DIR/config.toml" "$CODEX_DIR/config.toml.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -e "$CODEX_DIR/skills" ] && [ ! -L "$CODEX_DIR/skills" ]; then
+        echo "  Backing up codex skills"
+        mv "$CODEX_DIR/skills" "$CODEX_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
+    if [ -f "$CODEX_DIR/AGENTS.md" ] && [ ! -L "$CODEX_DIR/AGENTS.md" ]; then
+        echo "  Backing up codex AGENTS.md"
+        mv "$CODEX_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -81,6 +91,7 @@ create_symlinks() {
     # Ensure .claude directory exists
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
+    mkdir -p "$SCRIPT_DIR/codex/skills"
 
     # Remove existing symlinks if they exist
     [ -L "$CLAUDE_DIR/settings.json" ] && rm "$CLAUDE_DIR/settings.json"
@@ -88,6 +99,8 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
+    [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
+    [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -109,6 +122,12 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
+
+    ln -sf "$SCRIPT_DIR/codex/skills" "$CODEX_DIR/skills"
+    echo "  codex skills/ -> $SCRIPT_DIR/codex/skills"
+
+    ln -sf "$SCRIPT_DIR/codex/AGENTS.md" "$CODEX_DIR/AGENTS.md"
+    echo "  codex AGENTS.md -> $SCRIPT_DIR/codex/AGENTS.md"
 
     echo ""
 }
@@ -263,6 +282,7 @@ main() {
     echo "=== Setup Complete ==="
     echo ""
     echo "Claude Code configuration is now symlinked to botfiles."
+    echo "Codex CLI configuration, skills, and AGENTS.md are now symlinked to botfiles."
     echo "Restart Claude Code for changes to take effect."
 }
 

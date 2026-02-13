@@ -9,6 +9,9 @@ claude/hooks/hooks.log
 codex/.azure_codex_config_rc
 codex/.openai_codex_config_rc
 
+# Codex system skills are machine-managed and can differ by OS/Codex version
+codex/skills/.system/
+
 # LiteLLM secrets and logs
 litellm/.env
 litellm/.proxy.pid

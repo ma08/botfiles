@@ -61,11 +61,15 @@ trust_level = "trusted"
 [projects."/Users/sourya4/pro/new-smv"]
 trust_level = "trusted"
 
+[projects."/Users/sourya4/pro/opencode_experiments"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 
 [notice.model_migrations]
 "gpt-5.1-codex-max" = "gpt-5.2-codex"
+"gpt-5.2-codex" = "gpt-5.3-codex"
 
 
 [model_providers.azure]

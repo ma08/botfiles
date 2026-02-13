@@ -4,7 +4,8 @@
 - `claude/` holds the Claude Code configuration that gets symlinked into `~/.claude/`.
 - `claude/hooks/` contains Python notification hooks plus `.env.example`, `pyproject.toml`, and `uv.lock` for dependencies.
 - `claude/skills/` is the target for installed skills; `claude/backup_skills/` stores archived skill examples.
-- `codex/` stores Codex CLI config and provider env templates (`config.toml`, `.azure_codex_config_rc.example`).
+- `codex/` stores Codex CLI config, provider env templates, synced Codex skills, and global Codex instructions (`config.toml`, `.azure_codex_config_rc.example`, `skills/`, `AGENTS.md`).
+- `codex/skills/.system/` is machine-managed and git-ignored (may vary by OS/Codex version).
 - `.botrc` sources Claude/Codex env config files for your shell.
 - `setup.sh` bootstraps the symlinks and installs hook dependencies.
 

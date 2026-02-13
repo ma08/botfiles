@@ -1,0 +1,11 @@
+# Git Status
+
+ M .gitignore
+ M AGENTS.md
+ M README.md
+ M codex/config.toml
+ M setup.sh
+?? codex/AGENTS.md
+?? codex/skills/
+?? context/
+?? instruction.md

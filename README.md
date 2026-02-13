@@ -12,7 +12,7 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
-- **codex/** - Codex CLI config and provider environment templates
+- **codex/** - Codex CLI config, provider env templates, synced skills, and global AGENTS instructions
 - **.botrc** - Shell loader that sources Claude/Codex env configs
 
 ## Prerequisites
@@ -71,7 +71,10 @@ If you prefer manual setup:
 ln -sf ~/pro/botfiles/claude/settings.json ~/.claude/settings.json
 ln -sf ~/pro/botfiles/claude/statusline-simple.sh ~/.claude/statusline-simple.sh
 ln -sf ~/pro/botfiles/claude/hooks ~/.claude/hooks
+ln -sf ~/pro/botfiles/claude/skills ~/.claude/skills
 ln -sf ~/pro/botfiles/codex/config.toml ~/.codex/config.toml
+ln -sf ~/pro/botfiles/codex/skills ~/.codex/skills
+ln -sf ~/pro/botfiles/codex/AGENTS.md ~/.codex/AGENTS.md
 
 # Install Python dependencies
 cd ~/pro/botfiles/claude/hooks
@@ -83,6 +86,7 @@ uv sync
 ### Shell Environment (.botrc)
 
 `.botrc` sources `claude/.vertex_claude_config_rc` and `codex/.azure_codex_config_rc` if present.
+`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 Add it to your shell startup file:
 
 ```bash
@@ -119,7 +123,12 @@ This file is ignored by git and sourced via `.botrc`.
 
 ## Skills
 
-Skills extend Claude Code with specialized capabilities. After running `setup.sh`, skills are available at `~/.claude/skills/`.
+Skills extend Claude Code and Codex with specialized capabilities.
+After running `setup.sh`:
+
+- Claude skills are available at `~/.claude/skills/` (backed by `claude/skills/`)
+- Codex skills are available at `~/.codex/skills/` (backed by `codex/skills/`)
+- Codex **system** skills under `~/.codex/skills/.system/` are machine-managed and intentionally git-ignored in this repo (to allow version/platform differences across machines)
 
 ### Notion Skill
 
@@ -181,8 +190,11 @@ botfiles/
 ├── .gitignore
 ├── setup.sh
 ├── codex/
+│   ├── AGENTS.md
 │   ├── config.toml
-│   └── .azure_codex_config_rc.example
+│   ├── .azure_codex_config_rc.example
+│   └── skills/
+│       └── README.md
 ├── litellm/
 │   ├── config.yaml
 │   ├── .env.example

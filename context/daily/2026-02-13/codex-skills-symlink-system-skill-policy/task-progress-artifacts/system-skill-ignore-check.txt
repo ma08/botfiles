@@ -1,0 +1,4 @@
+# System Skill Ignore Check
+
+.gitignore:13:codex/skills/.system/	codex/skills/.system
+.gitignore:13:codex/skills/.system/	codex/skills/.system/.codex-system-skills.marker

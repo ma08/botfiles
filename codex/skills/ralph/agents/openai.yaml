@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ralph"
+  short_description: "Help with Ralph tasks and workflows"
+  default_prompt: "Use the ralph workflow to set up or troubleshoot autonomous loop tasks with PROMPT.md, AGENT.md, fix_plan.md, and specs."

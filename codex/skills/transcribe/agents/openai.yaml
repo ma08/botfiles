@@ -1,0 +1,4 @@
+interface:
+  display_name: "Transcribe"
+  short_description: "Help with Transcribe tasks"
+  default_prompt: "Transcribe provided audio or video files with the repository transcription workflow and return clean transcript artifacts."

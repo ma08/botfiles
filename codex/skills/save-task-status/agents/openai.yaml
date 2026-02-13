@@ -1,0 +1,4 @@
+interface:
+  display_name: "Save Task Status"
+  short_description: "Help with Save Task Status tasks"
+  default_prompt: "Capture and persist current session progress into context/daily with updated README status, notes, and next steps."

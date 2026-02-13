@@ -1,0 +1,15 @@
+# Symlink Verification
+
+## ls -la
+lrwxr-xr-x@ 1 sourya4  staff  44 Feb 13 06:00 /Users/sourya4/.claude/CLAUDE.md -> /Users/sourya4/pro/botfiles/claude/CLAUDE.md
+lrwxr-xr-x@ 1 sourya4  staff  41 Feb 13 06:00 /Users/sourya4/.claude/skills -> /Users/sourya4/pro/botfiles/claude/skills
+lrwxr-xr-x@ 1 sourya4  staff  43 Feb 13 06:00 /Users/sourya4/.codex/AGENTS.md -> /Users/sourya4/pro/botfiles/codex/AGENTS.md
+lrwxr-xr-x@ 1 sourya4  staff  45 Feb 13 06:00 /Users/sourya4/.codex/config.toml -> /Users/sourya4/pro/botfiles/codex/config.toml
+lrwxr-xr-x@ 1 sourya4  staff  40 Feb 13 06:00 /Users/sourya4/.codex/skills -> /Users/sourya4/pro/botfiles/codex/skills
+
+## readlink
+/Users/sourya4/pro/botfiles/codex/skills
+/Users/sourya4/pro/botfiles/codex/config.toml
+/Users/sourya4/pro/botfiles/codex/AGENTS.md
+/Users/sourya4/pro/botfiles/claude/skills
+/Users/sourya4/pro/botfiles/claude/CLAUDE.md
