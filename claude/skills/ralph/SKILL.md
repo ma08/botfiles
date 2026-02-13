@@ -8,6 +8,16 @@ source: personal
 
 Ralph is a technique for autonomous agentic software development using LLMs in a deterministic loop. Named after the naive character from The Simpsons, Ralph represents giving an AI minimal planning ability and maximum execution autonomy.
 
+## Critical: Separation of Concerns
+
+**The orchestrator session prepares the loop. The loop agent does the work.**
+
+When a plan involves a Ralph loop, do NOT implement the code changes yourself. Your job is to create the Ralph infrastructure files (PROMPT.md, AGENT.md, fix_plan.md, specs/, run-ralph.sh) and hand off to the user to run the loop. The loop agent — spawned fresh each iteration by run-ralph.sh — reads PROMPT.md, picks the next incomplete task from fix_plan.md, implements it, validates, commits, and loops.
+
+- **Orchestrator creates**: Ralph files, specs, fix_plan.md (tasks in TODO)
+- **Orchestrator does NOT**: implement code, write tests, mark tasks complete, commit
+- **Loop agent does**: implement code, run tests, update fix_plan.md, commit per task
+
 ## Core Philosophy
 
 1. **Blame Yourself, Not Ralph**: If Ralph does something wrong, look at your prompts, specs, and instructions. "Tune Ralph like a guitar."
@@ -77,11 +87,12 @@ Ralph cycles through three phases (repeat forever):
 - If generating wrong patterns → update specs
 - If building wrong thing → specs are incorrect
 
-### Phase 2: Backpressure (Test/Build/Validate)
-- Run tests for the unit just implemented
-- Build/compile the project
-- Type system provides backpressure
-- **Critical**: The wheel must turn fast
+### Phase 2: Backpressure (Validate at Three Tiers)
+- **Tier 1 (Static)**: Type check, compile, structural grep — EVERY iteration (~5s)
+- **Tier 2 (Smoke)**: Hit running service with trivial input, verify no crash — EVERY iteration if available (~5s)
+- **Tier 3 (Integration)**: Real data through the feature — at [MILESTONE] tasks only (30s+)
+- **Critical**: Tiers 1+2 must be fast. The wheel must turn fast. Tier 3 is for confidence checkpoints.
+- If Tier 2 unavailable (service not running): fall back to Tier 1 only. Do NOT start services.
 
 ### Phase 3: Commit & Loop Back
 - When tests pass, update fix_plan.md
@@ -349,6 +360,13 @@ This is the recommended approach when you're actively working in a Claude Code s
 - Use parallel subagents (up to 500) for searching, analyzing, file writing
 - Use only 1 subagent for builds/tests (avoid conflicts)
 - Primary context operates as scheduler, not worker
+
+### Testing Serverless / Edge Functions
+- Single large files can't have individual functions imported into test harnesses
+- `deno check` / `tsc` may not be available on the target machine
+- Tier 2 curl-based smoke tests are the primary runtime safety net
+- Design checks that distinguish "code is broken" (500) from "expected error" (400/404)
+- For external SDK integration, test the key/connectivity separately from the main function
 
 ### Loop Back Is Everything
 - Ralph can self-improve through the loop

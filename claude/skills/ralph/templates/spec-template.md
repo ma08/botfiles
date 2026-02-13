@@ -35,6 +35,19 @@ def function_name(param: ParamType) -> ReturnType:
 - [Gotchas to avoid]
 - [Performance considerations]
 
+## Test Infrastructure
+
+### Smoke Test (Tier 2)
+[How to verify the code loads without crashing — e.g., curl a health endpoint, import the module, run --version]
+
+### Integration Test (Tier 3)
+[How to verify the feature works end-to-end — e.g., process real data, call the full API pipeline]
+
+### Prerequisites
+- [Services that must be running — e.g., "Local Supabase stack", "Redis on localhost:6379"]
+- [Test data that must exist — e.g., "Job ID abc123 with 50 segments in local DB"]
+- [Secrets/keys that must be configured — e.g., "GEMINI_API_KEY in .env.local"]
+
 ## Reference Code
 
 ```python

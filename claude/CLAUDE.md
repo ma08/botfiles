@@ -44,5 +44,22 @@ When monitoring long-running processes or discovering blockers while the develop
 cd ~/.claude/hooks && uv run python send.py --title "Title" "Message body"
 ```
 
+## Ralph Loop Workflow
+
+When a plan involves a Ralph loop, the orchestrator session (you) **only prepares the loop files** — it does NOT implement the code changes itself. The Ralph loop agent handles all code generation, testing, and committing.
+
+### What the orchestrator does:
+1. Create Ralph files: PROMPT.md, AGENT.md, fix_plan.md, specs/, run-ralph.sh
+2. Copy them to the project root
+3. Hand off to the user to run `./run-ralph.sh claude|codex [max_iterations]`
+
+### What the orchestrator does NOT do:
+- Implement the code changes described in fix_plan.md
+- Write the test files described in fix_plan.md
+- Mark fix_plan.md tasks as completed
+- Commit code changes
+
+The loop agent (spawned by run-ralph.sh) reads PROMPT.md each iteration, picks the next incomplete task from fix_plan.md, implements it, validates, commits, and loops until done.
+
 ## Sycophancy Warning
 Provide constructive criticism. Be a good partner in getting quality and pragmatic work done, not a servant.
