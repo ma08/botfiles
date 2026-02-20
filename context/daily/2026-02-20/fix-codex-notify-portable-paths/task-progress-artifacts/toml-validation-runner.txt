@@ -1,0 +1,4 @@
+notify_len 4
+notify_uses_runner True
+notify_sources_botrc_in_toml False (expected: sourced inside runner script)
+has_inline_notify_comments True

@@ -1,0 +1,25 @@
+diff --git a/codex/config.toml b/codex/config.toml
+index 9542c16..9020de2 100644
+--- a/codex/config.toml
++++ b/codex/config.toml
+@@ -3,13 +3,14 @@ model_provider = "azure"
+ model_reasoning_effort = "xhigh"
+ web_search = "live"
+ personality = "pragmatic"
++# Keep notify minimal in config.toml; execution details live in the runner script.
++# The runner sources .botrc so non-interactive hooks use shared multi-machine env.
++# Payload is forwarded as "$1" to the Python notification hook.
+ notify = [
+-  "/home/azureuser/.local/bin/uv",
+-  "run",
+-  "--project",
+-  "/home/azureuser/pro/botfiles/claude/hooks",
+-  "python",
+-  "/home/azureuser/pro/botfiles/codex/hooks/codex_notification.py",
++  "/bin/bash",
++  "-lc",
++  "~/pro/botfiles/codex/hooks/run-codex-notify.sh \"$1\"",
++  "codex-notify",
+ ]
+ profile = "chatgpt"
+ 

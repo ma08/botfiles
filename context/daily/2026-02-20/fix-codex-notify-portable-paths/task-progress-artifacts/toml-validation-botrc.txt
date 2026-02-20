@@ -1,0 +1,4 @@
+notify_len 4
+sources_botrc True
+uses_uv_bin True
+uses_botfiles_root True

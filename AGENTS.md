@@ -15,7 +15,8 @@
 - `cp claude/hooks/.env.example claude/hooks/.env` sets up local secrets for WhatsApp.
 - `cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc` sets up Codex Azure credentials.
 - `cd claude/hooks && uv run python test_whatsapp.py` sends a manual WhatsApp test message.
-- `cd claude/hooks && uv run python /home/azureuser/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
+- `cd claude/hooks && uv run python ~/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
+- `~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` tests the same notify wrapper used by `codex/config.toml`.
 - `source ~/pro/botfiles/.botrc` loads shared Claude/Codex environment variables.
 
 ## Coding Style & Naming Conventions
@@ -35,3 +36,9 @@
 ## Security & Configuration Tips
 - Keep secrets in local env files only; ensure `.env` and `codex/.azure_codex_config_rc` stay untracked.
 - Symlinks target `~/.claude` and `~/.codex`, so validate paths before running `setup.sh`.
+
+## Multiple Machine Support
+One of the primary use cases for this repository is to support multiple machines.
+Here are some relevant files that provide context about the different machines:
+- `~/pro/personal_os/context/projects.md`
+- `~/pro/personal_os/README.md`

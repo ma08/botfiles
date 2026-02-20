@@ -13,13 +13,16 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
 - **codex/** - Codex CLI config, provider env templates, synced skills, and global AGENTS instructions
-- **.botrc** - Shell loader that sources Claude/Codex env configs
+- **.botrc** - Shell loader that sources Claude/Codex env configs and modular shell scripts
+- **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 
 ## Prerequisites
 
 - [Claude Code CLI](https://claude.ai/claude-code) installed
 - [uv](https://github.com/astral-sh/uv) - Python package manager
 - [terminal-notifier](https://github.com/julienXX/terminal-notifier) - macOS notifications (optional)
+- [fzf](https://github.com/junegunn/fzf) - interactive session picker for `work-*` SSH workflows (optional but recommended)
+- [mosh](https://mosh.org/) - mobile shell transport for mosh-first workflows (optional; SSH fallback remains available)
 
 ```bash
 # Install uv
@@ -27,6 +30,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install terminal-notifier (macOS)
 brew install terminal-notifier
+
+# Install optional SSH workflow tools (macOS)
+brew install fzf mosh
 ```
 
 ## Quick Setup
@@ -41,6 +47,7 @@ brew install terminal-notifier
    ```bash
    ./setup.sh
    ```
+   The script now also performs warn-only checks for SSH workflow dependencies (`ssh`, `fzf`, `mosh`) and `~/.ssh/config`.
 
 3. **Configure WhatsApp notifications (optional)**
    ```bash
@@ -85,12 +92,50 @@ uv sync
 
 ### Shell Environment (.botrc)
 
-`.botrc` sources `claude/.vertex_claude_config_rc` and `codex/.azure_codex_config_rc` if present.
+`.botrc` sources provider config files and then loads modular scripts from `shell/*.sh` in lexical order.
 `setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 Add it to your shell startup file:
 
 ```bash
 source ~/pro/botfiles/.botrc
+```
+
+Codex notify flow:
+- `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
+- `shell/10-uv-bin.sh` resolves `UV_BIN` once for Linux/macOS portability.
+
+### SSH Workflow Commands
+
+The `shell/20-ssh-workflows.sh` module provides reconnect-friendly helpers for zellij workflows:
+
+```bash
+work-ml            # mosh-first connect to ML VM, pick/create zellij session
+work-ml-ssh        # SSH-only fallback path for ML VM
+work-arya          # SSH-first connect to Aryabhatta, pick/create zellij session
+work-arya-mosh     # mosh-first path for Aryabhatta (use when UDP is available)
+work-arya-ssh      # explicit SSH path for Aryabhatta
+mml                # raw shell shortcut (mosh-first, no zellij attach)
+marya              # raw shell shortcut (mosh-first, no zellij attach)
+cursor-ml          # open/reuse Cursor window at ML VM home over Remote-SSH
+```
+
+Dependency behavior:
+- `fzf` is required for interactive picker mode.
+- If `fzf` is missing, pass a session name explicitly (example: `work-ml my-session`).
+- `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`).
+- If `mosh` is missing or transport fails, workflows fall back to SSH.
+- Cursor Remote-SSH uses SSH transport and cannot run directly over mosh transport.
+- Use `cursor-ml` for editor workflow and `mml` for resilient terminal-only workflow.
+
+Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
+
+```bash
+export BOT_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
+export BOT_ML_HOST_FALLBACK=ladduu-dev-ml-vm
+export BOT_ARYA_HOST=ladduu-dev-aryabhatta
+export BOT_CURSOR_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
+export BOT_CURSOR_ML_HOST_FALLBACK=ladduu-dev-ml-vm
+export BOT_CURSOR_ML_PATH=/home/azureuser
 ```
 
 ### WhatsApp Notifications
@@ -189,6 +234,8 @@ botfiles/
 ├── README.md
 ├── .gitignore
 ├── setup.sh
+├── shell/
+│   └── 20-ssh-workflows.sh
 ├── codex/
 │   ├── AGENTS.md
 │   ├── config.toml

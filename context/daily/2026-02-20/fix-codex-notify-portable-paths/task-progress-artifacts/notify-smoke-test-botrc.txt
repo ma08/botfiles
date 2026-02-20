@@ -1,0 +1,2 @@
+Command: /bin/bash -lc '<notify command>' codex-notify '{...}'
+Exit: 0

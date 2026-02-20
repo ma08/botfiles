@@ -1,0 +1,1 @@
+-rwxr-xr-x@ 1 sourya4  staff  447 Feb 20 13:11 codex/hooks/run-codex-notify.sh

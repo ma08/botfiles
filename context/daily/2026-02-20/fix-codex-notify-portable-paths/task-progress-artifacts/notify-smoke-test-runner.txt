@@ -1,0 +1,7 @@
+Command 1 (direct runner):
+~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"runner smoke test"}'
+Exit 1: 0
+
+Command 2 (config-style invocation):
+/bin/bash -lc '~/pro/botfiles/codex/hooks/run-codex-notify.sh "$1"' codex-notify '{"type":"agent-turn-complete","last-assistant-message":"config-style invoke smoke test"}'
+Exit 2: 0

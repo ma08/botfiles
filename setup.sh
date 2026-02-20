@@ -37,6 +37,47 @@ check_prerequisites() {
     echo ""
 }
 
+# Check SSH workflow tool availability (warn-only).
+check_ssh_workflow_tools() {
+    echo "Checking SSH workflow tools..."
+    echo ""
+    echo "=== SSH Workflow Tools (optional but recommended) ==="
+
+    if command -v ssh &> /dev/null; then
+        echo "  [OK] ssh"
+    else
+        echo "  [MISSING] ssh (required for work-* commands)"
+        echo "    Install OpenSSH client using your OS package manager."
+    fi
+
+    if command -v fzf &> /dev/null; then
+        echo "  [OK] fzf (interactive session picker)"
+    else
+        echo "  [MISSING] fzf (interactive session picker)"
+        echo "    Install with: brew install fzf"
+        echo "    or: sudo apt-get install -y fzf"
+        echo "    You can still run with explicit session names, e.g. work-ml my-session"
+    fi
+
+    if command -v mosh &> /dev/null; then
+        echo "  [OK] mosh (used by mosh-first workflows)"
+    else
+        echo "  [MISSING] mosh (optional; ssh fallback still works)"
+        echo "    Install with: brew install mosh"
+        echo "    or: sudo apt-get install -y mosh"
+    fi
+
+    if [ -f "$HOME/.ssh/config" ]; then
+        echo "  [OK] ~/.ssh/config detected"
+    else
+        echo "  [MISSING] ~/.ssh/config"
+        echo "    Add host aliases used by work-* commands (for example ladduu-dev-ml-vm-ts)."
+    fi
+
+    echo "  [INFO] Remote hosts need zellij installed for work-* attach/create commands."
+    echo ""
+}
+
 # Backup existing files (if not already symlinks)
 backup_existing() {
     echo "Checking for existing files to backup..."
@@ -273,6 +314,7 @@ setup_shell_rc() {
 # Main
 main() {
     check_prerequisites
+    check_ssh_workflow_tools
     backup_existing
     create_symlinks
     install_deps

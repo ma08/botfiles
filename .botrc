@@ -61,6 +61,15 @@ alias lsf='ls -ld $(pwd)/*'
 export EDITOR=vim
 export VISUAL=vim
 
+# Load modular shell extensions from botfiles.
+if [ -d "$BOTFILES_ROOT/shell" ]; then
+  for _botrc_module in "$BOTFILES_ROOT"/shell/*.sh; do
+    [ -f "$_botrc_module" ] || continue
+    . "$_botrc_module"
+  done
+  unset _botrc_module
+fi
+
 # Ensure non-interactive shells (e.g., claude -p over SSH) set TERM so Ink-based CLIs behave
 if [ -z "$TERM" ] || [ "$TERM" = "dumb" ]; then
   export TERM=xterm-256color

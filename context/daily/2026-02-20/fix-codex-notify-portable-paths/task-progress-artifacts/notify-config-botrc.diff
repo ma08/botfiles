@@ -1,0 +1,21 @@
+diff --git a/codex/config.toml b/codex/config.toml
+index 9542c16..9696769 100644
+--- a/codex/config.toml
++++ b/codex/config.toml
+@@ -4,12 +4,10 @@ model_reasoning_effort = "xhigh"
+ web_search = "live"
+ personality = "pragmatic"
+ notify = [
+-  "/home/azureuser/.local/bin/uv",
+-  "run",
+-  "--project",
+-  "/home/azureuser/pro/botfiles/claude/hooks",
+-  "python",
+-  "/home/azureuser/pro/botfiles/codex/hooks/codex_notification.py",
++  "/bin/bash",
++  "-lc",
++  ". ~/pro/botfiles/.botrc; : \"${UV_BIN:?UV_BIN is not set. Check shell/10-uv-bin.sh or set UV_BIN before sourcing .botrc}\"; : \"${BOTFILES_ROOT:?BOTFILES_ROOT is not set}\"; \"$UV_BIN\" run --project \"$BOTFILES_ROOT/claude/hooks\" python \"$BOTFILES_ROOT/codex/hooks/codex_notification.py\" \"$1\"",
++  "codex-notify",
+ ]
+ profile = "chatgpt"
+ 

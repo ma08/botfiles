@@ -1,0 +1,5 @@
+notify_len 4
+notify_cmd0 /bin/bash
+notify_uses_home_local True
+notify_has_uv_fallback True
+notify_forwards_payload True
