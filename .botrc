@@ -37,6 +37,11 @@ alias bedccc="export CLAUDE_CODE_USE_BEDROCK=1; claude --continue"  # use bedroc
 alias bedccy="export CLAUDE_CODE_USE_BEDROCK=1; claude --dangerously-skip-permissions"  # use bedrock and skip all permission prompts
 alias bedccyc="export CLAUDE_CODE_USE_BEDROCK=1; claude --dangerously-skip-permissions -c"  # use bedrock and skip all permission prompts and continue last session
 
+alias ancc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude"
+alias anccc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --continue"
+alias anccy="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --dangerously-skip-permissions"
+alias anccyc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --dangerously-skip-permissions -c"
+
 # LiteLLM Web Search Proxy aliases (for Bedrock web search via Exa AI)
 alias ccws-start="$BOTFILES_ROOT/litellm/start-proxy.sh --bg"
 alias ccws-stop="$BOTFILES_ROOT/litellm/start-proxy.sh --stop"
