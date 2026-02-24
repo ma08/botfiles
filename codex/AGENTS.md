@@ -23,3 +23,8 @@ These are user-level instructions shared across machines via:
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
 - Save artifacts under `task-progress-artifacts/` (logs, screenshots, scripts, command outputs)
+
+## Ad-hoc Scripts (Required)
+
+- When running one-off Python/Bash, **write the script into the task's `task-progress-artifacts/` folder first**, with a short header comment explaining purpose + inputs/outputs, then execute it.
+- Prefer saved scripts over inline heredocs so work is reproducible and easy to maintain.

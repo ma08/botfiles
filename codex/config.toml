@@ -12,7 +12,7 @@ notify = [
   "~/pro/botfiles/codex/hooks/run-codex-notify.sh \"$1\"",
   "codex-notify",
 ]
-profile = "chatgpt"
+profile = "azure"
 
 [profiles.azure]
 model = "gpt-5.2-codex"
