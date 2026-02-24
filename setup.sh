@@ -311,9 +311,56 @@ setup_shell_rc() {
     echo ""
 }
 
+# Setup git identity (interactive, no hardcoded values)
+setup_git_identity() {
+    echo "Checking git identity..."
+
+    local current_name current_email
+    current_name="$(git config --global user.name 2>/dev/null || true)"
+    current_email="$(git config --global user.email 2>/dev/null || true)"
+
+    # Check if values look like placeholders or are unset
+    local needs_setup=false
+    if [ -z "$current_name" ] || [ "$current_name" = "Your Name" ]; then
+        needs_setup=true
+    fi
+    if [ -z "$current_email" ] || [ "$current_email" = "your.email@example.com" ]; then
+        needs_setup=true
+    fi
+
+    if [ "$needs_setup" = true ]; then
+        echo ""
+        echo "  WARNING: Git identity is not configured (or uses placeholder values)."
+        echo "  Without a proper identity, your commits will show as 'Your Name'."
+        echo "  This affects commit attribution on GitHub and other platforms."
+        echo ""
+        echo "  Current: name='${current_name:-<unset>}' email='${current_email:-<unset>}'"
+        echo ""
+
+        local git_name git_email
+        read -p "  Git user.name: " git_name
+        read -p "  Git user.email: " git_email
+
+        if [ -n "$git_name" ] && [ -n "$git_email" ]; then
+            git config --global user.name "$git_name"
+            git config --global user.email "$git_email"
+            echo "  [SET] user.name = $git_name"
+            echo "  [SET] user.email = $git_email"
+        else
+            echo "  Skipped (empty input). Set manually with:"
+            echo "    git config --global user.name 'Your Name'"
+            echo "    git config --global user.email 'you@example.com'"
+        fi
+    else
+        echo "  [OK] Git identity already configured: $current_name <$current_email>"
+    fi
+    echo ""
+}
+
 # Main
 main() {
     check_prerequisites
+    setup_git_identity
     check_ssh_workflow_tools
     backup_existing
     create_symlinks
