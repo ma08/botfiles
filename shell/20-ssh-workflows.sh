@@ -14,6 +14,24 @@
 : "${BOT_CURSOR_ML_HOST_PRIMARY:=$BOT_ML_HOST_PRIMARY}"
 : "${BOT_CURSOR_ML_HOST_FALLBACK:=$BOT_ML_HOST_FALLBACK}"
 : "${BOT_CURSOR_ML_PATH:=/home/azureuser}"
+# Keep mosh usable in Ghostty by default.
+# --no-init avoids sending smcup/rmcup (alternate-screen init), which can make
+# touchpad scroll behave like Up/Down keys in some Ghostty + mosh sessions.
+# References:
+# - https://github.com/ghostty-org/ghostty/discussions/4617
+# - https://www.manpagez.com/man/1/mosh/ (see --no-init)
+: "${BOT_MOSH_NO_INIT:=1}"
+
+_bot_mosh_connect() {
+  local host="$1"
+  shift
+
+  if [ "${BOT_MOSH_NO_INIT}" = "1" ]; then
+    mosh --no-init "$host" "$@"
+  else
+    mosh "$host" "$@"
+  fi
+}
 
 _bot_ssh_validate_session_name() {
   case "${1:-}" in
@@ -127,7 +145,7 @@ _bot_ssh_connect_zellij() {
 
   if [ "$transport" = "mosh" ]; then
     if command -v mosh >/dev/null 2>&1; then
-      if mosh "$host" -- zellij attach --create "$session_name"; then
+      if _bot_mosh_connect "$host" -- zellij attach --create "$session_name"; then
         return 0
       fi
       echo "mosh failed for ${host}; falling back to ssh."
@@ -184,7 +202,7 @@ mml() {
   }
 
   if command -v mosh >/dev/null 2>&1; then
-    if mosh "$host"; then
+    if _bot_mosh_connect "$host"; then
       return 0
     fi
     echo "mosh failed for ${host}; falling back to ssh."
@@ -199,7 +217,7 @@ marya() {
   local host="$BOT_ARYA_HOST"
 
   if command -v mosh >/dev/null 2>&1; then
-    if mosh "$host"; then
+    if _bot_mosh_connect "$host"; then
       return 0
     fi
     echo "mosh failed for ${host}; falling back to ssh."
