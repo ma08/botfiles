@@ -74,3 +74,17 @@ fi
 if [ -z "$TERM" ] || [ "$TERM" = "dumb" ]; then
   export TERM=xterm-256color
 fi
+
+
+# https://opencode.ai/docs/cli/
+# https://github.com/anomalyco/opencode/issues/1721
+OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=3600000
+
+# Originally set for good opencode
+# export COLORTERM=truecolor  # disabled: causes garish colors in Claude Code under Zellij
+
+
+# Needed for openclaw as we were getting some node version based errors
+export PATH="/usr/local/bin:$PATH"
+
+alias symcode="/home/azureuser/pro/symcode-sidebar-experiment/packages/opencode/dist/opencode-linux-x64/bin/symcode"

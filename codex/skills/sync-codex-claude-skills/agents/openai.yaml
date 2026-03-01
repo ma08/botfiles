@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Codex Claude Skills"
+  short_description: "Compare and sync skill directories"
+  default_prompt: "Compare codex/skills and claude/skills, report drift, then sync all or selected skills in the requested direction using scripts/sync_skills.py with dry-run first."

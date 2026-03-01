@@ -12,7 +12,7 @@ notify = [
   "~/pro/botfiles/codex/hooks/run-codex-notify.sh \"$1\"",
   "codex-notify",
 ]
-profile = "azure"
+profile = "openai_api"
 
 [profiles.azure]
 model = "gpt-5.2-codex"
@@ -30,6 +30,7 @@ model = "gpt-5.3-codex"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "chatgpt"
+plan_mode_reasoning_effort = "xhigh"
 
 [profiles.v0]
 model = "v0-1.5-md"
@@ -88,6 +89,7 @@ trust_level = "trusted"
 
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
+hide_rate_limit_model_nudge = true
 
 [notice.model_migrations]
 "gpt-5.1-codex-max" = "gpt-5.2-codex"
@@ -118,6 +120,5 @@ url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_c
 [features]
 steer = true
 shell_snapshot = true
-collab = true
 apps = true
 multi_agent = true

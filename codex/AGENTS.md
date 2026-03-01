@@ -22,9 +22,34 @@ These are user-level instructions shared across machines via:
 
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
+- New folders use time-prefixed names: `<HH>h<MM>m<SS>sPST-<task-slug>` (e.g., `21h45m59sPST-fix-auth-timeout`)
+- Full path example: `context/daily/2026-02-24/21h45m59sPST-fix-auth-timeout/`
+- All timestamps in task files use PST explicitly — use `TZ=America/Los_Angeles date` for reliable PST regardless of system timezone
+- Format timestamps as: `YYYY-MM-DD ~HH:MMam/pm PST`
+- Legacy folders without time prefix continue to work unchanged
 - Save artifacts under `task-progress-artifacts/` (logs, screenshots, scripts, command outputs)
+
+### Artifact Handling
+
+- **Save continuously** — when you produce or encounter log output, write scripts, capture errors, or generate any useful output, immediately save it to `task-progress-artifacts/`. Don't wait until session end.
+- **Use `task-progress-artifacts/` as your scratchpad** instead of `/tmp`. Everything relevant to the task belongs there.
+- **Screenshots & images**: save them to `task-progress-artifacts/` so they persist for future reference.
+- **Short-lived S3 URLs** (typically screenshots): download the file to `task-progress-artifacts/` first, then use it. These URLs expire — the local copy is what survives.
+- **Self-contained folders**: copy content into the task folder rather than referencing external paths that may disappear. The task folder should be a complete, portable package.
 
 ## Ad-hoc Scripts (Required)
 
 - When running one-off Python/Bash, **write the script into the task's `task-progress-artifacts/` folder first**, with a short header comment explaining purpose + inputs/outputs, then execute it.
 - Prefer saved scripts over inline heredocs so work is reproducible and easy to maintain.
+
+## Playwright in SSH VMs
+
+- Headed Playwright needs an X server; SSH-only VMs usually do not have one. Use headless by default.
+- If a visual browser is required, run with a virtual display:
+  - `xvfb-run -a bash "$PWCLI" open <url> --headed`
+- Wrapper script is preferred; if it is not executable, invoke via `bash`:
+  - `export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"`
+  - `export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"`
+  - `bash "$PWCLI" open <url>`
+- Always `snapshot` before interacting, and re-`snapshot` after navigation or UI changes.
+- Save Playwright artifacts (screenshots, traces) in a repo-appropriate location; default to `output/playwright/` when no repo guidance exists.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Message Developer"
+  short_description: "Send proactive developer notifications from Codex"
+  default_prompt: "Send a concise WhatsApp update or question to the developer during long-running tasks, blockers, or milestones using codex/hooks/run-codex-send.sh."

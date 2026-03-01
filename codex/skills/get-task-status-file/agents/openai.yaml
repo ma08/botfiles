@@ -1,0 +1,4 @@
+interface:
+  display_name: "Get Task Status File"
+  short_description: "Resolve current task status file paths"
+  default_prompt: "Find and print absolute status file path(s) for the current task context, label primary and related matches, and verify each file exists."
