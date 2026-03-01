@@ -1,0 +1,38 @@
+# Sync Skill Validation
+Timestamp: 2026-02-25 ~11:05pm PST
+
+$ python codex/skills/sync-codex-claude-skills/scripts/sync_skills.py --repo-root /home/azureuser/pro/botfiles status
+Repo root: /home/azureuser/pro/botfiles
+Claude skills: 6
+Codex skills: 9
+
+Only in claude (1):
+  - excalidraw-skill
+
+Only in codex (4):
+  - notion-research-documentation
+  - playwright
+  - sync-codex-claude-skills
+  - transcribe
+
+In both but different (5):
+  - get-task-status-file
+  - message-developer
+  - ralph
+  - save-task-status
+  - start-new-task
+
+In both and identical (0):
+  - (none)
+
+$ python codex/skills/sync-codex-claude-skills/scripts/sync_skills.py --repo-root /home/azureuser/pro/botfiles sync --from-side claude --to-side codex --skills start-new-task get-task-status-file message-developer
+Sync direction: claude -> codex
+Plan:
+  - start-new-task: replace
+  - get-task-status-file: replace
+  - message-developer: replace
+
+Dry-run only. Re-run with --apply to execute.
+
+$ python codex/skills/.system/skill-creator/scripts/quick_validate.py codex/skills/sync-codex-claude-skills
+Skill is valid!

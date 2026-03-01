@@ -41,8 +41,10 @@ If found, use that path pattern instead of the default.
 ## Directory Structure
 
 ```
-<task-slug>/
+<HH>h<MM>m<SS>sPST-<task-slug>/
 ├── status.md                     # Primary status file
+├── user_inputs/                  # Original user inputs (do not overwrite)
+│   └── initial.md
 └── task-progress-artifacts/      # Screenshots, exports, artifacts
 ```
 
@@ -51,6 +53,23 @@ When updating an **existing** task folder:
 1. If the folder contains `README.md` (legacy pattern), update that file
 2. If the folder contains `status.md`, update that
 3. For **new** task folders, always create `status.md`
+
+### user_inputs/ Directory
+
+- **Never overwrite** files in `user_inputs/` — these are immutable records of original user intent
+- Read `user_inputs/initial.md` for context when writing status updates — check whether current work is still aligned with original goals
+- New user requirements mid-task → create new files in `user_inputs/` (e.g., `clarifications.md`, `scope-change-YYYY-MM-DD.md`)
+- User-provided screenshots and reference material go in `user_inputs/`, not `task-progress-artifacts/`
+- If `user_inputs/` doesn't exist (legacy folder), proceed without it — don't retroactively create it
+
+### Folder Naming and Timezone Conventions
+
+- **New folders** use time-prefixed names: `<HH>h<MM>m<SS>sPST-<task-slug>` (e.g., `21h45m59sPST-fix-auth-timeout`)
+- Get PST time with: `TZ=America/Los_Angeles date +'%Hh%Mm%Ss'`
+- **All timestamps** in status files, notes, and artifacts use PST with explicit timezone label
+- Format: `YYYY-MM-DD ~HH:MMam/pm PST`
+- Use `TZ=America/Los_Angeles date` for reliable PST regardless of system timezone
+- **Backward compatibility**: existing folders without time prefix continue to work — update them in place without renaming
 
 ### Accepted Plan Persistence (Required)
 - Persist accepted plans in task status files (`status.md`, or legacy `README.md` when present).
@@ -80,7 +99,7 @@ From the current conversation, determine:
 - Does a task folder already exist for this work?
 
 If an existing folder exists (same slug, any date), update it in place.
-If no folder exists, create one at the resolved path.
+If no folder exists, create one at the resolved path. When creating a new folder, use the time-prefixed naming convention (`<HH>h<MM>m<SS>sPST-<slug>`). If the task is brand new and has no `user_inputs/initial.md`, consider whether `/start-new-task` should be invoked first to properly scaffold the folder.
 
 ### Step 3: Gather Current Status
 Collect from the session:
@@ -131,7 +150,7 @@ After saving, reference each artifact in the status file's Artifacts section.
 # <Task Title>
 
 **Goal**: <One-line description>
-**Last Updated**: YYYY-MM-DD ~HH:MMam/pm
+**Last Updated**: YYYY-MM-DD ~HH:MMam/pm PST
 **Status**: <In Progress | Blocked | Testing | Complete>
 
 ## Quick Links
@@ -139,6 +158,11 @@ After saving, reference each artifact in the status file's Artifacts section.
 | Resource | URL |
 |----------|-----|
 | <relevant links> | |
+
+## User Inputs
+
+- [`user_inputs/initial.md`](user_inputs/initial.md) — original task description and requirements
+<!-- Add links to additional user_inputs/ files as they are created -->
 
 ## Current State
 
@@ -190,13 +214,21 @@ After saving, reference each artifact in the status file's Artifacts section.
 
 ## Notes
 
-### YYYY-MM-DD ~HHam/pm: Brief description
+### YYYY-MM-DD ~HH:MMam/pm PST: Brief description
 
 **Component**:
 - Status: Running/Done/Blocked
 - Details: Key info
 - Command: `command to check/resume`
 ```
+
+## Relationship with start-new-task
+
+- **start-new-task** creates the initial folder structure: `status.md`, `user_inputs/initial.md`, and `task-progress-artifacts/`
+- **save-task-status** maintains and updates `status.md` throughout the task lifecycle
+- Both skills share the same `task-status-root` configuration
+- If you encounter a task with no folder yet, and it's clearly a new effort, consider invoking `/start-new-task` first
+- For legacy folders created before `/start-new-task` existed: update them normally, don't retroactively restructure
 
 ## Tips
 
@@ -206,6 +238,9 @@ After saving, reference each artifact in the status file's Artifacts section.
 - For bugs, include reproduction steps, root cause analysis, and attempted fixes
 - For accepted plans, append full plan history under `## Accepted Plans` (do not overwrite prior versions)
 - Adapt the template — omit sections that don't apply
+- Check `user_inputs/initial.md` before writing status — verify current work aligns with original intent
+- When capturing new mid-task requirements from the user, save them to `user_inputs/` as a new file (don't overwrite existing ones)
+- Always use PST timestamps (`TZ=America/Los_Angeles date`) — never rely on system timezone
 
 ### Artifact Hygiene
 - **Save early, save often** — don't accumulate artifacts mentally; write them to disk as you go
