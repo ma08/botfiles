@@ -1,4 +1,4 @@
 interface:
   display_name: "Save Task Status"
   short_description: "Help with Save Task Status tasks"
-  default_prompt: "Capture and persist current session progress into context/daily with updated README status, notes, and next steps."
+  default_prompt: "Capture and persist session progress in task status files (`status.md` or legacy `README.md`). When a plan is explicitly accepted, append it under `## Accepted Plans` with PST timestamp, metadata, and full plan body."

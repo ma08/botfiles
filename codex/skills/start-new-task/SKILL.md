@@ -82,6 +82,7 @@ Use the status template below. Fill in:
 - Current PST timestamp
 - Status: `In Progress`
 - Reference to `user_inputs/initial.md`
+- If the task is being created because a plan was explicitly accepted, add `## Accepted Plans` and append `Plan v1` with full plan markdown
 
 ### Step 7: Populate user_inputs/initial.md
 
@@ -166,6 +167,19 @@ Task just started. See `user_inputs/initial.md` for full requirements.
 - [ ] Begin implementation
 ```
 
+Optional snippet (add only when a plan was explicitly accepted):
+
+```markdown
+## Accepted Plans
+
+### Plan v1 — YYYY-MM-DD ~HH:MMam/pm PST
+**Accepted Signal**: <ui_accept | explicit_text>
+**Supersedes**: none
+**Revision Summary**: Initial accepted plan
+
+<Full accepted plan markdown body>
+```
+
 ### user_inputs/initial.md - Rich Template
 
 Use when the description contains specific requirements, multiple sub-goals, or technical details.
@@ -222,4 +236,5 @@ Use when the description is a brief phrase with minimal detail.
 - `save-task-status` maintains and updates status files through the task lifecycle
 - Both skills share the same `task-status-root` configuration
 - After `$start-new-task`, use `$save-task-status` for subsequent status updates
-- If `$save-task-status` is invoked and no task folder exists, consider whether `$start-new-task` should run first
+- If `$save-task-status` is invoked and no task folder exists, run `$start-new-task` first
+- If creation is triggered by an accepted plan, persist that plan immediately as `Plan v1` in `## Accepted Plans`

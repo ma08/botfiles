@@ -29,6 +29,17 @@ These are user-level instructions shared across machines via:
 - Legacy folders without time prefix continue to work unchanged
 - Save artifacts under `task-progress-artifacts/` (logs, screenshots, scripts, command outputs)
 
+### Plan Acceptance Persistence (Required)
+
+- Persist accepted plans in the active task status file (`status.md`; use legacy `README.md` only when that is the existing status file)
+- Do not use `.codex/plans/` for accepted plan storage
+- Treat a plan as accepted only on explicit acceptance (discrete accept action or explicit approval text)
+- Persist immediately after acceptance and before implementation
+- If no task status file exists, create a task folder first using the task status workflow, then persist `Plan v1`
+- Store accepted plans under `## Accepted Plans` and append versions (`Plan v1`, `Plan v2`, ...)
+- Each appended plan entry must include: PST timestamp, accepted signal, supersedes value, short revision summary, and full accepted plan body
+- If task targeting is ambiguous, ask a concise clarification before writing
+
 ### Artifact Handling
 
 - **Save continuously** — when you produce or encounter log output, write scripts, capture errors, or generate any useful output, immediately save it to `task-progress-artifacts/`. Don't wait until session end.

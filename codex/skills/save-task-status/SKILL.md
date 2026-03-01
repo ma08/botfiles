@@ -15,6 +15,7 @@ Captures the current state of work and saves it to a structured task folder for 
 - When work reaches a milestone or sub-task completion
 - After completing significant work that should be tracked
 - When debugging a complex bug (captures bug report details)
+- Immediately after a plan is explicitly accepted
 - Proactively, without being asked — keep task status current as you work
 
 ## How to Invoke
@@ -51,6 +52,20 @@ When updating an **existing** task folder:
 2. If the folder contains `status.md`, update that
 3. For **new** task folders, always create `status.md`
 
+### Accepted Plan Persistence (Required)
+- Persist accepted plans in task status files (`status.md`, or legacy `README.md` when present).
+- Trigger only on explicit acceptance (discrete accept action or explicit approval text).
+- Persist immediately after acceptance and before implementation.
+- If no task folder exists, create one first, then append `Plan v1`.
+- Append (do not replace) accepted plans under `## Accepted Plans`.
+- Use this entry format:
+  - `### Plan vN — YYYY-MM-DD ~HH:MMam/pm PST`
+  - `**Accepted Signal**: <ui_accept | explicit_text>`
+  - `**Supersedes**: <Plan v(N-1) | none>`
+  - `**Revision Summary**: <1-2 lines>`
+  - Full accepted plan markdown body
+- If task targeting is ambiguous, ask a concise clarification before writing.
+
 ## Process
 
 ### Step 1: Determine Task Status Root
@@ -76,10 +91,20 @@ Collect from the session:
 - Bug details if debugging (root cause, attempted fixes, reproduction steps)
 - Plan/approach if early in a task
 
-### Step 4: Write or Update the Status File
+### Step 4: Persist Accepted Plan (When Applicable)
+If the session includes an explicitly accepted plan:
+1. Ensure the target status file exists.
+2. Add `## Accepted Plans` if missing.
+3. Append the next `Plan vN` entry using the required format above.
+4. Update `Last Updated` with a PST timestamp.
+5. Sync `Current State` and `Next Steps` to the latest accepted plan.
+
+If no plan was explicitly accepted, skip this step.
+
+### Step 5: Write or Update the Status File
 Use the template below. Include only sections relevant to the current situation — omit sections that don't apply. The goal is a useful document for resuming work, not bureaucratic completeness.
 
-### Step 5: Save Artifacts (Non-Optional)
+### Step 6: Save Artifacts (Non-Optional)
 **Always** actively collect and save artifacts to `task-progress-artifacts/`. Don't wait until the end — save artifacts as they're created during the session.
 
 **What to save** (any of these encountered during work):
@@ -118,6 +143,15 @@ After saving, reference each artifact in the status file's Artifacts section.
 ## Current State
 
 <Brief description of where things stand>
+
+## Accepted Plans (only when at least one plan is explicitly accepted)
+
+### Plan vN — YYYY-MM-DD ~HH:MMam/pm PST
+**Accepted Signal**: <ui_accept | explicit_text>
+**Supersedes**: <Plan v(N-1) | none>
+**Revision Summary**: <1-2 lines>
+
+<Full accepted plan markdown body>
 
 ## Progress
 
@@ -170,7 +204,7 @@ After saving, reference each artifact in the status file's Artifacts section.
 - Include exact commands to resume or check status
 - Note any blockers or pending decisions
 - For bugs, include reproduction steps, root cause analysis, and attempted fixes
-- For plans, include implementation approach, technical decisions, and testing checklist
+- For accepted plans, append full plan history under `## Accepted Plans` (do not overwrite prior versions)
 - Adapt the template — omit sections that don't apply
 
 ### Artifact Hygiene

@@ -1,4 +1,4 @@
 interface:
   display_name: "Start New Task"
   short_description: "Scaffold a tracked task workspace"
-  default_prompt: "Create a new task folder with PST timestamp, status.md, immutable user_inputs/initial.md, and task-progress-artifacts, then confirm the path and next steps."
+  default_prompt: "Create a new task folder with PST timestamp, status.md, immutable user_inputs/initial.md, and task-progress-artifacts. If task creation is triggered by an explicitly accepted plan, persist it immediately as `Plan v1` under `## Accepted Plans`."
