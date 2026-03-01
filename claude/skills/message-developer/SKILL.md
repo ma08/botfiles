@@ -61,5 +61,5 @@ This skill uses the existing WhatsApp hook infrastructure:
 
 - **CLI entry point**: `~/.claude/hooks/send.py`
 - **WhatsApp sender**: `~/.claude/hooks/whatsapp.py` (Meta Cloud API v17.0)
-- **Config**: `~/.claude/hooks/.env` (WHATSAPP_TOKEN, PHONE_NUMBER_ID, NOTIFY_PHONE_NUMBER, SYSTEM_NAME)
+- **Config**: `~/pro/botfiles/secrets/local/claude-hooks.rc` (WHATSAPP_TOKEN, PHONE_NUMBER_ID, NOTIFY_PHONE_NUMBER, SYSTEM_NAME)
 - **Dependencies**: `~/.claude/hooks/.venv` (requests, python-dotenv via uv)

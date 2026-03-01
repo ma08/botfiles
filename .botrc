@@ -10,16 +10,19 @@ fi
 BOTFILES_ROOT="$(cd "$(dirname "$_botrc_source")" && pwd)"
 export BOTFILES_ROOT
 
-# Disabling temporarly as vertex models getting billed and not using startup credits
-# [ -f "$BOTFILES_ROOT/claude/.vertex_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.vertex_claude_config_rc"
-
-# using bedrock instead of vertex as startup credits in AWS can be used for claude models in bedrock
-[ -f "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc" ] && . "$BOTFILES_ROOT/claude/.bedrock_claude_config_rc"
-
-[ -f "$BOTFILES_ROOT/codex/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.azure_codex_config_rc"
-[ -f "$BOTFILES_ROOT/codex/.openai_codex_config_rc" ] && . "$BOTFILES_ROOT/codex/.openai_codex_config_rc"
-
-[ -f "$BOTFILES_ROOT/opencode/.azure_codex_config_rc" ] && . "$BOTFILES_ROOT/opencode/.azure_codex_config_rc"
+# Load centralized local secrets (all files under secrets/local are git-ignored).
+if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
+  for _bot_secret in \
+    "$BOTFILES_ROOT/secrets/local/claude-bedrock.rc" \
+    "$BOTFILES_ROOT/secrets/local/claude-vertex.rc" \
+    "$BOTFILES_ROOT/secrets/local/codex-azure.rc" \
+    "$BOTFILES_ROOT/secrets/local/codex-openai.rc" \
+    "$BOTFILES_ROOT/secrets/local/opencode-azure.rc" \
+    "$BOTFILES_ROOT/secrets/local/claude-hooks.rc"; do
+    [ -f "$_bot_secret" ] && . "$_bot_secret"
+  done
+  unset _bot_secret
+fi
 
 # Codex CLI profile shortcuts
 alias codex-azure="codex --profile azure"
@@ -41,12 +44,6 @@ alias ancc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude"
 alias anccc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --continue"
 alias anccy="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --dangerously-skip-permissions"
 alias anccyc="export CLAUDE_CODE_USE_ANTHROPIC=0; claude --dangerously-skip-permissions -c"
-
-# LiteLLM Web Search Proxy aliases (for Bedrock web search via Exa AI)
-alias ccws-start="$BOTFILES_ROOT/litellm/start-proxy.sh --bg"
-alias ccws-stop="$BOTFILES_ROOT/litellm/start-proxy.sh --stop"
-alias ccws="$BOTFILES_ROOT/litellm/ccws.sh"
-alias ccwsc="$BOTFILES_ROOT/litellm/ccws.sh --continue"
 
 # Zellij aliases (mobile-friendly session management)
 alias zj="zellij"                    # quick start

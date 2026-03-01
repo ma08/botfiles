@@ -1,8 +1,21 @@
 # Python cache files
 **/__pycache__/
 
-# Claude hooks - secrets and generated files
+# Centralized secrets (runtime files are local-only and never committed)
+secrets/*
+!secrets/README.md
+!secrets/templates/
+!secrets/templates/**
+secrets/local/
+
+# Legacy secret paths kept ignored for migration safety
 claude/hooks/.env
+claude/.bedrock_claude_config_rc
+claude/.vertex_claude_config_rc
+opencode/.azure_codex_config_rc
+claude/.bedrock_claude_env_secrets
+
+# Claude hooks - generated files
 claude/hooks/.venv/
 claude/hooks/__pycache__/
 claude/hooks/*.py[oc]
@@ -15,11 +28,5 @@ codex/.openai_codex_config_rc
 # Codex system skills are machine-managed and can differ by OS/Codex version
 codex/skills/.system/
 
-# LiteLLM secrets and logs
-litellm/.env
-litellm/.proxy.pid
-litellm/proxy.log
-
 # OS files
 .DS_Store
-claude/.bedrock_claude_env_secrets

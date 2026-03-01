@@ -16,7 +16,7 @@ import requests
 
 _BOTFILES_ROOT = Path(__file__).resolve().parents[1]
 _CLAUDE_HOOKS_DIR = _BOTFILES_ROOT / "claude" / "hooks"
-_ENV_PATH = _CLAUDE_HOOKS_DIR / ".env"
+_ENV_PATH = _BOTFILES_ROOT / "secrets" / "local" / "claude-hooks.rc"
 
 _LOG_FILE = _CLAUDE_HOOKS_DIR / "hooks.log"
 
@@ -31,7 +31,7 @@ def _log(message: str) -> None:
 
 def load_env(override: bool = False) -> None:
     """
-    Load key=value pairs from the shared .env without raising parse warnings.
+    Load key=value pairs from the shared secrets rc file.
 
     Only basic KEY=VALUE and optional 'export KEY=VALUE' lines are supported.
     """

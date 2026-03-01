@@ -1,2 +1,0 @@
-# Azure OpenAI for Codex (copy to .azure_codex_config_rc and fill in).
-export AZURE_OPENAI_API_KEY="your_azure_openai_api_key"

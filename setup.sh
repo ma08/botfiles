@@ -138,6 +138,7 @@ create_symlinks() {
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
     mkdir -p "$SCRIPT_DIR/codex/skills"
+    mkdir -p "$SCRIPT_DIR/secrets/local"
     mkdir -p "$HOME/.config/zellij"
 
     # Remove existing symlinks if they exist
@@ -188,14 +189,6 @@ install_deps() {
     echo "Installing Python dependencies..."
     cd "$SCRIPT_DIR/claude/hooks"
     uv sync
-
-    # Install LiteLLM proxy (optional, for web search with Bedrock)
-    if ! command -v litellm &> /dev/null; then
-        echo "Installing LiteLLM proxy (for Bedrock web search)..."
-        uv tool install 'litellm[proxy]'
-    else
-        echo "  - litellm: OK"
-    fi
     echo ""
 }
 
@@ -203,69 +196,49 @@ install_deps() {
 check_secrets() {
     echo "Checking configuration files..."
     echo ""
+    mkdir -p "$SCRIPT_DIR/secrets/local"
 
-    # Claude Code Hooks (.env for WhatsApp)
-    echo "=== Claude Code Hooks ==="
-    if [ -f "$SCRIPT_DIR/claude/hooks/.env" ]; then
-        echo "  [OK] claude/hooks/.env"
-    else
-        echo "  [MISSING] claude/hooks/.env (WhatsApp notifications)"
-        echo "    cp $SCRIPT_DIR/claude/hooks/.env.example $SCRIPT_DIR/claude/hooks/.env"
-    fi
+    check_secret_file() {
+        local label="$1"
+        local runtime_path="$2"
+        local template_path="$3"
+        local display_path="${runtime_path#$SCRIPT_DIR/}"
 
-    # Claude Code provider configs (Bedrock/Vertex)
-    echo ""
-    echo "=== Claude Code Providers (optional) ==="
-    if [ -f "$SCRIPT_DIR/claude/.bedrock_claude_config_rc" ]; then
-        echo "  [OK] claude/.bedrock_claude_config_rc (AWS Bedrock)"
-    else
-        echo "  [MISSING] claude/.bedrock_claude_config_rc (AWS Bedrock)"
-        echo "    cp $SCRIPT_DIR/claude/.bedrock_claude_config_rc.example $SCRIPT_DIR/claude/.bedrock_claude_config_rc"
-    fi
+        if [ -f "$runtime_path" ]; then
+            echo "  [OK] $display_path ($label)"
+        else
+            echo "  [MISSING] $display_path ($label)"
+            echo "    cp $template_path $runtime_path"
+        fi
+    }
 
-    if [ -f "$SCRIPT_DIR/claude/.vertex_claude_config_rc" ]; then
-        echo "  [OK] claude/.vertex_claude_config_rc (GCP Vertex)"
-    else
-        echo "  [MISSING] claude/.vertex_claude_config_rc (GCP Vertex)"
-        echo "    cp $SCRIPT_DIR/claude/.vertex_claude_config_rc.example $SCRIPT_DIR/claude/.vertex_claude_config_rc"
-    fi
+    echo "=== Centralized Secrets (strict cutover) ==="
+    check_secret_file \
+        "AWS Bedrock for Claude Code" \
+        "$SCRIPT_DIR/secrets/local/claude-bedrock.rc" \
+        "$SCRIPT_DIR/secrets/templates/claude-bedrock.rc.example"
+    check_secret_file \
+        "GCP Vertex for Claude Code" \
+        "$SCRIPT_DIR/secrets/local/claude-vertex.rc" \
+        "$SCRIPT_DIR/secrets/templates/claude-vertex.rc.example"
+    check_secret_file \
+        "Azure OpenAI for Codex" \
+        "$SCRIPT_DIR/secrets/local/codex-azure.rc" \
+        "$SCRIPT_DIR/secrets/templates/codex-azure.rc.example"
+    check_secret_file \
+        "OpenAI API for Codex" \
+        "$SCRIPT_DIR/secrets/local/codex-openai.rc" \
+        "$SCRIPT_DIR/secrets/templates/codex-openai.rc.example"
+    check_secret_file \
+        "Azure resource for OpenCode" \
+        "$SCRIPT_DIR/secrets/local/opencode-azure.rc" \
+        "$SCRIPT_DIR/secrets/templates/opencode-azure.rc.example"
+    check_secret_file \
+        "Claude/Codex hook notifications" \
+        "$SCRIPT_DIR/secrets/local/claude-hooks.rc" \
+        "$SCRIPT_DIR/secrets/templates/claude-hooks.rc.example"
 
-    # Codex Azure config
-    echo ""
-    echo "=== Codex CLI ==="
-    if [ -f "$SCRIPT_DIR/codex/.azure_codex_config_rc" ]; then
-        echo "  [OK] codex/.azure_codex_config_rc"
-    else
-        echo "  [MISSING] codex/.azure_codex_config_rc (Azure OpenAI API key)"
-        echo "    cp $SCRIPT_DIR/codex/.azure_codex_config_rc.example $SCRIPT_DIR/codex/.azure_codex_config_rc"
-    fi
-
-    if [ -f "$SCRIPT_DIR/codex/.openai_codex_config_rc" ]; then
-        echo "  [OK] codex/.openai_codex_config_rc"
-    else
-        echo "  [MISSING] codex/.openai_codex_config_rc (OpenAI API key)"
-        echo "    cp $SCRIPT_DIR/codex/.openai_codex_config_rc.example $SCRIPT_DIR/codex/.openai_codex_config_rc"
-    fi
-
-    # OpenCode Azure config
-    echo ""
-    echo "=== OpenCode (optional) ==="
-    if [ -f "$SCRIPT_DIR/opencode/.azure_codex_config_rc" ]; then
-        echo "  [OK] opencode/.azure_codex_config_rc"
-    else
-        echo "  [MISSING] opencode/.azure_codex_config_rc (Azure OpenAI)"
-        echo "    cp $SCRIPT_DIR/opencode/.azure_codex_config_rc.example $SCRIPT_DIR/opencode/.azure_codex_config_rc"
-    fi
-
-    # LiteLLM Web Search (for Bedrock)
-    echo ""
-    echo "=== LiteLLM Web Search (optional) ==="
-    if [ -f "$SCRIPT_DIR/litellm/.env" ]; then
-        echo "  [OK] litellm/.env (Exa AI API key)"
-    else
-        echo "  [MISSING] litellm/.env (Exa AI for web search)"
-        echo "    cp $SCRIPT_DIR/litellm/.env.example $SCRIPT_DIR/litellm/.env"
-    fi
+    unset -f check_secret_file
 
     echo ""
 }

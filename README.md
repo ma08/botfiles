@@ -12,8 +12,9 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
-- **codex/** - Codex CLI config, provider env templates, synced skills, and global AGENTS instructions
-- **.botrc** - Shell loader that sources Claude/Codex env configs and modular shell scripts
+- **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
+- **secrets/** - Centralized secret templates and local runtime secret files
+- **.botrc** - Shell loader that sources centralized secret rc files and modular shell scripts
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 - **zellij/** - Canonical Zellij config (including lock key remap away from `Ctrl+g`)
 
@@ -50,25 +51,26 @@ brew install fzf mosh
    ```
    The script now also performs warn-only checks for SSH workflow dependencies (`ssh`, `fzf`, `mosh`) and `~/.ssh/config`.
 
-3. **Configure WhatsApp notifications (optional)**
+3. **Create local secret files from templates**
    ```bash
-   cp claude/hooks/.env.example claude/hooks/.env
-   # Edit .env with your WhatsApp credentials
+   mkdir -p secrets/local
+   cp secrets/templates/claude-bedrock.rc.example secrets/local/claude-bedrock.rc
+   cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
+   cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc
+   # Optional:
+   cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
+   cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
+   cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
+   # Edit secrets/local/*.rc with your values
    ```
 
-4. **Configure Codex Azure credentials**
-   ```bash
-   cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc
-   # Edit .azure_codex_config_rc with your API key
-   ```
-
-5. **Load shared env config**
+4. **Load shared env config**
    ```bash
    echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
    source ~/.zshrc
    ```
 
-6. **Restart Claude Code**
+5. **Restart Claude Code**
 
 ## Manual Setup
 
@@ -95,7 +97,7 @@ uv sync
 
 ### Shell Environment (.botrc)
 
-`.botrc` sources provider config files and then loads modular scripts from `shell/*.sh` in lexical order.
+`.botrc` sources centralized runtime secrets from `secrets/local/*.rc` and then loads modular scripts from `shell/*.sh` in lexical order.
 `setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 Add it to your shell startup file:
 
@@ -106,6 +108,25 @@ source ~/pro/botfiles/.botrc
 Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
 - `shell/10-uv-bin.sh` resolves `UV_BIN` once for Linux/macOS portability.
+
+### Centralized Secrets
+
+All runtime secrets live in `secrets/local/*.rc` (git-ignored).
+All shareable templates live in `secrets/templates/*.rc.example` (tracked).
+
+Start from templates:
+
+```bash
+mkdir -p ~/pro/botfiles/secrets/local
+cp ~/pro/botfiles/secrets/templates/claude-bedrock.rc.example ~/pro/botfiles/secrets/local/claude-bedrock.rc
+cp ~/pro/botfiles/secrets/templates/claude-vertex.rc.example ~/pro/botfiles/secrets/local/claude-vertex.rc
+cp ~/pro/botfiles/secrets/templates/codex-azure.rc.example ~/pro/botfiles/secrets/local/codex-azure.rc
+cp ~/pro/botfiles/secrets/templates/codex-openai.rc.example ~/pro/botfiles/secrets/local/codex-openai.rc
+cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
+cp ~/pro/botfiles/secrets/templates/claude-hooks.rc.example ~/pro/botfiles/secrets/local/claude-hooks.rc
+```
+
+Then fill in values in each `secrets/local/*.rc` file.
 
 ### Zellij Configuration
 
@@ -154,14 +175,14 @@ export BOT_CURSOR_ML_PATH=/home/azureuser
 
 ### WhatsApp Notifications
 
-To enable WhatsApp notifications, create `claude/hooks/.env` with:
+To enable WhatsApp notifications, create `secrets/local/claude-hooks.rc` with:
 
-```env
-WHATSAPP_ENABLED=true
-WHATSAPP_TOKEN=your_whatsapp_cloud_api_token
-PHONE_NUMBER_ID=your_phone_number_id
-NOTIFY_PHONE_NUMBER=+1234567890
-SYSTEM_NAME=MyMachineName
+```bash
+export WHATSAPP_ENABLED=true
+export WHATSAPP_TOKEN="your_whatsapp_cloud_api_token"
+export PHONE_NUMBER_ID="your_phone_number_id"
+export NOTIFY_PHONE_NUMBER="+1234567890"
+export SYSTEM_NAME="MyMachineName"
 ```
 
 You'll need a [Meta WhatsApp Business API](https://developers.facebook.com/docs/whatsapp/cloud-api) account.
@@ -172,10 +193,10 @@ The `SYSTEM_NAME` is included in WhatsApp notifications to identify which machin
 
 ### Codex Provider Credentials
 
-Create `codex/.azure_codex_config_rc` from the template:
+Create `secrets/local/codex-azure.rc` from the template:
 
 ```bash
-cp codex/.azure_codex_config_rc.example codex/.azure_codex_config_rc
+cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
 ```
 
 This file is ignored by git and sourced via `.botrc`.
@@ -221,25 +242,6 @@ node ~/.claude/skills/notion/examples/test-connection.js
 
 See `claude/skills/notion/README.md` for detailed usage.
 
-## Web Search (via LiteLLM Proxy)
-
-When using Claude Code with AWS Bedrock, web search is not natively supported.
-The LiteLLM proxy enables web search by intercepting search requests and routing them to Exa AI.
-
-**Quick usage:**
-```bash
-ccws-start    # Start the proxy (background)
-ccws          # Run Claude Code with web search
-ccws-stop     # Stop the proxy when done
-```
-
-**First-time setup:**
-1. Install litellm: `uv tool install 'litellm[proxy]'`
-2. Copy API key: `cp litellm/.env.example litellm/.env`
-3. Edit `litellm/.env` with your Exa AI API key
-
-See `litellm/README.md` for detailed setup and troubleshooting.
-
 ## Directory Structure
 
 ```
@@ -254,22 +256,24 @@ botfiles/
 │   └── clipboard-copy
 ├── zellij/
 │   └── config.kdl
+├── secrets/
+│   ├── README.md
+│   └── templates/
+│       ├── claude-bedrock.rc.example
+│       ├── claude-hooks.rc.example
+│       ├── claude-vertex.rc.example
+│       ├── codex-azure.rc.example
+│       ├── codex-openai.rc.example
+│       └── opencode-azure.rc.example
 ├── codex/
 │   ├── AGENTS.md
 │   ├── config.toml
-│   ├── .azure_codex_config_rc.example
 │   └── skills/
 │       └── README.md
-├── litellm/
-│   ├── config.yaml
-│   ├── .env.example
-│   ├── start-proxy.sh
-│   └── README.md
 └── claude/
     ├── settings.json
     ├── statusline-simple.sh
     ├── hooks/
-    │   ├── .env.example
     │   ├── .gitignore
     │   ├── pyproject.toml
     │   ├── notification.py
@@ -300,7 +304,7 @@ Restart Claude Code after pulling updates.
 
 1. Clone this repo to `~/pro/botfiles`
 2. Run `./setup.sh`
-3. Create `.env` with your WhatsApp credentials
+3. Create `secrets/local/*.rc` from `secrets/templates/*.rc.example`
 4. Restart Claude Code
 
 ## License

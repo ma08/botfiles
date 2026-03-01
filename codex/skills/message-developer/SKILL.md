@@ -75,6 +75,6 @@ This skill uses the existing shared notification stack:
 - Codex sender CLI: `~/pro/botfiles/codex/hooks/send.py`
 - Shared notification utility: `~/pro/botfiles/utils/notify_utils.py`
 - Auto turn-complete hook: `~/pro/botfiles/codex/hooks/run-codex-notify.sh`
-- Config: `~/pro/botfiles/claude/hooks/.env`
+- Config: `~/pro/botfiles/secrets/local/claude-hooks.rc`
 - Required env keys: `WHATSAPP_ENABLED`, `WHATSAPP_TOKEN`, `PHONE_NUMBER_ID`, `NOTIFY_PHONE_NUMBER`, `SYSTEM_NAME`
 - Python deps: managed via `uv` project at `~/pro/botfiles/claude/hooks`

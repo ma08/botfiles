@@ -9,7 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-# Environment files with secrets
+# Legacy local env file (deprecated; use secrets/local/claude-hooks.rc)
 .env
 
 # Log files
