@@ -1,0 +1,27 @@
+# Proactive Notification Verification
+Captured: 2026-02-25 ~03:46pm PST
+
+Command run: ~/pro/botfiles/codex/hooks/run-codex-send.sh --title "Proactive Test" "Proactive message from Codex skill test..."
+
+Relevant hooks.log lines:
+[2026-02-25T23:43:25.572934] send_notification called: title=Codex
+[2026-02-25T23:43:25.573064] Local notification disabled by caller
+[2026-02-25T23:43:25.573128] Config: whatsapp_enabled=True
+[2026-02-25T23:43:25.573179] Sending WhatsApp: system_name=Azure-A100-GPU-VM, to=<REDACTED_PHONE_E164>
+[2026-02-25T23:43:25.573223] WhatsApp: Sending to <REDACTED_PHONE_E164>, phone_number_id=<REDACTED_PHONE_NUMBER_ID>
+[2026-02-25T23:43:25.573267] WhatsApp: Payload to=<REDACTED_PHONE_DIGITS>, message_preview=[Azure-A100-GPU-VM]
+Codex
+Finished Processing
+Created the Codex equivalent and installed it locally ...
+[2026-02-25T23:43:26.008089] WhatsApp: Response status=200, body={'messaging_product': 'whatsapp', 'contacts': [{'input': '<REDACTED_PHONE_DIGITS>', 'wa_id': '<REDACTED_WA_ID>'}], 'messages': [{'id': '<REDACTED_WAMID>'}]}
+[2026-02-25T23:43:26.008254] WhatsApp: Message sent successfully
+[2026-02-25T23:45:07.760560] send_notification called: title=Proactive Test
+[2026-02-25T23:45:07.760678] Local notification disabled by caller
+[2026-02-25T23:45:07.760741] Config: whatsapp_enabled=True
+[2026-02-25T23:45:07.760791] Sending WhatsApp: system_name=Azure-A100-GPU-VM, to=<REDACTED_PHONE_E164>
+[2026-02-25T23:45:07.760834] WhatsApp: Sending to <REDACTED_PHONE_E164>, phone_number_id=<REDACTED_PHONE_NUMBER_ID>
+[2026-02-25T23:45:07.760880] WhatsApp: Payload to=<REDACTED_PHONE_DIGITS>, message_preview=[Azure-A100-GPU-VM]
+Proactive Test
+Proactive message from Codex skill test. You should also receive ...
+[2026-02-25T23:45:08.427473] WhatsApp: Response status=200, body={'messaging_product': 'whatsapp', 'contacts': [{'input': '<REDACTED_PHONE_DIGITS>', 'wa_id': '<REDACTED_WA_ID>'}], 'messages': [{'id': '<REDACTED_WAMID>'}]}
+[2026-02-25T23:45:08.427647] WhatsApp: Message sent successfully
