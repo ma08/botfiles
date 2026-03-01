@@ -1,3 +1,5 @@
+# Rollback option:
+# model = "gpt-5.2-codex"
 model = "gpt-5.3-codex"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
@@ -12,10 +14,13 @@ notify = [
   "~/pro/botfiles/codex/hooks/run-codex-notify.sh \"$1\"",
   "codex-notify",
 ]
+file_opener = "cursor"
 profile = "openai_api"
 
 [profiles.azure]
-model = "gpt-5.2-codex"
+# Rollback option:
+# model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
 
@@ -24,6 +29,7 @@ model = "gpt-5.3-codex"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "api"
+plan_mode_reasoning_effort = "xhigh"
 
 [profiles.chatgpt]
 model = "gpt-5.3-codex"
@@ -91,11 +97,6 @@ trust_level = "trusted"
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
 
-[notice.model_migrations]
-"gpt-5.1-codex-max" = "gpt-5.2-codex"
-"gpt-5.2-codex" = "gpt-5.3-codex"
-
-
 [model_providers.azure]
 name = "Azure OpenAI"
 # Replace YOUR_RESOURCE_NAME with your Azure OpenAI resource name
@@ -117,8 +118,13 @@ url = "https://mcp.notion.com/mcp"
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_code_context_exa,crawling_exa,company_research_exa,people_search_exa,deep_researcher_start,deep_researcher_check"
 
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+http_headers = { "X-Figma-Region" = "us-east-1" }
+
 [features]
 steer = true
 shell_snapshot = true
 apps = true
 multi_agent = true
+rmcp_client = true

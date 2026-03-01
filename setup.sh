@@ -122,6 +122,11 @@ backup_existing() {
         mv "$CODEX_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -f "$HOME/.config/zellij/config.kdl" ] && [ ! -L "$HOME/.config/zellij/config.kdl" ]; then
+        echo "  Backing up zellij config.kdl"
+        mv "$HOME/.config/zellij/config.kdl" "$HOME/.config/zellij/config.kdl.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -133,6 +138,7 @@ create_symlinks() {
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
     mkdir -p "$SCRIPT_DIR/codex/skills"
+    mkdir -p "$HOME/.config/zellij"
 
     # Remove existing symlinks if they exist
     [ -L "$CLAUDE_DIR/settings.json" ] && rm "$CLAUDE_DIR/settings.json"
@@ -142,6 +148,7 @@ create_symlinks() {
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
+    [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -169,6 +176,9 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/codex/AGENTS.md" "$CODEX_DIR/AGENTS.md"
     echo "  codex AGENTS.md -> $SCRIPT_DIR/codex/AGENTS.md"
+
+    ln -sf "$SCRIPT_DIR/zellij/config.kdl" "$HOME/.config/zellij/config.kdl"
+    echo "  zellij config.kdl -> $SCRIPT_DIR/zellij/config.kdl"
 
     echo ""
 }
@@ -372,6 +382,7 @@ main() {
     echo ""
     echo "Claude Code configuration is now symlinked to botfiles."
     echo "Codex CLI configuration, skills, and AGENTS.md are now symlinked to botfiles."
+    echo "Zellij config is now symlinked to botfiles."
     echo "Restart Claude Code for changes to take effect."
 }
 

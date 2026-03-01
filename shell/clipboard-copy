@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Portable clipboard helper for Zellij copy_command.
+# Input: text from stdin. Output: writes to remote/local clipboard backend.
+# Priority: remote Mac pbcopy over SSH, then local pbcopy/wl-copy/xclip/xsel.
+
+target="${BOT_CLIPBOARD_SSH_TARGET:-sourya-mac}"
+log_file="${BOT_CLIPBOARD_LOG:-/tmp/botfiles-clipboard-copy.log}"
+
+data="$(cat || true)"
+bytes="${#data}"
+
+log() {
+  printf '%s | %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$log_file"
+}
+
+copy_to_remote_mac() {
+  local host="$1"
+  if ssh -n -o BatchMode=yes -o ConnectTimeout=3 "$host" 'command -v pbcopy >/dev/null 2>&1' >/dev/null 2>&1; then
+    printf '%s' "$data" | ssh -o BatchMode=yes -o ConnectTimeout=6 "$host" pbcopy
+    return 0
+  fi
+  return 1
+}
+
+copy_local() {
+  if command -v pbcopy >/dev/null 2>&1; then
+    printf '%s' "$data" | pbcopy
+    return 0
+  fi
+  if command -v wl-copy >/dev/null 2>&1; then
+    printf '%s' "$data" | wl-copy
+    return 0
+  fi
+  if command -v xclip >/dev/null 2>&1; then
+    printf '%s' "$data" | xclip -selection clipboard
+    return 0
+  fi
+  if command -v xsel >/dev/null 2>&1; then
+    printf '%s' "$data" | xsel --clipboard --input
+    return 0
+  fi
+  return 1
+}
+
+if [ -n "$target" ] && copy_to_remote_mac "$target"; then
+  log "ok remote=$target bytes=$bytes"
+  exit 0
+fi
+
+if copy_local; then
+  log "ok local bytes=$bytes"
+  exit 0
+fi
+
+log "fail target=$target bytes=$bytes"
+printf 'clipboard-copy: no supported clipboard backend found\n' >&2
+exit 1

@@ -15,6 +15,7 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
 - **codex/** - Codex CLI config, provider env templates, synced skills, and global AGENTS instructions
 - **.botrc** - Shell loader that sources Claude/Codex env configs and modular shell scripts
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
+- **zellij/** - Canonical Zellij config (including lock key remap away from `Ctrl+g`)
 
 ## Prerequisites
 
@@ -82,6 +83,8 @@ ln -sf ~/pro/botfiles/claude/skills ~/.claude/skills
 ln -sf ~/pro/botfiles/codex/config.toml ~/.codex/config.toml
 ln -sf ~/pro/botfiles/codex/skills ~/.codex/skills
 ln -sf ~/pro/botfiles/codex/AGENTS.md ~/.codex/AGENTS.md
+mkdir -p ~/.config/zellij
+ln -sf ~/pro/botfiles/zellij/config.kdl ~/.config/zellij/config.kdl
 
 # Install Python dependencies
 cd ~/pro/botfiles/claude/hooks
@@ -103,6 +106,17 @@ source ~/pro/botfiles/.botrc
 Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
 - `shell/10-uv-bin.sh` resolves `UV_BIN` once for Linux/macOS portability.
+
+### Zellij Configuration
+
+`setup.sh` symlinks `~/.config/zellij/config.kdl` to `zellij/config.kdl` in this repo.
+
+Keybinding decision:
+- Zellij lock mode is mapped to `Alt+g` (not `Ctrl+g`) to avoid conflicts with terminal apps such as Codex/Vim input workflows.
+
+Clipboard copy behavior:
+- `zellij/config.kdl` uses `copy_command "sh -c ~/pro/botfiles/shell/clipboard-copy"`.
+- `shell/clipboard-copy` prefers remote Mac clipboard forwarding (`BOT_CLIPBOARD_SSH_TARGET`, default `sourya-mac`) and falls back to local clipboard tools (`pbcopy`, `wl-copy`, `xclip`, `xsel`).
 
 ### SSH Workflow Commands
 
@@ -235,7 +249,11 @@ botfiles/
 ├── .gitignore
 ├── setup.sh
 ├── shell/
-│   └── 20-ssh-workflows.sh
+│   ├── 10-uv-bin.sh
+│   ├── 20-ssh-workflows.sh
+│   └── clipboard-copy
+├── zellij/
+│   └── config.kdl
 ├── codex/
 │   ├── AGENTS.md
 │   ├── config.toml
