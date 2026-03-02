@@ -10,6 +10,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from shutil import which
+from shlex import quote as shell_quote
+from urllib.parse import quote as url_quote
 
 import requests
 
@@ -103,6 +105,13 @@ def get_config() -> dict:
         "phone_number_id": os.getenv("PHONE_NUMBER_ID", ""),
         "notify_phone_number": os.getenv("NOTIFY_PHONE_NUMBER", ""),
         "system_name": os.getenv("SYSTEM_NAME", ""),
+        "zellij_web_enable_links": os.getenv("ZELLIJ_WEB_ENABLE_LINKS", "false").lower()
+        == "true",
+        "zellij_web_base_url": os.getenv("ZELLIJ_WEB_BASE_URL", "").strip(),
+        "zellij_send_attach_command": os.getenv(
+            "ZELLIJ_SEND_ATTACH_COMMAND", "true"
+        ).lower()
+        == "true",
     }
 
 
@@ -112,6 +121,50 @@ def get_system_name() -> str:
     if system_name:
         return system_name
     return socket.gethostname()
+
+
+def get_zellij_session_name() -> str:
+    """Get zellij session name from environment, fallback to 'unknown'."""
+    session_name = os.getenv("ZELLIJ_SESSION_NAME", "").strip()
+    if session_name:
+        return session_name
+    return "unknown"
+
+
+def build_context_header(system_name: str, session_name: str) -> str:
+    """Build a compact context header for outbound chat notifications."""
+    return f"[{system_name} | zj:{session_name}]"
+
+
+def build_zellij_session_url(
+    session_name: str,
+    base_url: str,
+    links_enabled: bool,
+) -> str | None:
+    """
+    Build a direct zellij web URL for a session.
+
+    Returns None when links are disabled, base URL is missing, or session is unknown.
+    """
+    if not links_enabled:
+        return None
+
+    normalized_base_url = base_url.strip().rstrip("/")
+    if not normalized_base_url:
+        return None
+
+    if session_name == "unknown":
+        return None
+
+    encoded_session = url_quote(session_name, safe="")
+    return f"{normalized_base_url}/{encoded_session}"
+
+
+def build_zellij_attach_command(session_name: str) -> str | None:
+    """Build a shell-safe zellij attach command for copy/paste in SSH terminals."""
+    if session_name == "unknown":
+        return None
+    return f"zellij attach {shell_quote(session_name)}"
 
 
 def send_local_notification(title: str, message: str) -> None:
@@ -221,8 +274,26 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
         return
 
     system_name = get_system_name()
-    whatsapp_message = f"[{system_name}]\n{title}\n{message}"
-    _log(f"Sending WhatsApp: system_name={system_name}, to={config['notify_phone_number']}")
+    session_name = get_zellij_session_name()
+    context_header = build_context_header(system_name, session_name)
+    session_url = build_zellij_session_url(
+        session_name=session_name,
+        base_url=config["zellij_web_base_url"],
+        links_enabled=config["zellij_web_enable_links"],
+    )
+
+    whatsapp_lines = [context_header, title, str(message).strip()]
+    if config["zellij_web_enable_links"]:
+        whatsapp_lines.append(f"Open Session: {session_url or 'n/a'}")
+
+    whatsapp_message = "\n".join([line for line in whatsapp_lines if line])
+    _log(
+        "Sending WhatsApp: "
+        f"system_name={system_name}, "
+        f"session_name={session_name}, "
+        f"links_enabled={config['zellij_web_enable_links']}, "
+        f"to={config['notify_phone_number']}"
+    )
 
     send_whatsapp_message(
         message=whatsapp_message,
@@ -230,3 +301,15 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
         token=config["whatsapp_token"],
         phone_number_id=config["phone_number_id"],
     )
+
+    # Send a second standalone message so it can be copied directly in SSH/Termius.
+    if config["zellij_send_attach_command"]:
+        attach_command = build_zellij_attach_command(session_name)
+        if attach_command:
+            _log("Sending WhatsApp attach command message")
+            send_whatsapp_message(
+                message=attach_command,
+                to_phone=config["notify_phone_number"],
+                token=config["whatsapp_token"],
+                phone_number_id=config["phone_number_id"],
+            )
