@@ -1,4 +1,4 @@
 interface:
   display_name: "Save Task Status"
   short_description: "Help with Save Task Status tasks"
-  default_prompt: "Capture and persist session progress in task status files (`status.md` or legacy `README.md`). When a plan is explicitly accepted, append it under `## Accepted Plans` with PST timestamp, metadata, and full plan body."
+  default_prompt: "Capture and persist session progress in task status files (`status.md` or legacy `README.md`), then reconcile machine/coding-agent/session/zellij/issue metadata and refresh linked GitHub live-session blocks when drift is detected."

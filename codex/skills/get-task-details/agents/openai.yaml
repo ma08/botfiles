@@ -1,0 +1,4 @@
+interface:
+  display_name: "Get Task Details"
+  short_description: "Resolve status file and task metadata"
+  default_prompt: "Find and print task details for current context: status path, linked GitHub issue, machine name, coding-agent name, agent session id, zellij session/link, and related/stale matches when available."

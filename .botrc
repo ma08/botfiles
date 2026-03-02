@@ -13,6 +13,7 @@ export BOTFILES_ROOT
 # Load centralized local secrets (all files under secrets/local are git-ignored).
 if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
   for _bot_secret in \
+    "$BOTFILES_ROOT/secrets/local/machine.rc" \
     "$BOTFILES_ROOT/secrets/local/claude-bedrock.rc" \
     "$BOTFILES_ROOT/secrets/local/claude-vertex.rc" \
     "$BOTFILES_ROOT/secrets/local/codex-azure.rc" \

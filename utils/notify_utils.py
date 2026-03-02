@@ -18,7 +18,11 @@ import requests
 
 _BOTFILES_ROOT = Path(__file__).resolve().parents[1]
 _CLAUDE_HOOKS_DIR = _BOTFILES_ROOT / "claude" / "hooks"
-_ENV_PATH = _BOTFILES_ROOT / "secrets" / "local" / "claude-hooks.rc"
+_ENV_FILES = [
+    _BOTFILES_ROOT / "secrets" / "local" / "machine.rc",
+    _BOTFILES_ROOT / "secrets" / "local" / "claude-hooks.rc",
+]
+WHATSAPP_TEXT_MAX_CHARS = 4096
 
 _LOG_FILE = _CLAUDE_HOOKS_DIR / "hooks.log"
 
@@ -37,31 +41,31 @@ def load_env(override: bool = False) -> None:
 
     Only basic KEY=VALUE and optional 'export KEY=VALUE' lines are supported.
     """
-    if not _ENV_PATH.exists():
-        return
-
-    for line in _ENV_PATH.read_text().splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+    for env_path in _ENV_FILES:
+        if not env_path.exists():
             continue
+        for line in env_path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
 
-        if stripped.startswith("export "):
-            stripped = stripped[len("export ") :].strip()
+            if stripped.startswith("export "):
+                stripped = stripped[len("export ") :].strip()
 
-        if "=" not in stripped:
-            continue
+            if "=" not in stripped:
+                continue
 
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
+            key, value = stripped.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
 
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                value = value[1:-1]
 
-        if override or key not in os.environ:
-            os.environ[key] = value
+            if override or key not in os.environ or not str(os.environ.get(key, "")).strip():
+                os.environ[key] = value
 
 
 load_env()
@@ -208,6 +212,9 @@ def send_whatsapp_message(
 
     to_phone_digits = to_phone.lstrip("+")
     sanitized_message = message.encode("utf-8", errors="replace").decode("utf-8")
+    if len(sanitized_message) > WHATSAPP_TEXT_MAX_CHARS:
+        sanitized_message = sanitized_message[: WHATSAPP_TEXT_MAX_CHARS - 1].rstrip() + "…"
+        _log(f"WhatsApp: message truncated to {WHATSAPP_TEXT_MAX_CHARS} chars before send")
 
     payload = {
         "messaging_product": "whatsapp",
@@ -282,9 +289,31 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
         links_enabled=config["zellij_web_enable_links"],
     )
 
-    whatsapp_lines = [context_header, title, str(message).strip()]
-    if config["zellij_web_enable_links"]:
-        whatsapp_lines.append(f"Open Session: {session_url or 'n/a'}")
+    body_text = str(message).strip()
+    open_session_line = (
+        f"Open Session: {session_url or 'n/a'}" if config["zellij_web_enable_links"] else None
+    )
+    fixed_lines = [context_header, title]
+    if open_session_line:
+        fixed_lines.append(open_session_line)
+    fixed_text = "\n".join([line for line in fixed_lines if line])
+
+    if body_text:
+        available_body_chars = WHATSAPP_TEXT_MAX_CHARS - len(fixed_text) - 1
+        if len(body_text) > available_body_chars:
+            if available_body_chars <= 0:
+                body_text = ""
+            elif available_body_chars == 1:
+                body_text = "…"
+            else:
+                body_text = body_text[: available_body_chars - 1].rstrip() + "…"
+            _log("WhatsApp: notification body truncated to preserve context + session link")
+
+    whatsapp_lines = [context_header, title]
+    if body_text:
+        whatsapp_lines.append(body_text)
+    if open_session_line:
+        whatsapp_lines.append(open_session_line)
 
     whatsapp_message = "\n".join([line for line in whatsapp_lines if line])
     _log(

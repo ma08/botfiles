@@ -56,6 +56,7 @@ brew install fzf mosh
    mkdir -p secrets/local
    cp secrets/templates/claude-bedrock.rc.example secrets/local/claude-bedrock.rc
    cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
+   cp secrets/templates/machine.rc.example secrets/local/machine.rc
    cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc
    # Optional:
    cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
@@ -123,6 +124,7 @@ cp ~/pro/botfiles/secrets/templates/claude-vertex.rc.example ~/pro/botfiles/secr
 cp ~/pro/botfiles/secrets/templates/codex-azure.rc.example ~/pro/botfiles/secrets/local/codex-azure.rc
 cp ~/pro/botfiles/secrets/templates/codex-openai.rc.example ~/pro/botfiles/secrets/local/codex-openai.rc
 cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
+cp ~/pro/botfiles/secrets/templates/machine.rc.example ~/pro/botfiles/secrets/local/machine.rc
 cp ~/pro/botfiles/secrets/templates/claude-hooks.rc.example ~/pro/botfiles/secrets/local/claude-hooks.rc
 ```
 
@@ -182,14 +184,23 @@ export WHATSAPP_ENABLED=true
 export WHATSAPP_TOKEN="your_whatsapp_cloud_api_token"
 export PHONE_NUMBER_ID="your_phone_number_id"
 export NOTIFY_PHONE_NUMBER="+1234567890"
-export SYSTEM_NAME="MyMachineName"
 ```
 
 You'll need a [Meta WhatsApp Business API](https://developers.facebook.com/docs/whatsapp/cloud-api) account.
 
 ### System Name
 
-The `SYSTEM_NAME` is included in WhatsApp notifications to identify which machine sent the alert. If not set, it defaults to the hostname.
+Define machine identity once in `secrets/local/machine.rc`:
+
+```bash
+export SYSTEM_NAME="MyMachineName"
+```
+
+`SYSTEM_NAME` is reused across:
+- WhatsApp notifications (origin context)
+- Task-status metadata sync (`start-new-task`, `save-task-status`, `get-task-details`)
+
+If not set, tooling falls back to hostname.
 
 ### Codex Provider Credentials
 
@@ -264,6 +275,7 @@ botfiles/
 │       ├── claude-vertex.rc.example
 │       ├── codex-azure.rc.example
 │       ├── codex-openai.rc.example
+│       ├── machine.rc.example
 │       └── opencode-azure.rc.example
 ├── codex/
 │   ├── AGENTS.md

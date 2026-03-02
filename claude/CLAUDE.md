@@ -6,6 +6,7 @@ When working on any task, **proactively** maintain task status documentation.
 
 ### Proactive Behavior
 - **At task start**: Use `/start-new-task` to scaffold a task folder with status.md, user_inputs/initial.md, and task-progress-artifacts/. For resuming existing tasks, use `/save-task-status` instead.
+- **At any checkpoint**: Use `/get-task-details` to retrieve the active status path plus issue/machine/coding-agent session metadata.
 - **At milestones**: Update the status file when completing sub-tasks, making key decisions, or discovering important information
 - **Save artifacts continuously**:
 - When you produce or encounter log output, write scripts, capture errors, or generate any useful output — immediately save it to `task-progress-artifacts/` in the task folder. Don't wait until session end.
@@ -25,6 +26,7 @@ Every tracked task gets a folder at `<task-status-root>/YYYY-MM-DD/<HH>h<MM>m<SS
 - **user_inputs/**: Immutable records of original user inputs. Never overwrite or delete files here. New inputs get new files (e.g., `clarifications.md`, `scope-change-YYYY-MM-DD.md`). User-provided screenshots and reference material go here, not in `task-progress-artifacts/`.
 - **Artifacts**: **Always** save log snippets, screenshots, adhoc scripts, config snapshots, command outputs, and error traces to `task-progress-artifacts/`. Copy content into the folder (don't just reference external paths that may disappear). The task folder should be a self-contained package.
 - **Timezone**: All timestamps in task files use PST explicitly. Use `TZ=America/Los_Angeles date` for reliable PST regardless of VM timezone. Format: `YYYY-MM-DD ~HH:MMam/pm PST`.
+- **Machine identity**: Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so metadata and notifications remain consistent across workflows.
 - **Legacy folders**: Existing folders without time prefix or `user_inputs/` continue to work unchanged.
 
 ### Per-Project Overrides

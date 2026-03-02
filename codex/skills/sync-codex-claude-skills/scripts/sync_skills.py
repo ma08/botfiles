@@ -6,7 +6,7 @@ Examples:
   python scripts/sync_skills.py status
   python scripts/sync_skills.py sync --from-side claude --to-side codex --all
   python scripts/sync_skills.py sync --from-side claude --to-side codex \
-    --skills start-new-task get-task-status-file --apply
+    --skills start-new-task get-task-details --apply
 """
 from __future__ import annotations
 

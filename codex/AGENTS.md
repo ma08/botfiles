@@ -21,6 +21,7 @@ These are user-level instructions shared across machines via:
 ## Task Status Files
 
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
+- Use `get-task-details` to retrieve current status path plus linked issue, machine, coding-agent session id, and zellij context
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
 - New folders use time-prefixed names: `<HH>h<MM>m<SS>sPST-<task-slug>` (e.g., `21h45m59sPST-fix-auth-timeout`)
 - Full path example: `context/daily/2026-02-24/21h45m59sPST-fix-auth-timeout/`
@@ -28,6 +29,7 @@ These are user-level instructions shared across machines via:
 - Format timestamps as: `YYYY-MM-DD ~HH:MMam/pm PST`
 - Legacy folders without time prefix continue to work unchanged
 - Save artifacts under `task-progress-artifacts/` (logs, screenshots, scripts, command outputs)
+- Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so task metadata and notifications identify the machine consistently
 
 ### Plan Acceptance Persistence (Required)
 

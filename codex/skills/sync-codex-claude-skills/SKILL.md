@@ -52,7 +52,7 @@ Decide scope:
 
 ```bash
 python scripts/sync_skills.py sync --from-side claude --to-side codex --all
-python scripts/sync_skills.py sync --from-side claude --to-side codex --skills start-new-task get-task-status-file
+python scripts/sync_skills.py sync --from-side claude --to-side codex --skills start-new-task get-task-details
 ```
 
 Without `--apply`, script prints plan only (`create`, `replace`, `unchanged`) and makes no changes.
