@@ -188,6 +188,48 @@ export NOTIFY_PHONE_NUMBER="+1234567890"
 
 You'll need a [Meta WhatsApp Business API](https://developers.facebook.com/docs/whatsapp/cloud-api) account.
 
+### Zellij Web Links in Notifications
+
+You can include clickable session links (`Open Session: ...`) in WhatsApp and email alerts.
+
+1. Ensure zellij web server is running locally on the machine:
+   ```bash
+   /opt/homebrew/bin/zellij web --status || /opt/homebrew/bin/zellij web --start --daemonize
+   ```
+   Linux path variant:
+   ```bash
+   zellij web --status || zellij web --start --daemonize
+   ```
+
+2. Expose zellij web over your tailnet on `:8443`:
+   ```bash
+   tailscale serve --bg --https=8443 127.0.0.1:8082
+   tailscale serve status
+   ```
+   macOS app bundle CLI variant:
+   ```bash
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg --https=8443 127.0.0.1:8082
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale serve status
+   ```
+
+3. Add these to `secrets/local/claude-hooks.rc`:
+   ```bash
+   ZELLIJ_WEB_ENABLE_LINKS=true
+   ZELLIJ_WEB_BASE_URL=https://<your-tailnet-dns-name>:8443
+   ZELLIJ_SEND_ATTACH_COMMAND=true
+   ```
+
+4. Trigger a smoke notification:
+   ```bash
+   /opt/homebrew/bin/uv run --project ~/pro/botfiles/claude/hooks \
+     python ~/pro/botfiles/codex/hooks/send.py --title "Zellij Link Smoke" "verify zellij link"
+   ```
+
+Notes:
+- `ZELLIJ_WEB_BASE_URL` must match the machine sending the notification (machine-local setting).
+- Session URLs are built as: `<ZELLIJ_WEB_BASE_URL>/<url-encoded-zellij-session-name>`.
+- If notifications run outside zellij (`ZELLIJ_SESSION_NAME` missing), link falls back to `n/a`.
+
 ### System Name
 
 Define machine identity once in `secrets/local/machine.rc`:
