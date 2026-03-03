@@ -175,9 +175,10 @@ def get_zellij_session_name() -> str:
     return "unknown"
 
 
-def build_context_header(system_name: str, session_name: str) -> str:
+def build_context_header(system_name: str, session_name: str, agent_session_id: str) -> str:
     """Build a compact context header for outbound chat notifications."""
-    return f"[{system_name} | zj:{session_name}]"
+    resolved_agent_session_id = agent_session_id or "none"
+    return f"[{system_name} | sid:{resolved_agent_session_id} | zj:{session_name}]"
 
 
 def build_zellij_session_url(
@@ -213,15 +214,17 @@ def build_zellij_attach_command(session_name: str) -> str | None:
 
 def build_email_subject(
     system_name: str,
-    session_name: str,
+    agent_session_id: str,
     subject_prefix: str,
     task_label: str,
 ) -> str:
     """Build a stable subject for per-session email thread grouping."""
+    resolved_agent_session_id = agent_session_id or "none"
     return (
         f"{subject_prefix} "
         f"[task:{task_label}] "
-        f"[{system_name} | zj:{session_name}]"
+        f"[{system_name}] "
+        f"[sid:{resolved_agent_session_id}]"
     )
 
 
@@ -502,7 +505,7 @@ def send_email_notification(
     title: str,
     message: str,
     system_name: str,
-    session_name: str,
+    agent_session_id: str,
     context_header: str,
     session_url: str | None,
     attach_command: str | None,
@@ -528,13 +531,14 @@ def send_email_notification(
     task_label = get_task_label(config)
     subject = build_email_subject(
         system_name=system_name,
-        session_name=session_name,
+        agent_session_id=agent_session_id,
         subject_prefix=config["email_subject_prefix"],
         task_label=task_label,
     )
 
     body_lines = [
         context_header,
+        f"Agent Session ID: {agent_session_id or 'none'}",
         f"Title: {title}",
         "",
         str(message).strip(),
@@ -546,7 +550,7 @@ def send_email_notification(
 
     thread_state_path = Path(config["gmail_thread_state_path"]).expanduser()
     thread_state = _load_json_file(thread_state_path)
-    thread_key = f"{system_name}::{session_name}::{task_label}"
+    thread_key = f"{system_name}::{agent_session_id or 'none'}::{task_label}"
     existing_thread = thread_state.get(thread_key, {})
     thread_id = str(existing_thread.get("thread_id", "")).strip() or None
     last_message_id = str(existing_thread.get("last_message_id", "")).strip() or None
@@ -673,7 +677,8 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
     config = get_config()
     system_name = get_system_name()
     session_name = get_zellij_session_name()
-    context_header = build_context_header(system_name, session_name)
+    agent_session_id = _get_agent_session_id()
+    context_header = build_context_header(system_name, session_name, agent_session_id)
     session_url = build_zellij_session_url(
         session_name=session_name,
         base_url=config["zellij_web_base_url"],
@@ -707,7 +712,8 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
             open_session_line = (
                 f"Open Session: {session_url or 'n/a'}" if config["zellij_web_enable_links"] else None
             )
-            fixed_lines = [context_header, title]
+            session_id_line = f"Agent Session ID: {agent_session_id or 'none'}"
+            fixed_lines = [context_header, title, session_id_line]
             if open_session_line:
                 fixed_lines.append(open_session_line)
             fixed_text = "\n".join([line for line in fixed_lines if line])
@@ -723,7 +729,7 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
                         body_text = body_text[: available_body_chars - 1].rstrip() + "…"
                     _log("WhatsApp: notification body truncated to preserve context + session link")
 
-            whatsapp_lines = [context_header, title]
+            whatsapp_lines = [context_header, title, session_id_line]
             if body_text:
                 whatsapp_lines.append(body_text)
             if open_session_line:
@@ -734,6 +740,7 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
                 "Sending WhatsApp: "
                 f"system_name={system_name}, "
                 f"session_name={session_name}, "
+                f"agent_session_id={agent_session_id or 'none'}, "
                 f"links_enabled={config['zellij_web_enable_links']}, "
                 f"to={config['notify_phone_number']}"
             )
@@ -763,7 +770,7 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
             title=title,
             message=message,
             system_name=system_name,
-            session_name=session_name,
+            agent_session_id=agent_session_id,
             context_header=context_header,
             session_url=session_url,
             attach_command=attach_command,
