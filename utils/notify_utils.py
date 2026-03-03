@@ -664,7 +664,12 @@ def send_whatsapp_message(
         return False
 
 
-def send_notification(title: str, message: str, send_local: bool = True) -> None:
+def send_notification(
+    title: str,
+    message: str,
+    send_local: bool = True,
+    agent_session_id_override: str | None = None,
+) -> None:
     """Send notification to all enabled channels (local + WhatsApp + Email)."""
     _log(f"send_notification called: title={title}")
 
@@ -677,7 +682,7 @@ def send_notification(title: str, message: str, send_local: bool = True) -> None
     config = get_config()
     system_name = get_system_name()
     session_name = get_zellij_session_name()
-    agent_session_id = _get_agent_session_id()
+    agent_session_id = (agent_session_id_override or "").strip() or _get_agent_session_id()
     context_header = build_context_header(system_name, session_name, agent_session_id)
     session_url = build_zellij_session_url(
         session_name=session_name,
