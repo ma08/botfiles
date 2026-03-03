@@ -219,7 +219,16 @@ You can include clickable session links (`Open Session: ...`) in WhatsApp and em
    ZELLIJ_SEND_ATTACH_COMMAND=true
    ```
 
-4. Trigger a smoke notification:
+4. Create a one-time zellij web login token:
+   ```bash
+   /opt/homebrew/bin/zellij web --create-token
+   ```
+   Save the resulting token securely and open:
+   ```text
+   https://<your-tailnet-dns-name>:8443/?token=<token>
+   ```
+
+5. Trigger a smoke notification:
    ```bash
    /opt/homebrew/bin/uv run --project ~/pro/botfiles/claude/hooks \
      python ~/pro/botfiles/codex/hooks/send.py --title "Zellij Link Smoke" "verify zellij link"
