@@ -214,17 +214,16 @@ def build_zellij_attach_command(session_name: str) -> str | None:
 
 def build_email_subject(
     system_name: str,
-    agent_session_id: str,
+    session_name: str,
     subject_prefix: str,
     task_label: str,
 ) -> str:
     """Build a stable subject for per-session email thread grouping."""
-    resolved_agent_session_id = agent_session_id or "none"
+    resolved_session_name = session_name if session_name and session_name != "unknown" else "none"
     return (
         f"{subject_prefix} "
         f"[task:{task_label}] "
-        f"[{system_name}] "
-        f"[sid:{resolved_agent_session_id}]"
+        f"[{system_name} | zj:{resolved_session_name}]"
     )
 
 
@@ -505,6 +504,7 @@ def send_email_notification(
     title: str,
     message: str,
     system_name: str,
+    session_name: str,
     agent_session_id: str,
     context_header: str,
     session_url: str | None,
@@ -531,7 +531,7 @@ def send_email_notification(
     task_label = get_task_label(config)
     subject = build_email_subject(
         system_name=system_name,
-        agent_session_id=agent_session_id,
+        session_name=session_name,
         subject_prefix=config["email_subject_prefix"],
         task_label=task_label,
     )
@@ -550,7 +550,8 @@ def send_email_notification(
 
     thread_state_path = Path(config["gmail_thread_state_path"]).expanduser()
     thread_state = _load_json_file(thread_state_path)
-    thread_key = f"{system_name}::{agent_session_id or 'none'}::{task_label}"
+    resolved_session_name = session_name if session_name and session_name != "unknown" else "none"
+    thread_key = f"{system_name}::{resolved_session_name}::{task_label}"
     existing_thread = thread_state.get(thread_key, {})
     thread_id = str(existing_thread.get("thread_id", "")).strip() or None
     last_message_id = str(existing_thread.get("last_message_id", "")).strip() or None
@@ -775,6 +776,7 @@ def send_notification(
             title=title,
             message=message,
             system_name=system_name,
+            session_name=session_name,
             agent_session_id=agent_session_id,
             context_header=context_header,
             session_url=session_url,
