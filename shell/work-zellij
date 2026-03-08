@@ -547,8 +547,8 @@ run_picker() {
   local color_flag=0
   local -a theme_args=()
 
-  change_bind="change:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
-  refresh_bind="ctrl-r:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
+  change_bind="change:reload(${SCRIPT_PATH} candidates --query {q})+first"
+  refresh_bind="ctrl-r:reload(${SCRIPT_PATH} candidates --query {q})+first"
   header="Enter attach/create | Ctrl-K delete EXITED | Ctrl-R refresh | Esc cancel"
 
   if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
