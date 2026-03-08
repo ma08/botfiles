@@ -146,6 +146,7 @@ Clipboard copy behavior:
 The `shell/20-ssh-workflows.sh` module provides reconnect-friendly helpers for zellij workflows:
 
 ```bash
+work-here          # manage zellij sessions on the current machine
 work-ml            # mosh-first connect to ML VM, pick/create zellij session
 work-ml-ssh        # SSH-only fallback path for ML VM
 work-arya          # SSH-first connect to Aryabhatta, pick/create zellij session
@@ -158,11 +159,22 @@ cursor-ml          # open/reuse Cursor window at ML VM home over Remote-SSH
 
 Dependency behavior:
 - `fzf` is required for interactive picker mode.
-- If `fzf` is missing, pass a session name explicitly (example: `work-ml my-session`).
+- If `fzf` is missing, pass a session name explicitly (example: `work-ml my-session` or `work-here my-session`).
+- Local `zellij` is required for `work-here`; remote hosts still need `zellij` for all `work-*` attach/create flows.
 - `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`).
 - If `mosh` is missing or transport fails, workflows fall back to SSH.
 - Cursor Remote-SSH uses SSH transport and cannot run directly over mosh transport.
 - Use `cursor-ml` for editor workflow and `mml` for resilient terminal-only workflow.
+
+Interactive picker behavior:
+- Current and active sessions are listed first with inline zellij metadata; `EXITED` sessions are grouped below them.
+- `Enter` attaches the selected session or creates the highlighted `Create new session: <name>` row.
+- `Ctrl-K` permanently deletes an `EXITED` session after a `y/N` confirmation.
+- `Ctrl-R` refreshes the session list without leaving the workflow.
+- When the typed query is a valid new session name, a dynamic create row appears at the top of the picker.
+- After create, resurrect, delete, cancel, or failure actions, the helper prints a one-line record back to the shell when control returns.
+- `work-here` is a plain-shell entrypoint. If you are already inside zellij on the current host, use `Ctrl-o w` to open the built-in session manager instead.
+- The current interaction model and text output here are the functional baseline to preserve before any later visual-only changes such as picker color or theme adjustments.
 
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 
@@ -315,7 +327,8 @@ botfiles/
 ├── shell/
 │   ├── 10-uv-bin.sh
 │   ├── 20-ssh-workflows.sh
-│   └── clipboard-copy
+│   ├── clipboard-copy
+│   └── work-zellij
 ├── zellij/
 │   └── config.kdl
 ├── secrets/

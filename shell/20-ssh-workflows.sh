@@ -59,102 +59,20 @@ _bot_ssh_pick_reachable_host() {
   return 1
 }
 
-_bot_ssh_fetch_remote_zellij_sessions() {
-  local host="$1"
-  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
-    "command -v zellij >/dev/null 2>&1 || exit 127; zellij list-sessions --short --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\\.?$/d' || true" \
-    2>/dev/null
+_bot_zellij_workflow_script() {
+  printf "%s\n" "${BOTFILES_ROOT:-$HOME/pro/botfiles}/shell/work-zellij"
 }
 
-_bot_ssh_prompt_new_session_name() {
-  local host="$1"
-  local session_name
+_bot_run_zellij_workflow() {
+  local workflow_script
+  workflow_script="$(_bot_zellij_workflow_script)"
 
-  while true; do
-    printf "New zellij session name for %s: " "$host"
-    IFS= read -r session_name || return 1
-    session_name="$(printf "%s" "$session_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-
-    if [ -z "$session_name" ]; then
-      echo "Session name cannot be empty."
-      continue
-    fi
-
-    if _bot_ssh_validate_session_name "$session_name"; then
-      printf "%s\n" "$session_name"
-      return 0
-    fi
-
-    echo "Invalid name. Use only letters, numbers, dot, underscore, colon, or hyphen."
-  done
-}
-
-_bot_ssh_choose_zellij_session() {
-  local host="$1"
-  local explicit_session="$2"
-  local existing_sessions
-  local selected
-
-  if [ -n "$explicit_session" ]; then
-    if _bot_ssh_validate_session_name "$explicit_session"; then
-      printf "%s\n" "$explicit_session"
-      return 0
-    fi
-    echo "Invalid session name: ${explicit_session}"
+  if [ ! -x "$workflow_script" ]; then
+    echo "work-zellij helper not found or not executable: $workflow_script"
     return 1
   fi
 
-  if ! command -v fzf >/dev/null 2>&1; then
-    echo "fzf is required for interactive session picking."
-    echo "Install fzf or pass a session name explicitly (example: work-ml my-session)."
-    return 1
-  fi
-
-  existing_sessions="$(_bot_ssh_fetch_remote_zellij_sessions "$host")"
-  selected="$(
-    {
-      printf "%s\n" "[new session]"
-      printf "%s\n" "$existing_sessions" | awk 'NF && !seen[$0]++'
-    } | fzf \
-      --height=40% \
-      --layout=reverse \
-      --border \
-      --no-multi \
-      --prompt="zellij@${host}> " \
-      --header="Select existing session or create a new one"
-  )" || return 1
-
-  if [ "$selected" = "[new session]" ]; then
-    _bot_ssh_prompt_new_session_name "$host"
-    return $?
-  fi
-
-  if _bot_ssh_validate_session_name "$selected"; then
-    printf "%s\n" "$selected"
-    return 0
-  fi
-
-  echo "Invalid session returned from picker: ${selected}"
-  return 1
-}
-
-_bot_ssh_connect_zellij() {
-  local transport="$1"
-  local host="$2"
-  local session_name="$3"
-
-  if [ "$transport" = "mosh" ]; then
-    if command -v mosh >/dev/null 2>&1; then
-      if _bot_mosh_connect "$host" -- zellij attach --create "$session_name"; then
-        return 0
-      fi
-      echo "mosh failed for ${host}; falling back to ssh."
-    else
-      echo "mosh is not installed; falling back to ssh."
-    fi
-  fi
-
-  ssh -t "$host" "zellij attach --create $session_name"
+  "$workflow_script" "$@"
 }
 
 _bot_ssh_workflow_connect() {
@@ -162,15 +80,20 @@ _bot_ssh_workflow_connect() {
   local explicit_session="$2"
   shift 2
   local host
-  local session_name
 
   host="$(_bot_ssh_pick_reachable_host "$@")" || {
     echo "No reachable host found in candidates: $*"
     return 1
   }
 
-  session_name="$(_bot_ssh_choose_zellij_session "$host" "$explicit_session")" || return 1
-  _bot_ssh_connect_zellij "$transport" "$host" "$session_name"
+  # The helper owns all TTY interaction so prompts are not swallowed by
+  # command substitution when fzf or confirmation steps are active.
+  if [ -n "$explicit_session" ]; then
+    _bot_run_zellij_workflow connect --mode remote --transport "$transport" --host "$host" --session "$explicit_session"
+    return $?
+  fi
+
+  _bot_run_zellij_workflow connect --mode remote --transport "$transport" --host "$host"
 }
 
 work-ml() {
@@ -191,6 +114,15 @@ work-arya-mosh() {
 
 work-arya-ssh() {
   _bot_ssh_workflow_connect "ssh" "${1:-}" "$BOT_ARYA_HOST"
+}
+
+work-here() {
+  if [ -n "${1:-}" ]; then
+    _bot_run_zellij_workflow connect --mode local --transport local --session "$1"
+    return $?
+  fi
+
+  _bot_run_zellij_workflow connect --mode local --transport local
 }
 
 # Raw shell shortcuts (no zellij attach), useful for quick ad-hoc sessions.

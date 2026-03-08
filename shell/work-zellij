@@ -1,0 +1,737 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  work-zellij connect --mode <local|remote> --transport <local|ssh|mosh> [--host <host>] [--session <name>]
+  work-zellij candidates --query <query>
+
+Internal environment for candidates:
+  WORK_ZELLIJ_CACHE_FILE   Path to cached `zellij list-sessions --reverse --no-formatting` output.
+EOF
+}
+
+tty_print() {
+  printf '%s\n' "$*" >&2
+}
+
+action_print() {
+  printf '%s\n' "$*"
+}
+
+die() {
+  tty_print "work-zellij: $*"
+  exit 1
+}
+
+validate_session_name() {
+  case "${1:-}" in
+    "")
+      return 1
+      ;;
+    *[!A-Za-z0-9._:-]*)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+lowercase_text() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+session_name_matches_query() {
+  local session_name="$1"
+  local query="$2"
+  local session_name_lc
+  local query_lc
+  local session_index
+  local query_index
+  local session_length
+  local query_length
+
+  [ -n "$query" ] || return 0
+
+  session_name_lc="$(lowercase_text "$session_name")"
+  query_lc="$(lowercase_text "$query")"
+
+  case "$session_name_lc" in
+    *"$query_lc"*)
+      return 0
+      ;;
+  esac
+
+  session_length=${#session_name_lc}
+  query_length=${#query_lc}
+  session_index=0
+  query_index=0
+
+  while [ "$session_index" -lt "$session_length" ] && [ "$query_index" -lt "$query_length" ]; do
+    if [ "${session_name_lc:$session_index:1}" = "${query_lc:$query_index:1}" ]; then
+      query_index=$((query_index + 1))
+    fi
+    session_index=$((session_index + 1))
+  done
+
+  [ "$query_index" -eq "$query_length" ]
+}
+
+inside_zellij() {
+  [ -n "${ZELLIJ_SESSION_NAME:-}" ] || [ -n "${ZELLIJ:-}" ]
+}
+
+host_label() {
+  hostname -s 2>/dev/null || hostname 2>/dev/null || printf 'local'
+}
+
+session_name_from_line() {
+  local line="$1"
+  printf '%s\n' "${line%% \[Created*}"
+}
+
+session_state_from_line() {
+  local line="$1"
+
+  case "$line" in
+    *"(current)"*)
+      printf 'current\n'
+      ;;
+    *"EXITED"*)
+      printf 'exited\n'
+      ;;
+    *)
+      printf 'active\n'
+      ;;
+  esac
+}
+
+visible_prefix_for_state() {
+  case "$1" in
+    current)
+      printf 'CURRENT'
+      ;;
+    active)
+      printf 'ACTIVE '
+      ;;
+    exited)
+      printf 'EXITED '
+      ;;
+    create)
+      printf 'CREATE '
+      ;;
+    *)
+      printf 'SESSION'
+      ;;
+  esac
+}
+
+format_visible_row() {
+  local state="$1"
+  local body="$2"
+
+  printf '%s  %s' "$(visible_prefix_for_state "$state")" "$body"
+}
+
+fetch_sessions() {
+  local mode="$1"
+  local host="${2:-}"
+
+  if [ "$mode" = "local" ]; then
+    command -v zellij >/dev/null 2>&1 || return 127
+    zellij list-sessions --reverse --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\.?$/d'
+    return 0
+  fi
+
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
+    "command -v zellij >/dev/null 2>&1 || exit 127; zellij list-sessions --reverse --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\\.?$/d'" \
+    2>/dev/null
+}
+
+session_state_in_cache() {
+  local cache_file="$1"
+  local candidate_name="$2"
+  local line
+  local session_name
+
+  [ -f "$cache_file" ] || return 1
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    session_name="$(session_name_from_line "$line")"
+    if [ "$session_name" = "$candidate_name" ]; then
+      session_state_from_line "$line"
+      return 0
+    fi
+  done < "$cache_file"
+
+  return 1
+}
+
+cache_has_exact_session_name() {
+  local cache_file="$1"
+  local candidate_name="$2"
+
+  session_state_in_cache "$cache_file" "$candidate_name" >/dev/null
+}
+
+populate_session_cache_or_die() {
+  local mode="$1"
+  local host="$2"
+  local cache_file="$3"
+  local target_label="$4"
+  local fetch_status
+
+  if fetch_sessions "$mode" "$host" > "$cache_file"; then
+    return 0
+  fi
+
+  fetch_status=$?
+  rm -f "$cache_file"
+
+  if [ "$fetch_status" -eq 127 ]; then
+    if [ "$mode" = "local" ]; then
+      die "zellij is not installed on the current machine."
+    fi
+    die "zellij is not installed or not on PATH for ${target_label}."
+  fi
+
+  die "Unable to fetch zellij sessions for ${target_label}."
+}
+
+exact_session_state() {
+  local mode="$1"
+  local host="$2"
+  local session_name="$3"
+  local target_label="$4"
+  local cache_file
+  local session_state
+
+  cache_file="$(mktemp "${TMPDIR:-/tmp}/work-zellij-cache.XXXXXX")"
+  populate_session_cache_or_die "$mode" "$host" "$cache_file" "$target_label"
+
+  if session_state="$(session_state_in_cache "$cache_file" "$session_name")"; then
+    printf '%s\n' "$session_state"
+  else
+    printf 'missing\n'
+  fi
+
+  rm -f "$cache_file"
+}
+
+action_kind_from_session_state() {
+  case "$1" in
+    missing|create|new)
+      printf 'create\n'
+      ;;
+    exited)
+      printf 'resurrect\n'
+      ;;
+    active|current)
+      printf 'attach\n'
+      ;;
+    *)
+      printf 'attach\n'
+      ;;
+  esac
+}
+
+log_attach_action_result() {
+  local action_kind="$1"
+  local action_status="$2"
+  local session_name="$3"
+  local target_label="$4"
+
+  if [ "$action_status" -eq 0 ]; then
+    case "$action_kind" in
+      create)
+        action_print "Created zellij session '${session_name}' on ${target_label}."
+        ;;
+      resurrect)
+        action_print "Resurrected zellij session '${session_name}' on ${target_label}."
+        ;;
+    esac
+    return 0
+  fi
+
+  case "$action_kind" in
+    create)
+      action_print "Failed to create zellij session '${session_name}' on ${target_label}."
+      ;;
+    resurrect)
+      action_print "Failed to resurrect zellij session '${session_name}' on ${target_label}."
+      ;;
+    attach)
+      action_print "Failed to attach zellij session '${session_name}' on ${target_label}."
+      ;;
+    *)
+      action_print "Failed zellij action for session '${session_name}' on ${target_label}."
+      ;;
+  esac
+}
+
+run_attach_action() {
+  local mode="$1"
+  local transport="$2"
+  local host="$3"
+  local session_name="$4"
+  local action_kind="$5"
+  local target_label="$6"
+  local action_status
+
+  set +e
+  attach_session "$mode" "$transport" "$host" "$session_name"
+  action_status=$?
+  set -e
+
+  log_attach_action_result "$action_kind" "$action_status" "$session_name" "$target_label"
+  return "$action_status"
+}
+
+ensure_local_zellij() {
+  if ! command -v zellij >/dev/null 2>&1; then
+    die "zellij is required on the current machine for work-here."
+  fi
+}
+
+mosh_connect() {
+  local host="$1"
+  shift
+
+  if [ "${BOT_MOSH_NO_INIT:-1}" = "1" ]; then
+    mosh --no-init "$host" "$@"
+  else
+    mosh "$host" "$@"
+  fi
+}
+
+attach_session() {
+  local mode="$1"
+  local transport="$2"
+  local host="$3"
+  local session_name="$4"
+
+  if [ "$mode" = "local" ]; then
+    zellij attach --create "$session_name"
+    return $?
+  fi
+
+  if [ "$transport" = "mosh" ]; then
+    if command -v mosh >/dev/null 2>&1; then
+      if mosh_connect "$host" -- zellij attach --create "$session_name"; then
+        return 0
+      fi
+      tty_print "mosh failed for ${host}; falling back to ssh."
+    else
+      tty_print "mosh is not installed; falling back to ssh."
+    fi
+  fi
+
+  ssh -t "$host" "zellij attach --create '$session_name'"
+}
+
+delete_session() {
+  local mode="$1"
+  local host="$2"
+  local session_name="$3"
+
+  if [ "$mode" = "local" ]; then
+    zellij delete-session "$session_name" >/dev/null 2>&1
+    return $?
+  fi
+
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" "zellij delete-session '$session_name'" >/dev/null 2>&1
+}
+
+confirm_delete() {
+  local session_name="$1"
+  local target_label="$2"
+  local answer
+
+  if [ ! -e /dev/tty ]; then
+    return 1
+  fi
+
+  printf "Delete exited zellij session '%s' on %s? [y/N]: " "$session_name" "$target_label" > /dev/tty
+  IFS= read -r answer < /dev/tty || return 1
+
+  case "$answer" in
+    y|Y|yes|YES)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+emit_row() {
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4"
+}
+
+generate_candidates() {
+  local query="$1"
+  local cache_file="${WORK_ZELLIJ_CACHE_FILE:-}"
+  local line
+  local name
+  local state
+  local visible
+  local has_exact_match=0
+  local -a current_rows=()
+  local -a active_rows=()
+  local -a exited_rows=()
+
+  [ -n "$cache_file" ] || die "WORK_ZELLIJ_CACHE_FILE is required for candidates."
+  [ -f "$cache_file" ] || die "Candidate cache file not found: $cache_file"
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    name="$(session_name_from_line "$line")"
+    [ -n "$name" ] || continue
+
+    if [ "$query" = "$name" ]; then
+      has_exact_match=1
+    fi
+
+    if [ -n "$query" ] && ! session_name_matches_query "$name" "$query"; then
+      continue
+    fi
+
+    state="$(session_state_from_line "$line")"
+    visible="$(format_visible_row "$state" "$line")"
+
+    case "$state" in
+      current)
+        current_rows+=("$(emit_row session "$name" "$state" "$visible")")
+        ;;
+      active)
+        active_rows+=("$(emit_row session "$name" "$state" "$visible")")
+        ;;
+      exited)
+        exited_rows+=("$(emit_row session "$name" "$state" "$visible")")
+        ;;
+    esac
+  done < "$cache_file"
+
+  if [ -n "$query" ] && validate_session_name "$query" && [ "$has_exact_match" -eq 0 ]; then
+    emit_row create "$query" new "$(format_visible_row create "Create new session: $query")"
+  fi
+
+  if [ "${#current_rows[@]}" -gt 0 ]; then
+    printf '%s\n' "${current_rows[@]}"
+  fi
+  if [ "${#active_rows[@]}" -gt 0 ]; then
+    printf '%s\n' "${active_rows[@]}"
+  fi
+  if [ "${#exited_rows[@]}" -gt 0 ]; then
+    printf '%s\n' "${exited_rows[@]}"
+  fi
+}
+
+run_picker() {
+  local cache_file="$1"
+  local target_label="$2"
+  local initial_query="$3"
+  local change_bind
+  local refresh_bind
+  local header
+
+  change_bind="change:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
+  refresh_bind="ctrl-r:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
+  header="Enter attach/create | Ctrl-K delete EXITED | Ctrl-R refresh | Esc cancel"
+
+  WORK_ZELLIJ_CACHE_FILE="$cache_file" \
+    "$SCRIPT_PATH" candidates --query "$initial_query" | \
+    WORK_ZELLIJ_CACHE_FILE="$cache_file" \
+    fzf \
+      --height=70% \
+      --layout=reverse \
+      --border \
+      --info=inline \
+      --disabled \
+      --no-multi \
+      --no-sort \
+      --prompt="zellij@${target_label}> " \
+      --header="$header" \
+      --delimiter=$'\t' \
+      --with-nth=4 \
+      --query "$initial_query" \
+      --expect=ctrl-k \
+      --print-query \
+      --bind "$change_bind" \
+      --bind "$refresh_bind"
+}
+
+parse_selection_line() {
+  local selection_line="$1"
+  IFS=$'\t' read -r SELECTED_KIND SELECTED_NAME SELECTED_STATE SELECTED_VISIBLE <<EOF
+$selection_line
+EOF
+}
+
+parse_picker_output() {
+  local picker_output="$1"
+  local line
+  local line_number
+
+  key=""
+  query=""
+  selection_line=""
+  line_number=0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_number=$((line_number + 1))
+    case "$line_number" in
+      1)
+        query="$line"
+        ;;
+      2)
+        key="$line"
+        ;;
+      3)
+        selection_line="$line"
+        ;;
+    esac
+  done <<EOF
+$picker_output
+EOF
+}
+
+connect_workflow() {
+  local mode="$1"
+  local transport="$2"
+  local host="$3"
+  local explicit_session="${4:-}"
+  local target_label="$host"
+  local cache_file=""
+  local picker_output
+  local picker_status
+  local key=""
+  local query=""
+  local selection_line=""
+  local initial_query=""
+  local query_can_create=0
+  local action_kind=""
+  local delete_status
+  local session_state
+
+  if [ "$mode" = "local" ]; then
+    ensure_local_zellij
+    target_label="$(host_label)"
+    if inside_zellij; then
+      die "work-here only supports current-host session management from a plain shell. You are already inside zellij session '${ZELLIJ_SESSION_NAME:-unknown}'. Use Ctrl-o w for the built-in session manager."
+    fi
+  fi
+
+  if [ -n "$explicit_session" ]; then
+    if ! validate_session_name "$explicit_session"; then
+      die "Invalid session name: ${explicit_session}"
+    fi
+    session_state="$(exact_session_state "$mode" "$host" "$explicit_session" "$target_label")"
+    action_kind="$(action_kind_from_session_state "$session_state")"
+    run_attach_action "$mode" "$transport" "$host" "$explicit_session" "$action_kind" "$target_label"
+    return $?
+  fi
+
+  if ! command -v fzf >/dev/null 2>&1; then
+    die "fzf is required for interactive session picking. Install fzf or pass a session name explicitly."
+  fi
+
+  while true; do
+    cache_file="$(mktemp "${TMPDIR:-/tmp}/work-zellij-cache.XXXXXX")"
+    populate_session_cache_or_die "$mode" "$host" "$cache_file" "$target_label"
+
+    set +e
+    picker_output="$(run_picker "$cache_file" "$target_label" "$initial_query")"
+    picker_status=$?
+    set -e
+
+    parse_picker_output "$picker_output"
+    initial_query="$query"
+    query_can_create=0
+    if [ -n "$query" ] && validate_session_name "$query" && ! cache_has_exact_session_name "$cache_file" "$query"; then
+      query_can_create=1
+    fi
+    rm -f "$cache_file"
+
+    case "$picker_status" in
+      0|1)
+        ;;
+      130)
+        return 1
+        ;;
+      *)
+        return "$picker_status"
+        ;;
+    esac
+
+    case "$key" in
+      ctrl-k)
+        if [ -z "$selection_line" ]; then
+          tty_print "No session selected to remove."
+          continue
+        fi
+
+        parse_selection_line "$selection_line"
+        if [ "$SELECTED_KIND" != "session" ] || [ "$SELECTED_STATE" != "exited" ]; then
+          tty_print "Only EXITED sessions can be removed from this picker."
+          continue
+        fi
+
+        if ! confirm_delete "$SELECTED_NAME" "$target_label"; then
+          action_print "Cancelled delete of exited zellij session '${SELECTED_NAME}' on ${target_label}."
+          continue
+        fi
+
+        set +e
+        delete_session "$mode" "$host" "$SELECTED_NAME"
+        delete_status=$?
+        set -e
+
+        case "$delete_status" in
+          0)
+            action_print "Deleted exited zellij session '${SELECTED_NAME}' on ${target_label}."
+            initial_query=""
+            ;;
+          2)
+            action_print "Exited zellij session '${SELECTED_NAME}' on ${target_label} was already gone."
+            initial_query=""
+            ;;
+          *)
+            action_print "Failed to delete exited zellij session '${SELECTED_NAME}' on ${target_label}."
+            ;;
+        esac
+        continue
+        ;;
+      "")
+        if [ -z "$selection_line" ]; then
+          if [ "$query_can_create" -eq 1 ]; then
+            run_attach_action "$mode" "$transport" "$host" "$query" "create" "$target_label"
+            return $?
+          fi
+          tty_print "No session selected."
+          continue
+        fi
+
+        parse_selection_line "$selection_line"
+        case "$SELECTED_KIND" in
+          create|session)
+            action_kind="$SELECTED_KIND"
+            if [ "$SELECTED_KIND" = "session" ]; then
+              action_kind="$(action_kind_from_session_state "$SELECTED_STATE")"
+            fi
+            run_attach_action "$mode" "$transport" "$host" "$SELECTED_NAME" "$action_kind" "$target_label"
+            return $?
+            ;;
+          *)
+            die "Unexpected picker selection: ${SELECTED_KIND:-unknown}"
+            ;;
+        esac
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
+}
+
+main() {
+  local command="${1:-}"
+  local mode=""
+  local transport=""
+  local host=""
+  local session_name=""
+  local query=""
+
+  case "$command" in
+    connect)
+      shift
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --mode)
+            mode="${2:-}"
+            shift 2
+            ;;
+          --transport)
+            transport="${2:-}"
+            shift 2
+            ;;
+          --host)
+            host="${2:-}"
+            shift 2
+            ;;
+          --session)
+            session_name="${2:-}"
+            shift 2
+            ;;
+          -h|--help)
+            usage
+            return 0
+            ;;
+          *)
+            usage >&2
+            die "Unknown connect argument: $1"
+            ;;
+        esac
+      done
+
+      case "$mode" in
+        local|remote)
+          ;;
+        *)
+          die "connect requires --mode <local|remote>."
+          ;;
+      esac
+
+      case "$transport" in
+        local|ssh|mosh)
+          ;;
+        *)
+          die "connect requires --transport <local|ssh|mosh>."
+          ;;
+      esac
+
+      if [ "$mode" = "remote" ] && [ -z "$host" ]; then
+        die "connect requires --host for remote mode."
+      fi
+
+      connect_workflow "$mode" "$transport" "$host" "$session_name"
+      ;;
+    candidates)
+      shift
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --query)
+            query="${2:-}"
+            shift 2
+            ;;
+          -h|--help)
+            usage
+            return 0
+            ;;
+          *)
+            usage >&2
+            die "Unknown candidates argument: $1"
+            ;;
+        esac
+      done
+
+      generate_candidates "$query"
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      usage >&2
+      die "Unknown command: ${command:-<none>}"
+      ;;
+  esac
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi

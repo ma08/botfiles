@@ -59,6 +59,14 @@ check_ssh_workflow_tools() {
         echo "    You can still run with explicit session names, e.g. work-ml my-session"
     fi
 
+    if command -v zellij &> /dev/null; then
+        echo "  [OK] zellij (required for work-here and remote attach targets)"
+    else
+        echo "  [MISSING] zellij (required for work-here on this machine)"
+        echo "    Install with: brew install zellij"
+        echo "    or install via your Linux package manager or cargo."
+    fi
+
     if command -v mosh &> /dev/null; then
         echo "  [OK] mosh (used by mosh-first workflows)"
     else
