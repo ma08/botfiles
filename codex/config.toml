@@ -18,9 +18,10 @@ file_opener = "cursor"
 profile = "openai_api"
 
 [profiles.azure]
-# Rollback option:
+# Rollback options:
+# model = "gpt-5.3-codex"
 # model = "gpt-5.2-codex"
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
 
