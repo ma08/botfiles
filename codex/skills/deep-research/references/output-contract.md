@@ -19,7 +19,7 @@ If the user asks for another format, provide it after the Markdown report.
 - Question
 - Constraints
 - Time horizon
-- How research was done (OpenAI + Exa + validation approach)
+- How research was done (OpenAI + Gemini + Exa + validation approach)
 
 ## Key Findings
 - Evidence-backed findings with citations

@@ -1,7 +1,7 @@
 # Rollback option:
 # model = "gpt-5.2-codex"
-model = "gpt-5.3-codex"
-model_provider = "azure"
+model = "gpt-5.4"
+model_provider = "openai"
 model_reasoning_effort = "xhigh"
 web_search = "live"
 personality = "pragmatic"
@@ -25,7 +25,7 @@ model_provider = "azure"
 model_reasoning_effort = "xhigh"
 
 [profiles.openai_api]
-model = "gpt-5.3-codex"
+model = "gpt-5.4"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "api"
@@ -93,6 +93,9 @@ trust_level = "trusted"
 [projects."/home/azureuser/pro/personal_os"]
 trust_level = "trusted"
 
+[projects."/home/azureuser/pro/django-whatsapp-bot"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
@@ -125,6 +128,6 @@ http_headers = { "X-Figma-Region" = "us-east-1" }
 [features]
 steer = true
 shell_snapshot = true
-apps = true
+# apps = true
 multi_agent = true
-rmcp_client = true
+# rmcp_client = true

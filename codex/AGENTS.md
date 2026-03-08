@@ -41,6 +41,7 @@ These are user-level instructions shared across machines via:
 - Store accepted plans under `## Accepted Plans` and append versions (`Plan v1`, `Plan v2`, ...)
 - Each appended plan entry must include: PST timestamp, accepted signal, supersedes value, short revision summary, and full accepted plan body
 - If task targeting is ambiguous, ask a concise clarification before writing
+- Once task file is saved, ask for the user to review from the plan file and make any changes as needed to the plan. Only after their explicit approval to proceed, proceed to the implementation phase. Remember that approval for implementation is allowed only after review is done from file.
 
 ### Artifact Handling
 

@@ -1,7 +1,7 @@
 # Deep Research Workflow
 
 ## Goal
-Run two independent research passes (OpenAI + Exa), reconcile findings, and deliver a decision-grade report.
+Run three independent research passes (OpenAI + Gemini + Exa), reconcile findings, and deliver a decision-grade report.
 
 ## Speed-first execution rule
 - Run independent work in parallel by default.
@@ -24,7 +24,7 @@ Create a prompt file in task artifacts with:
 - Confidence and uncertainty instructions
 - Requirement to separate evidence vs inference
 
-## Step 3: Launch OpenAI and Exa in parallel
+## Step 3: Launch OpenAI, Gemini, and Exa in parallel
 OpenAI lane:
 
 ```bash
@@ -39,13 +39,45 @@ Exa lane:
 - Poll with `mcp__exa__deep_researcher_check` until completed.
 - Persist Exa report output in task artifacts.
 
+Gemini lane:
+
+```bash
+uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
+  --action submit_and_check \
+  --prompt-file <prompt.md> \
+  --outdir <task-progress-artifacts> \
+  --timeout-minutes 180 \
+  --max-timeout-retries 2
+```
+
+If you prefer unlimited wait:
+
+```bash
+uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
+  --action submit_and_check \
+  --prompt-file <prompt.md> \
+  --outdir <task-progress-artifacts> \
+  --timeout-minutes 0
+```
+
+Notes:
+- `--timeout-minutes <= 0` means no timeout.
+- `submit_and_check` retries a timed-out submission once by default (`--max-timeout-retries 1`).
+- Do not pass `--foreground` for deep-research agents (Gemini requires `background=true`).
+- Resume any in-flight interaction with `--action check --interaction-id <id>`.
+
 Expected OpenAI outputs:
 - Raw submit/check JSON snapshots
 - `openai-report-<response_id>.md`
 - `openai-sources-<response_id>.md`
 
+Expected Gemini outputs:
+- Raw submit/check JSON snapshots
+- `gemini-report-<interaction_id>.md`
+- `gemini-sources-<interaction_id>.md`
+
 ## Step 4: Reconcile
-- Build a claim matrix with columns: claim, OpenAI evidence, Exa evidence, source quality, confidence.
+- Build a claim matrix with columns: claim, OpenAI evidence, Gemini evidence, Exa evidence, source quality, confidence.
 - Mark conflict types:
   - Data mismatch
   - Date mismatch

@@ -1,4 +1,4 @@
 interface:
   display_name: "Deep Research"
-  short_description: "Run OpenAI+Exa deep research with markdown-first output"
-  default_prompt: "Use $deep-research to run OpenAI and Exa deep research, cross-check findings, and deliver a comprehensive easy-to-read markdown report with citations. Provide other formats only if explicitly requested."
+  short_description: "Run OpenAI+Gemini+Exa deep research with markdown-first output"
+  default_prompt: "Use $deep-research to run OpenAI, Gemini, and Exa deep research, cross-check findings, and deliver a comprehensive easy-to-read markdown report with citations. Provide other formats only if explicitly requested."
