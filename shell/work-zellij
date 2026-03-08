@@ -555,7 +555,7 @@ run_picker() {
     color_flag=1
     theme_args=(
       --ansi
-      "--color=fg:-1,bg:-1,fg+:-1,bg+:236,hl:255,hl+:255,info:5,prompt:2,pointer:2,marker:2,spinner:5,header:240,border:240,gutter:2,separator:240,scrollbar:240,query:255"
+      "--color=fg:-1,bg:-1,fg+:-1,bg+:236,hl:255,hl+:255,info:5,prompt:2,pointer:2,marker:2,spinner:5,header:240,border:240,gutter:2,query:255"
     )
   fi
 
