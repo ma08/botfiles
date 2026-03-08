@@ -27,6 +27,24 @@ die() {
   exit 1
 }
 
+picker_color_enabled() {
+  [ "${WORK_ZELLIJ_ENABLE_COLOR:-0}" = "1" ] || return 1
+  [ -z "${NO_COLOR:-}" ] || return 1
+  [ "${TERM:-}" != "dumb" ]
+}
+
+ansi_wrap() {
+  local code="$1"
+  local text="${2:-}"
+
+  if ! picker_color_enabled; then
+    printf '%s' "$text"
+    return 0
+  fi
+
+  printf '\033[%sm%s\033[m' "$code" "$text"
+}
+
 validate_session_name() {
   case "${1:-}" in
     "")
@@ -130,11 +148,98 @@ visible_prefix_for_state() {
   esac
 }
 
+styled_prefix_for_state() {
+  local state="$1"
+  local prefix
+
+  prefix="$(visible_prefix_for_state "$state")"
+
+  case "$state" in
+    current)
+      ansi_wrap '32' "$prefix"
+      ;;
+    active)
+      ansi_wrap '90' "$prefix"
+      ;;
+    exited)
+      ansi_wrap '31;1' "$prefix"
+      ;;
+    create)
+      ansi_wrap '35;1' "$prefix"
+      ;;
+    *)
+      ansi_wrap '90' "$prefix"
+      ;;
+  esac
+}
+
+format_session_body() {
+  local state="$1"
+  local line="$2"
+  local session_name="$line"
+  local created_age=""
+  local suffix=""
+
+  if [[ "$line" =~ ^(.+)\ \[Created\ (.+)\ ago\](.*)$ ]]; then
+    session_name="${BASH_REMATCH[1]}"
+    created_age="${BASH_REMATCH[2]}"
+    suffix="${BASH_REMATCH[3]}"
+  fi
+
+  printf '%s' "$(ansi_wrap '32;1' "$session_name")"
+
+  if [ -n "$created_age" ]; then
+    printf ' %s%s%s' \
+      "$(ansi_wrap '90' '[Created ')" \
+      "$(ansi_wrap '35;1' "$created_age")" \
+      "$(ansi_wrap '90' ' ago]')"
+  fi
+
+  case "$state" in
+    current)
+      printf ' %s' "$(ansi_wrap '90' '(current)')"
+      ;;
+    exited)
+      printf ' %s%s%s' \
+        "$(ansi_wrap '90' '(')" \
+        "$(ansi_wrap '31;1' 'EXITED')" \
+        "$(ansi_wrap '90' ' - attach to resurrect)')"
+      ;;
+    active)
+      if [ -n "$suffix" ]; then
+        printf '%s' "$(ansi_wrap '90' "$suffix")"
+      fi
+      ;;
+  esac
+}
+
+format_create_body() {
+  local session_name="$1"
+
+  printf '%s%s' \
+    "$(ansi_wrap '90' 'Create new session: ')" \
+    "$(ansi_wrap '32;1' "$session_name")"
+}
+
 format_visible_row() {
   local state="$1"
   local body="$2"
 
-  printf '%s  %s' "$(visible_prefix_for_state "$state")" "$body"
+  if ! picker_color_enabled; then
+    if [ "$state" = "create" ]; then
+      printf '%s  Create new session: %s' "$(visible_prefix_for_state "$state")" "$body"
+      return 0
+    fi
+    printf '%s  %s' "$(visible_prefix_for_state "$state")" "$body"
+    return 0
+  fi
+
+  if [ "$state" = "create" ]; then
+    printf '%s  %s' "$(styled_prefix_for_state "$state")" "$(format_create_body "$body")"
+    return 0
+  fi
+
+  printf '%s  %s' "$(styled_prefix_for_state "$state")" "$(format_session_body "$state" "$body")"
 }
 
 fetch_sessions() {
@@ -418,7 +523,7 @@ generate_candidates() {
   done < "$cache_file"
 
   if [ -n "$query" ] && validate_session_name "$query" && [ "$has_exact_match" -eq 0 ]; then
-    emit_row create "$query" new "$(format_visible_row create "Create new session: $query")"
+    emit_row create "$query" new "$(format_visible_row create "$query")"
   fi
 
   if [ "${#current_rows[@]}" -gt 0 ]; then
@@ -439,15 +544,28 @@ run_picker() {
   local change_bind
   local refresh_bind
   local header
+  local color_flag=0
+  local -a theme_args=()
 
   change_bind="change:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
   refresh_bind="ctrl-r:reload-sync(${SCRIPT_PATH} candidates --query {q})+first"
   header="Enter attach/create | Ctrl-K delete EXITED | Ctrl-R refresh | Esc cancel"
 
+  if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+    color_flag=1
+    theme_args=(
+      --ansi
+      "--color=fg:-1,bg:-1,fg+:-1,bg+:236,hl:255,hl+:255,info:5,prompt:2,pointer:2,marker:2,spinner:5,header:240,border:240,gutter:2,separator:240,scrollbar:240,query:255"
+    )
+  fi
+
+  WORK_ZELLIJ_ENABLE_COLOR="$color_flag" \
   WORK_ZELLIJ_CACHE_FILE="$cache_file" \
     "$SCRIPT_PATH" candidates --query "$initial_query" | \
+    WORK_ZELLIJ_ENABLE_COLOR="$color_flag" \
     WORK_ZELLIJ_CACHE_FILE="$cache_file" \
     fzf \
+      "${theme_args[@]}" \
       --height=70% \
       --layout=reverse \
       --border \

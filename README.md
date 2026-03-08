@@ -174,7 +174,8 @@ Interactive picker behavior:
 - When the typed query is a valid new session name, a dynamic create row appears at the top of the picker.
 - After create, resurrect, delete, cancel, or failure actions, the helper prints a one-line record back to the shell when control returns.
 - `work-here` is a plain-shell entrypoint. If you are already inside zellij on the current host, use `Ctrl-o w` to open the built-in session manager instead.
-- The current interaction model and text output here are the functional baseline to preserve before any later visual-only changes such as picker color or theme adjustments.
+- The picker owns a zellij-inspired color theme: green session names, magenta age text, red `EXITED` state text, and muted `fzf` chrome for the prompt, border, and header.
+- The current interaction model and themed output here are the functional baseline to preserve before any later visual refinements.
 
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 
