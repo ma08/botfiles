@@ -17,12 +17,14 @@ Capture:
 - Required deliverables and deadline
 
 ## Step 2: Write the prompt brief
-Create a prompt file in task artifacts with:
+Create a prompt file in top-level task artifacts with:
 - Objective and constraints
 - Required sections in final report
 - Explicit citation requirement
 - Confidence and uncertainty instructions
 - Requirement to separate evidence vs inference
+
+Keep raw engine outputs under `task-progress-artifacts/scratchpad/<engine>/` and reserve top-level `task-progress-artifacts/` for the final synthesized report, memo, comparison table, and other human-reviewable outputs.
 
 ## Step 3: Launch OpenAI, Gemini, and Exa in parallel
 OpenAI lane:
@@ -31,13 +33,13 @@ OpenAI lane:
 uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --action submit_and_check \
   --prompt-file <prompt.md> \
-  --outdir <task-progress-artifacts>
+  --outdir <task-progress-artifacts/scratchpad/openai>
 ```
 
 Exa lane:
 - Start with `mcp__exa__deep_researcher_start`.
 - Poll with `mcp__exa__deep_researcher_check` until completed.
-- Persist Exa report output in task artifacts.
+- Persist raw Exa report output in `task-progress-artifacts/scratchpad/exa/`, then promote only the synthesized final deliverable to top-level task artifacts.
 
 Gemini lane:
 
@@ -45,7 +47,7 @@ Gemini lane:
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action submit_and_check \
   --prompt-file <prompt.md> \
-  --outdir <task-progress-artifacts> \
+  --outdir <task-progress-artifacts/scratchpad/gemini> \
   --timeout-minutes 180 \
   --max-timeout-retries 2
 ```
@@ -56,7 +58,7 @@ If you prefer unlimited wait:
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action submit_and_check \
   --prompt-file <prompt.md> \
-  --outdir <task-progress-artifacts> \
+  --outdir <task-progress-artifacts/scratchpad/gemini> \
   --timeout-minutes 0
 ```
 
@@ -67,14 +69,14 @@ Notes:
 - Resume any in-flight interaction with `--action check --interaction-id <id>`.
 
 Expected OpenAI outputs:
-- Raw submit/check JSON snapshots
-- `openai-report-<response_id>.md`
-- `openai-sources-<response_id>.md`
+- Raw submit/check JSON snapshots under `task-progress-artifacts/scratchpad/openai/`
+- `openai-report-<response_id>.md` under `task-progress-artifacts/scratchpad/openai/`
+- `openai-sources-<response_id>.md` under `task-progress-artifacts/scratchpad/openai/`
 
 Expected Gemini outputs:
-- Raw submit/check JSON snapshots
-- `gemini-report-<interaction_id>.md`
-- `gemini-sources-<interaction_id>.md`
+- Raw submit/check JSON snapshots under `task-progress-artifacts/scratchpad/gemini/`
+- `gemini-report-<interaction_id>.md` under `task-progress-artifacts/scratchpad/gemini/`
+- `gemini-sources-<interaction_id>.md` under `task-progress-artifacts/scratchpad/gemini/`
 
 ## Step 4: Reconcile
 - Build a claim matrix with columns: claim, OpenAI evidence, Gemini evidence, Exa evidence, source quality, confidence.

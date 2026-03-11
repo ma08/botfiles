@@ -1,10 +1,11 @@
 ---
 name: start-new-task
 description: >-
-  Initialize a new task folder with status.md, user_inputs/initial.md, and
-  task-progress-artifacts/. Supports GitHub issue URL inputs, issue-informed
-  slugs (`repo-issue-number-title`), and machine/zellij metadata capture with
-  optional live-session issue block sync.
+  Initialize a new task folder with status.md, user_inputs/initial.md,
+  user_inputs/input_artifacts/, task-progress-artifacts/, and
+  task-progress-artifacts/scratchpad/. Supports GitHub issue URL inputs,
+  issue-informed slugs (`repo-issue-number-title`), and machine/zellij
+  metadata capture with optional live-session issue block sync.
 ---
 
 # Start New Task
@@ -66,14 +67,20 @@ Search for an existing task folder with the same slug:
 <HH>h<MM>m<SS>sPST-<slug>/
 ├── status.md
 ├── user_inputs/
-│   └── initial.md
+│   ├── initial.md
+│   └── input_artifacts/
 └── task-progress-artifacts/
+    └── scratchpad/
 ```
 
 ### Step 6: Populate `status.md` and `user_inputs/initial.md`
-- Capture the original description verbatim.
+- Capture the original description verbatim in `user_inputs/initial.md`.
+- Keep additional Markdown input notes directly under `user_inputs/`.
+- Reserve `user_inputs/input_artifacts/` for user-provided or user-referenced files, images, and local copies of input artifacts.
+- Create `user_inputs/input_artifacts/index.md` once the task has a captured input artifact or an external artifact reference that needs provenance without a local copy.
 - Include relevant links.
 - Keep timestamps in PST (`TZ=America/Los_Angeles date`).
+- Treat top-level `task-progress-artifacts/` as the curated deliverables area and `task-progress-artifacts/scratchpad/` as the default destination for raw/intermediate files.
 
 ### Step 7: Upsert Task Metadata + Optional Issue Live Block
 After creating `status.md`, run:

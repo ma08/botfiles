@@ -1,4 +1,4 @@
 interface:
   display_name: "Start New Task"
   short_description: "Scaffold a tracked task workspace"
-  default_prompt: "Create a new task folder with PST timestamp, status.md, immutable user_inputs/initial.md, and task-progress-artifacts. Resolve GitHub issue URLs for issue-aware slugging (`repo-issue-number-title`), then upsert task metadata (machine/coding-agent/session/zellij/issue) and sync the linked issue live-session block when available."
+  default_prompt: "Create a new task folder with PST timestamp, status.md, immutable `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. Keep the `user_inputs/` root for Markdown input notes, use `user_inputs/input_artifacts/` for files/images/reference captures, keep the top-level artifact folder curated for important deliverables/evidence, and use `scratchpad/` for raw/intermediate output files. Resolve GitHub issue URLs for issue-aware slugging (`repo-issue-number-title`), then upsert task metadata (machine/coding-agent/session/zellij/issue) and sync the linked issue live-session block when available."

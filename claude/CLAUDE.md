@@ -5,14 +5,17 @@
 When working on any task, **proactively** maintain task status documentation.
 
 ### Proactive Behavior
-- **At task start**: Use `/start-new-task` to scaffold a task folder with status.md, user_inputs/initial.md, and task-progress-artifacts/. For resuming existing tasks, use `/save-task-status` instead.
+- **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For resuming existing tasks, use `/save-task-status` instead.
 - **At any checkpoint**: Use `/get-task-details` to retrieve the active status path plus issue/machine/coding-agent session metadata.
 - **At milestones**: Update the status file when completing sub-tasks, making key decisions, or discovering important information
 - **Save artifacts continuously**:
-- When you produce or encounter log output, write scripts, capture errors, or generate any useful output — immediately save it to `task-progress-artifacts/` in the task folder. Don't wait until session end.
-- You should save any screenshots too to the `task-progress-artifacts/` folder so that we can refer to them later long-term if needed.
-- Aim to use `task-progress-artifacts/` to save any and all useful artifacts that are relevant to the task at hand. Use it instead of `/tmp` for your scratchpad.
-- When given a short-lived s3 url (generally screenshots), first download the file to `task-progress-artifacts/` and then use it as you need to.
+- When you produce or encounter log output, write scripts, capture errors, or generate any useful output — immediately save it under `task-progress-artifacts/` in the task folder. Don't wait until session end.
+- Keep the top-level `task-progress-artifacts/` folder curated for user-facing deliverables and key evidence that should be easy to browse later.
+- Use `task-progress-artifacts/scratchpad/` instead of `/tmp` for raw logs, intermediate screenshots, polling snapshots, JSON dumps, and other scratch work.
+- Keep text user input notes under `user_inputs/*.md`.
+- Save user-provided or user-referenced files/images in `user_inputs/input_artifacts/`.
+- Save generated screenshots to `task-progress-artifacts/scratchpad/` by default, then move or copy the important long-term evidence to top-level `task-progress-artifacts/` when it should be easy to review later.
+- When given a short-lived s3 url, download input-context files into `user_inputs/input_artifacts/`; download generated output captures into `task-progress-artifacts/scratchpad/`, then promote them only if they become durable reference material.
 - **Before session end**: Ensure the status file reflects the current state so work can be resumed
 - Use `/start-new-task` to create new task folders and `/save-task-status` for structured status updates throughout the task lifecycle
 
@@ -23,8 +26,9 @@ Every tracked task gets a folder at `<task-status-root>/YYYY-MM-DD/<HH>h<MM>m<SS
 - **Full path example**: `context/daily/2026-02-24/21h45m59sPST-fix-auth-timeout/`
 - **Slugs**: lowercase, hyphenated, descriptive, under 50 characters
 - **Status file**: `status.md` for new tasks; update existing `README.md` if present in legacy folders
-- **user_inputs/**: Immutable records of original user inputs. Never overwrite or delete files here. New inputs get new files (e.g., `clarifications.md`, `scope-change-YYYY-MM-DD.md`). User-provided screenshots and reference material go here, not in `task-progress-artifacts/`.
-- **Artifacts**: **Always** save log snippets, screenshots, adhoc scripts, config snapshots, command outputs, and error traces to `task-progress-artifacts/`. Copy content into the folder (don't just reference external paths that may disappear). The task folder should be a self-contained package.
+- **user_inputs/**: Immutable records of original user inputs. Never overwrite or delete files here. New text inputs get new Markdown files (e.g., `clarifications.md`, `scope-change-YYYY-MM-DD.md`).
+- **input_artifacts/**: Under `user_inputs/`, store user-provided or user-referenced files, images, and local copies of input artifacts. Maintain `user_inputs/input_artifacts/index.md` when artifacts are captured or when an external artifact cannot be copied locally.
+- **task-progress-artifacts/**: Keep curated deliverables and key evidence in top-level `task-progress-artifacts/`. Put raw log snippets, adhoc scripts, config snapshots, command outputs, screenshots, and error traces in `task-progress-artifacts/scratchpad/`. Copy content into the folder (don't just reference external paths that may disappear). The task folder should be a self-contained package.
 - **Timezone**: All timestamps in task files use PST explicitly. Use `TZ=America/Los_Angeles date` for reliable PST regardless of VM timezone. Format: `YYYY-MM-DD ~HH:MMam/pm PST`.
 - **Machine identity**: Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so metadata and notifications remain consistent across workflows.
 - **Legacy folders**: Existing folders without time prefix or `user_inputs/` continue to work unchanged.

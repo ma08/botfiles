@@ -60,12 +60,13 @@ Optimize for shortest end-to-end time without reducing research quality.
 ## OpenAI Execution
 
 Use the bundled script for deterministic runs and durable artifacts.
+Keep the final synthesized memo/report/brief in top-level `task-progress-artifacts/`, and send raw engine-specific outputs to `task-progress-artifacts/scratchpad/openai/`.
 
 ```bash
 uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --action submit_and_check \
   --prompt-file <path/to/research-prompt.md> \
-  --outdir <path/to/task-progress-artifacts>
+  --outdir <path/to/task-progress-artifacts/scratchpad/openai>
 ```
 
 Useful variants:
@@ -75,13 +76,13 @@ Useful variants:
 uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --action submit \
   --prompt-file <path/to/research-prompt.md> \
-  --outdir <path/to/task-progress-artifacts>
+  --outdir <path/to/task-progress-artifacts/scratchpad/openai>
 
 # Check an existing response id
 uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --action check \
   --response-id <resp_id> \
-  --outdir <path/to/task-progress-artifacts>
+  --outdir <path/to/task-progress-artifacts/scratchpad/openai>
 ```
 
 Model guidance:
@@ -92,12 +93,13 @@ Model guidance:
 
 Use the bundled script for deterministic runs and durable artifacts.
 For best first-pass reliability, use an explicit long timeout and retry budget.
+Keep raw Gemini outputs under `task-progress-artifacts/scratchpad/gemini/`; reserve top-level task artifacts for the synthesized outputs you want humans to review quickly.
 
 ```bash
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action submit_and_check \
   --prompt-file <path/to/research-prompt.md> \
-  --outdir <path/to/task-progress-artifacts> \
+  --outdir <path/to/task-progress-artifacts/scratchpad/gemini> \
   --timeout-minutes 180 \
   --max-timeout-retries 2
 ```
@@ -108,7 +110,7 @@ If you want unlimited waiting, use no-timeout mode:
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action submit_and_check \
   --prompt-file <path/to/research-prompt.md> \
-  --outdir <path/to/task-progress-artifacts> \
+  --outdir <path/to/task-progress-artifacts/scratchpad/gemini> \
   --timeout-minutes 0
 ```
 
@@ -119,13 +121,13 @@ Useful variants:
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action submit \
   --prompt-file <path/to/research-prompt.md> \
-  --outdir <path/to/task-progress-artifacts>
+  --outdir <path/to/task-progress-artifacts/scratchpad/gemini>
 
 # Check an existing interaction id
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
   --action check \
   --interaction-id <interaction_id> \
-  --outdir <path/to/task-progress-artifacts>
+  --outdir <path/to/task-progress-artifacts/scratchpad/gemini>
 ```
 
 Timeout behavior:
@@ -157,6 +159,8 @@ Use Exa deep researcher for an additional independent pass.
 - Continue polling until status is `completed`.
 
 3. Persist the returned report in task artifacts.
+   - Default raw Exa outputs to `task-progress-artifacts/scratchpad/exa/`.
+   - Promote only the final synthesized report/memo/brief to top-level `task-progress-artifacts/`.
 
 ## Source Quality and Citation Rules
 

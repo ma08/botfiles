@@ -35,9 +35,11 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 
 ### Step 2: Update Core Status Content
 - Refresh `Last Updated` (PST format).
-- Update `Current State`, `Progress`, `Artifacts`, `Next Steps`.
+- Update `User Inputs`, `Input Artifacts`, `Current State`, `Progress`, `Artifacts`, and `Next Steps` as needed.
+- Keep the `Input Artifacts` section focused on `user_inputs/input_artifacts/` paths and provenance notes.
+- Keep the `Artifacts` section focused on curated top-level outputs first; reference `task-progress-artifacts/scratchpad/` items only when deeper evidence is useful.
 - Preserve existing `## Accepted Plans` history.
-- Keep `user_inputs/` immutable.
+- Keep `user_inputs/` immutable; add new Markdown notes or input-artifact captures instead of overwriting prior inputs.
 
 ### Step 3: Reconcile Metadata Block
 Run:
@@ -66,7 +68,13 @@ If dependencies are missing:
 - Missing `SYSTEM_NAME`: use hostname fallback.
 
 ### Step 5: Artifact Hygiene
-Save generated outputs continuously to `task-progress-artifacts/` and reference them in status.
+- Save generated outputs continuously under `task-progress-artifacts/` and reference them in status.
+- Put raw logs, command outputs, polling snapshots, JSON dumps, intermediate screenshots, and adhoc scripts in `task-progress-artifacts/scratchpad/`.
+- Keep top-level `task-progress-artifacts/` reserved for curated deliverables and important evidence that should be easy to review later.
+- Keep Markdown input notes under `user_inputs/`.
+- Capture user-provided or user-referenced files, images, and downloaded reference copies in `user_inputs/input_artifacts/`.
+- Maintain `user_inputs/input_artifacts/index.md` when an input artifact is captured or when an external input artifact cannot be copied locally.
+- In status summaries, prefer local `user_inputs/input_artifacts/...` references for input context and top-level `task-progress-artifacts/...` references for generated outputs.
 
 ## Managed Metadata Block
 
