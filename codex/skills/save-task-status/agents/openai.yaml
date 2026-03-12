@@ -1,4 +1,4 @@
 interface:
   display_name: "Save Task Status"
   short_description: "Help with Save Task Status tasks"
-  default_prompt: "Capture and persist session progress in task status files (`status.md` or legacy `README.md`), then reconcile machine/coding-agent/session/zellij/issue metadata and refresh linked GitHub live-session blocks when drift is detected."
+  default_prompt: "Capture and persist session progress in task status files (`status.md` or legacy `README.md`). When the task is linked to a GitHub issue and a canonical issue-owning repo checkout exists locally, update that canonical task folder instead of creating a same-session duplicate in the current repo. Then reconcile machine/coding-agent/session/zellij/issue metadata and refresh linked GitHub live-session blocks when drift is detected."

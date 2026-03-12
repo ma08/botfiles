@@ -24,7 +24,9 @@ If no description is provided, ask for one.
 ## Shared Helpers
 
 ```bash
-python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_context.py --description "<text>"
+python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_context.py \
+  --project-root "<project-root>" \
+  --description "<text>"
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py --status-file "<status-file>" --sync-github-issue
 ```
 
@@ -41,6 +43,7 @@ Run:
 
 ```bash
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_context.py \
+  --project-root "<project-root>" \
   --description "<user description>" \
   --max-slug-length 60
 ```
@@ -48,6 +51,8 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_cont
 Use output fields:
 - `Task Slug`
 - `GitHub Issue` (if detected)
+- `Canonical Project Root`
+- `Canonical Task Status Root`
 - `Machine`
 - `Coding Agent`
 - `Agent Session ID`
@@ -56,12 +61,14 @@ Use output fields:
 
 ### Step 3: Slug and Folder Naming
 - If a GitHub issue URL exists, slug format is `repo-issue-<number>-<title>`.
+- If `Canonical Project Root` / `Canonical Task Status Root` are emitted for an issue-linked task, create or resume the task there instead of the current repo.
 - Enforce max slug length `60`; truncation appends a stable hash suffix.
 - Folder format remains `<HH>h<MM>m<SS>sPST-<slug>`.
 
 ### Step 4: Existing Task Check
 Search for an existing task folder with the same slug:
 - If found, ask resume vs create-new.
+- For issue-linked work, search the canonical issue-owning repo task root first.
 - If resume, hand off to `$save-task-status`.
 
 ### Step 5: Create Folder Structure
@@ -97,11 +104,16 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 
 Behavior:
 - Always upserts managed task metadata in status file.
+- Sets this task as the current task for the active `{project, coding-agent, agent-session}` context.
 - If issue-linked and GitHub CLI auth is available, upserts managed live-session block at top of issue body.
 - If dependencies are missing (`gh`, auth, zellij env), core task creation still succeeds.
 
 ### Step 8: Confirm and Continue
 Ask the user to confirm scope; proceed if they say to continue.
+
+## Current-Task Semantics
+- Starting a new task automatically switches the current task for this session.
+- This supports reusing one agent session across multiple tasks while keeping `get-task-details` semantically correct.
 
 ## Managed Metadata Contract
 

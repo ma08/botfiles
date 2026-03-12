@@ -44,7 +44,13 @@ def main() -> int:
         print("Error: No message provided", file=sys.stderr)
         return 1
 
-    send_notification(title=args.title, message=message, send_local=False)
+    send_notification(
+        title=args.title,
+        message=message,
+        send_local=False,
+        coding_agent_override="codex",
+        working_directory_override=Path.cwd(),
+    )
     print("Notification attempted")
     return 0
 

@@ -94,6 +94,16 @@ def _resolve_agent_session_id(input_data: dict) -> str:
     return _extract_session_id_from_payload(input_data)
 
 
+def _resolve_working_directory(input_data: dict) -> str | None:
+    if not isinstance(input_data, dict):
+        return None
+    for key in ("cwd", "working_directory", "workdir"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def handle_notification(input_data: dict) -> None:
     event_type = input_data.get("type", "")
     if event_type and event_type != "agent-turn-complete":
@@ -121,6 +131,8 @@ def handle_notification(input_data: dict) -> None:
         message="\n".join(message_lines).strip(),
         send_local=False,
         agent_session_id_override=agent_session_id or None,
+        coding_agent_override="codex",
+        working_directory_override=_resolve_working_directory(input_data),
     )
 
 

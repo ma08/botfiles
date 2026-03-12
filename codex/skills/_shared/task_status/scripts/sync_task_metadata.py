@@ -35,6 +35,7 @@ from task_status_common import (  # noqa: E402
     resolve_machine_name,
     resolve_status_file,
     resolve_zellij_session,
+    upsert_current_task_pointer,
     update_issue_body,
     upsert_marked_block,
 )
@@ -142,6 +143,16 @@ def main() -> int:
         log(f"Updated task metadata in {status_file}")
     else:
         log(f"No task metadata changes needed in {status_file}")
+
+    if not args.dry_run:
+        pointer_updated = upsert_current_task_pointer(
+            status_file,
+            coding_agent=coding_agent,
+            agent_session_id=agent_session_id,
+            caller_path=Path(__file__),
+        )
+        if pointer_updated:
+            log(f"Updated current-task pointer for session {agent_session_id}")
 
     if not args.sync_github_issue:
         return 0

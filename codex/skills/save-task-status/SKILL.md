@@ -31,7 +31,8 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 1. Check `AGENTS.md` `task-status-root` override.
 2. Fall back to `CLAUDE.md` override.
 3. Default to `context/daily/YYYY-MM-DD/<task-slug>/`.
-4. Update existing task folder when possible; do not create duplicates for resumed work.
+4. If the task is linked to a GitHub issue and the canonical issue-owning repo checkout is known, update that canonical task folder instead of a same-session duplicate in the current repo.
+5. Update existing task folder when possible; do not create duplicates for resumed work.
 
 ### Step 2: Update Core Status Content
 - Refresh `Last Updated` (PST format).
@@ -52,6 +53,7 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 
 What this does:
 - Upserts managed `TASK-METADATA` block in status file.
+- Updates the machine-local current-task pointer for this `{project, coding-agent, agent-session}` so later `get-task-details` resolves this task as current.
 - Recomputes:
   - Machine (`SYSTEM_NAME` -> hostname -> `unknown`)
   - Coding agent (`codex|claude|unknown`)
@@ -75,6 +77,10 @@ If dependencies are missing:
 - Capture user-provided or user-referenced files, images, and downloaded reference copies in `user_inputs/input_artifacts/`.
 - Maintain `user_inputs/input_artifacts/index.md` when an input artifact is captured or when an external input artifact cannot be copied locally.
 - In status summaries, prefer local `user_inputs/input_artifacts/...` references for input context and top-level `task-progress-artifacts/...` references for generated outputs.
+
+## Current-Task Semantics
+- `save-task-status` is also a task switch for the current session.
+- If one agent session touches multiple tasks over time, the most recently synced task becomes the session's current task.
 
 ## Managed Metadata Block
 

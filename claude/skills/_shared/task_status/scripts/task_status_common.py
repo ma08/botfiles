@@ -26,14 +26,26 @@ GITHUB_ISSUE_RE = re.compile(
     r"^https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)(?:[/?#].*)?$",
     re.IGNORECASE,
 )
+GITHUB_REMOTE_RE = re.compile(
+    r"^(?:https?://github\.com/|ssh://git@github\.com/|git@github\.com:)"
+    r"(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)(?:\.git)?/?$",
+    re.IGNORECASE,
+)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ROOT_OVERRIDE_RE = re.compile(r"^\s*task-status-root:\s*(?P<value>.+?)\s*$")
 BULLET_KV_RE = re.compile(r"^\s*-\s*([^:]+):\s*(.*)\s*$")
+TASK_FOLDER_TIME_PREFIX_RE = re.compile(r"^\d{2}h\d{2}m\d{2}sPST-")
+TASK_HASH_SUFFIX_RE = re.compile(r"-[0-9a-f]{8,}$")
+ISSUE_SLUG_WITH_SEMANTIC_RE = re.compile(r"^(.+-issue-\d+)(?:-(.+))?$")
+PST_LABEL_RE = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2}) ~(?P<hour>\d{2}):(?P<minute>\d{2})(?P<ampm>am|pm) PST$"
+)
 
 TASK_METADATA_START = "<!-- TASK-METADATA:START -->"
 TASK_METADATA_END = "<!-- TASK-METADATA:END -->"
 LIVE_SESSION_START = "<!-- LIVE-SESSION:START -->"
 LIVE_SESSION_END = "<!-- LIVE-SESSION:END -->"
+TASK_STATUS_STATE_FILENAME = "task-status-state.json"
 
 
 @dataclass(frozen=True)
@@ -57,6 +69,31 @@ class IssueData:
     updated_at: str
     created_at: str
     author_login: str
+
+
+@dataclass(frozen=True)
+class RuntimeTaskContext:
+    machine: str
+    coding_agent: str
+    agent_session_id: str
+    zellij_session: str
+    zellij_link: str
+
+
+@dataclass(frozen=True)
+class TaskCandidate:
+    task_dir: Path
+    status_file: Path | None
+    metadata: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CurrentTaskPointer:
+    project_root: Path
+    task_dir: Path
+    status_file: Path
+    task_label: str
+    updated_at: str
 
 
 def now_pst_label() -> str:
@@ -168,6 +205,7 @@ def resolve_agent_session_id(env: dict[str, str] | None = None) -> str:
     for key in (
         "CODEX_THREAD_ID",
         "CODEX_SESSION_ID",
+        "AGENT_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CLAUDE_SESSION_ID",
         "SESSION_ID",
@@ -191,6 +229,23 @@ def build_attach_command(session_name: str) -> str:
     if session_name == "none":
         return "none"
     return f"zellij attach {shell_quote(session_name)}"
+
+
+def resolve_runtime_task_context(
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> RuntimeTaskContext:
+    merged = merged_env_with_botfiles_defaults(env or dict(os.environ), caller_path=caller_path)
+    default_agent = infer_agent_from_script(caller_path or Path(__file__))
+    zellij_session = resolve_zellij_session(merged)
+    return RuntimeTaskContext(
+        machine=resolve_machine_name(merged),
+        coding_agent=resolve_agent_name(merged, default_agent=default_agent),
+        agent_session_id=resolve_agent_session_id(merged),
+        zellij_session=zellij_session,
+        zellij_link=build_zellij_link(zellij_session, merged),
+    )
 
 
 def slugify(value: str) -> str:
@@ -528,6 +583,169 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
 
+def sanitize_task_label(raw_value: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9._-]+", "-", raw_value.strip())
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-")
+    if not normalized:
+        return ""
+    return normalized[:80]
+
+
+def extract_full_task_folder_slug(raw_value: str) -> str:
+    sanitized = sanitize_task_label(raw_value)
+    if not sanitized:
+        return ""
+    without_time_prefix = TASK_FOLDER_TIME_PREFIX_RE.sub("", sanitized)
+    return sanitize_task_label(without_time_prefix) or without_time_prefix
+
+
+def extract_semantic_task_label(raw_value: str) -> str:
+    sanitized = extract_full_task_folder_slug(raw_value)
+    if not sanitized:
+        return ""
+
+    candidate = TASK_HASH_SUFFIX_RE.sub("", sanitized).strip("-")
+    if not candidate:
+        candidate = sanitized
+
+    issue_match = ISSUE_SLUG_WITH_SEMANTIC_RE.match(candidate)
+    if issue_match:
+        issue_prefix = issue_match.group(1).strip("-")
+        semantic_suffix = (issue_match.group(2) or "").strip("-")
+        candidate = f"{issue_prefix}-{semantic_suffix}" if semantic_suffix else issue_prefix
+
+    return sanitize_task_label(candidate)
+
+
+def normalize_repo_slug(raw_value: str) -> str:
+    return slugify(raw_value)
+
+
+def parse_github_repo_key(raw_value: str) -> str | None:
+    candidate = (raw_value or "").strip()
+    if not candidate:
+        return None
+    if "/" in candidate and not candidate.startswith(("http://", "https://", "ssh://", "git@")):
+        owner, repo = candidate.split("/", 1)
+        owner = owner.strip().strip("/")
+        repo = repo.strip().strip("/").removesuffix(".git")
+        if owner and repo:
+            return f"{owner.lower()}/{repo.lower()}"
+        return None
+
+    match = GITHUB_REMOTE_RE.match(candidate)
+    if not match:
+        return None
+    owner = match.group("owner").strip().lower()
+    repo = match.group("repo").strip().lower()
+    if not owner or not repo:
+        return None
+    return f"{owner}/{repo}"
+
+
+def resolve_git_origin_repo_key(repo_root: Path) -> str | None:
+    resolved_root = repo_root.expanduser().resolve()
+    if not resolved_root.is_dir():
+        return None
+    code, stdout, _ = run_command(
+        ["git", "-C", str(resolved_root), "remote", "get-url", "origin"],
+        timeout_seconds=10,
+    )
+    if code != 0:
+        return None
+    return parse_github_repo_key(stdout.strip())
+
+
+def local_repo_search_roots(current_project_root: Path | None = None) -> list[Path]:
+    candidates: list[Path] = []
+    if current_project_root:
+        candidates.append(current_project_root.expanduser().resolve().parent)
+    candidates.append((Path.home() / "pro").resolve())
+
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen or not candidate.is_dir():
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+    return unique
+
+
+def find_local_repo_roots_for_github_repo(
+    repo_key: str,
+    *,
+    current_project_root: Path | None = None,
+) -> list[Path]:
+    target_repo_key = parse_github_repo_key(repo_key)
+    if not target_repo_key:
+        return []
+
+    matches: list[Path] = []
+    seen: set[Path] = set()
+
+    def maybe_add(repo_root: Path) -> None:
+        resolved = repo_root.expanduser().resolve()
+        if resolved in seen or not resolved.is_dir():
+            return
+        seen.add(resolved)
+        if resolve_git_origin_repo_key(resolved) == target_repo_key:
+            matches.append(resolved)
+
+    if current_project_root:
+        maybe_add(current_project_root)
+
+    for search_root in local_repo_search_roots(current_project_root):
+        for child in sorted(search_root.iterdir()):
+            if not child.is_dir():
+                continue
+            if not (child / ".git").exists():
+                continue
+            maybe_add(child)
+
+    return matches
+
+
+def parse_pst_label(value: str) -> datetime | None:
+    match = PST_LABEL_RE.match((value or "").strip())
+    if not match:
+        return None
+
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute"))
+    ampm = match.group("ampm")
+    if ampm == "am":
+        hour = 0 if hour == 12 else hour
+    else:
+        hour = 12 if hour == 12 else hour + 12
+
+    try:
+        date_part = datetime.strptime(match.group("date"), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    return datetime(
+        date_part.year,
+        date_part.month,
+        date_part.day,
+        hour,
+        minute,
+        tzinfo=ZoneInfo("America/Los_Angeles"),
+    )
+
+
+def read_task_metadata(status_file: Path | None) -> dict[str, str]:
+    if not status_file:
+        return {}
+    text = read_text(status_file)
+    block = extract_marked_block(
+        text,
+        start_marker=TASK_METADATA_START,
+        end_marker=TASK_METADATA_END,
+    )
+    return parse_bullet_metadata(block)
+
+
 def resolve_task_status_root(project_root: Path, *, caller_path: Path | None = None) -> Path:
     filenames = ("AGENTS.md", "CLAUDE.md")
     if caller_path:
@@ -575,6 +793,189 @@ def find_task_dirs(root: Path, slug: str | None = None) -> list[Path]:
                 continue
             candidates.append(task_dir)
     return candidates
+
+
+def load_task_candidates(root: Path, slug: str | None = None) -> list[TaskCandidate]:
+    candidates: list[TaskCandidate] = []
+    for task_dir in find_task_dirs(root, slug=slug):
+        status_file = resolve_status_file(task_dir)
+        candidates.append(
+            TaskCandidate(
+                task_dir=task_dir,
+                status_file=status_file,
+                metadata=read_task_metadata(status_file),
+            )
+        )
+    return candidates
+
+
+def task_candidate_sort_key(candidate: TaskCandidate) -> tuple[float, float, str]:
+    last_synced = parse_pst_label(candidate.metadata.get("Last Synced", ""))
+    last_synced_ts = last_synced.timestamp() if last_synced else 0.0
+    status_mtime = 0.0
+    if candidate.status_file and candidate.status_file.is_file():
+        try:
+            status_mtime = candidate.status_file.stat().st_mtime
+        except OSError:
+            status_mtime = 0.0
+    return (last_synced_ts, status_mtime, candidate.task_dir.name)
+
+
+def sort_task_candidates_by_recency(candidates: list[TaskCandidate]) -> list[TaskCandidate]:
+    return sorted(candidates, key=task_candidate_sort_key, reverse=True)
+
+
+def session_matching_candidates(
+    candidates: list[TaskCandidate],
+    agent_session_id: str,
+) -> list[TaskCandidate]:
+    if not agent_session_id or agent_session_id == "none":
+        return []
+    return [
+        candidate
+        for candidate in candidates
+        if candidate.metadata.get("Agent Session ID", "").strip() == agent_session_id
+    ]
+
+
+def resolve_task_status_state_path(*, caller_path: Path | None = None) -> Path | None:
+    root = discover_botfiles_root(caller_path or Path(__file__))
+    if not root:
+        return None
+    return root / "secrets" / "local" / TASK_STATUS_STATE_FILENAME
+
+
+def infer_project_root_from_path(path: Path) -> Path | None:
+    resolved = path.expanduser().resolve()
+    start = resolved if resolved.is_dir() else resolved.parent
+    for candidate in [start] + list(start.parents):
+        if (
+            (candidate / "AGENTS.md").is_file()
+            or (candidate / "CLAUDE.md").is_file()
+            or (candidate / ".botrc").is_file()
+        ):
+            return candidate
+    return None
+
+
+def build_session_task_key(project_root: Path, coding_agent: str, agent_session_id: str) -> str:
+    return f"{project_root.resolve()}::{(coding_agent or 'unknown').strip() or 'unknown'}::{agent_session_id.strip()}"
+
+
+def load_json_map(path: Path) -> dict[str, dict]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def save_json_map(path: Path, payload: dict[str, dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def upsert_current_task_pointer(
+    status_file: Path,
+    *,
+    coding_agent: str,
+    agent_session_id: str,
+    task_label: str | None = None,
+    caller_path: Path | None = None,
+) -> bool:
+    if not agent_session_id or agent_session_id == "none":
+        return False
+
+    state_path = resolve_task_status_state_path(caller_path=caller_path)
+    project_root = infer_project_root_from_path(status_file)
+    if not state_path or not project_root:
+        return False
+
+    resolved_status = status_file.expanduser().resolve()
+    task_dir = resolved_status.parent
+    key = build_session_task_key(project_root, coding_agent, agent_session_id)
+    payload = load_json_map(state_path)
+    entry = {
+        "project_root": str(project_root),
+        "task_dir": str(task_dir),
+        "status_file": str(resolved_status),
+        "task_label": task_label or extract_full_task_folder_slug(task_dir.name),
+        "updated_at": now_pst_label(),
+    }
+    if payload.get(key) == entry:
+        return False
+    payload[key] = entry
+    save_json_map(state_path, payload)
+    return True
+
+
+def delete_current_task_pointer(
+    project_root: Path,
+    *,
+    coding_agent: str,
+    agent_session_id: str,
+    caller_path: Path | None = None,
+) -> bool:
+    if not agent_session_id or agent_session_id == "none":
+        return False
+
+    state_path = resolve_task_status_state_path(caller_path=caller_path)
+    if not state_path:
+        return False
+
+    payload = load_json_map(state_path)
+    key = build_session_task_key(project_root, coding_agent, agent_session_id)
+    if key not in payload:
+        return False
+
+    payload.pop(key, None)
+    if payload:
+        save_json_map(state_path, payload)
+    else:
+        state_path.unlink(missing_ok=True)
+    return True
+
+
+def resolve_current_task_pointer(
+    project_root: Path,
+    *,
+    coding_agent: str,
+    agent_session_id: str,
+    caller_path: Path | None = None,
+) -> CurrentTaskPointer | None:
+    if not agent_session_id or agent_session_id == "none":
+        return None
+
+    state_path = resolve_task_status_state_path(caller_path=caller_path)
+    if not state_path:
+        return None
+    payload = load_json_map(state_path)
+    key = build_session_task_key(project_root, coding_agent, agent_session_id)
+    raw = payload.get(key)
+    if not isinstance(raw, dict):
+        return None
+
+    task_dir_raw = str(raw.get("task_dir", "")).strip()
+    status_file_raw = str(raw.get("status_file", "")).strip()
+    task_label = str(raw.get("task_label", "")).strip()
+    updated_at = str(raw.get("updated_at", "")).strip()
+    if not task_dir_raw or not status_file_raw:
+        return None
+
+    task_dir = Path(task_dir_raw).expanduser().resolve()
+    status_file = Path(status_file_raw).expanduser().resolve()
+    if not task_dir.is_dir() or not status_file.is_file():
+        return None
+
+    return CurrentTaskPointer(
+        project_root=project_root.resolve(),
+        task_dir=task_dir,
+        status_file=status_file,
+        task_label=task_label or extract_full_task_folder_slug(task_dir.name),
+        updated_at=updated_at,
+    )
 
 
 def non_issue_urls(urls: Iterable[str], issue_ref: IssueRef | None) -> list[str]:

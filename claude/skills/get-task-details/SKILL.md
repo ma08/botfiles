@@ -20,11 +20,18 @@ Resolve task status path and metadata in one read-only command.
 
 ```bash
 python ~/pro/botfiles/claude/skills/_shared/task_status/scripts/get_task_details.py \
+  --status-file "<optional-explicit-status-file>" \
+  --task-dir "<optional-explicit-task-dir>" \
   --project-root "<project-root>" \
   --task-slug "<optional-slug>"
 ```
 
 ## Output Contract (Human-Readable)
+- Default call (no `task-slug`):
+  - resolves the current task for this session
+  - checks the machine-local current-task pointer first
+  - if the pointer is missing or stale, falls back to the latest same-session task in the current project
+  - prints a clear no-match message instead of guessing from unrelated recent folders
 - Primary task:
   - Task folder
   - Status file path
@@ -34,13 +41,17 @@ python ~/pro/botfiles/claude/skills/_shared/task_status/scripts/get_task_details
   - Agent session ID
   - Zellij session
   - Zellij link
-- Optional Related tasks (same slug pattern)
-- Optional Stale tasks (>7 days old)
+- Optional Related tasks (same slug pattern) only when `task-slug` is used
+- Optional Stale tasks (>7 days old) only when `task-slug` is used
 
-If no task is found, print a clear message and suggest `/start-new-task`.
+If no task is found for the current session, print a clear message and suggest `save-task-status` or `start-new-task`.
 
 ## Notes
 - Read-only: this skill never edits files.
+- If recent conversation already includes an exact task folder path or `status.md` path, pass it directly with `--task-dir` or `--status-file` instead of relying on repo/session inference.
+- Default mode is current-task-for-this-session; use `task-slug` when you intentionally want cross-session lookup.
+- Multiple tasks in one agent session are supported: the current task is whichever task was most recently touched by `start-new-task` or `save-task-status` in this session.
+- Legacy or unsynced task folders without a managed `Task Metadata` block cannot be auto-resolved as the current session task.
 - Task status root resolution order:
   1. `CLAUDE.md` `task-status-root`
   2. `AGENTS.md` `task-status-root`

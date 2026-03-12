@@ -8,6 +8,14 @@ import sys
 from utils import send_notification
 
 
+def _resolve_working_directory(input_data: dict) -> str | None:
+    for key in ("cwd", "working_directory", "workdir"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def handle_pretooluse(input_data: dict) -> None:
     """Handle PreToolUse event by sending notification."""
     tool_name = input_data.get("tool_name", "Unknown")
@@ -25,6 +33,8 @@ def handle_pretooluse(input_data: dict) -> None:
     send_notification(
         title="Claude Code",
         message=f"Awaiting Your Input\n{message}",
+        coding_agent_override="claude",
+        working_directory_override=_resolve_working_directory(input_data),
     )
 
 

@@ -8,6 +8,14 @@ import sys
 from utils import get_latest_message_from_transcript, send_notification
 
 
+def _resolve_working_directory(input_data: dict) -> str | None:
+    for key in ("cwd", "working_directory", "workdir"):
+        value = input_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def handle_stop(input_data: dict) -> None:
     """Handle stop event by sending notification with latest message."""
     transcript_path = input_data.get("transcript_path", "")
@@ -16,6 +24,8 @@ def handle_stop(input_data: dict) -> None:
     send_notification(
         title="Claude Code",
         message=f"Finished Processing\n{latest_message}",
+        coding_agent_override="claude",
+        working_directory_override=_resolve_working_directory(input_data),
     )
 
 

@@ -1,0 +1,178 @@
+== syntax ==
+
+== codex/claude parity ==
+shared helper copies are in sync
+
+== default current-session lookup ==
+Primary:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb/status.md
+  Age (days): 4
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/16
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: 019cca7b-bc27-77e3-8f0d-33200d679162
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+== explicit slug: issue-16 ==
+Primary:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb/status.md
+  Age (days): 4
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/16
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: 019cca7b-bc27-77e3-8f0d-33200d679162
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+== explicit slug: personal-os-issue ==
+Primary:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb/status.md
+  Age (days): 4
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/16
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: 019cca7b-bc27-77e3-8f0d-33200d679162
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+Related:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-09/06h43m49sPST-sourya-personal-os-issue-20-make-support-request-to-cd586cef
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-09/06h43m49sPST-sourya-personal-os-issue-20-make-support-request-to-cd586cef/status.md
+  Age (days): 2
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/20
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019cd2d6-ba6d-75c1-b71e-cea6418af147
+  Zellij Session: personal-os
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/personal-os
+
+Related:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-08/07h16m30sPST-sourya-personal-os-issue-17-deploy-gpt-5-4-in-azure
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-08/07h16m30sPST-sourya-personal-os-issue-17-deploy-gpt-5-4-in-azure/status.md
+  Age (days): 3
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/17
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019ccdcc-e3fd-7d13-9d2c-e3a58725a3ff
+  Zellij Session: personal-os
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/personal-os
+
+
+Stale:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/18h02m44sPST-sourya-personal-os-issue-15-deep-research-about-opp-d3d6f9d0
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/18h02m44sPST-sourya-personal-os-issue-15-deep-research-about-opp-d3d6f9d0/status.md
+  Age (days): 8
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/15
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019cb690-491a-7592-b3d0-558d519ab1b6
+  Zellij Session: startup-position
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/startup-position
+
+Stale:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/16h17m43sPST-sourya-personal-os-issue-13-find-sam-altman-email-t-4f55701f
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/16h17m43sPST-sourya-personal-os-issue-13-find-sam-altman-email-t-4f55701f/status.md
+  Age (days): 8
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/13
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: 019cb629-a89b-75c3-8ef2-8859a0fa2026
+  Zellij Session: find-sam-altman-screenshot
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/find-sam-altman-screenshot
+
+Stale:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/15h58m40sPST-sourya-personal-os-issue-12-add-gemini-deep-researc-5479c6bd
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/15h58m40sPST-sourya-personal-os-issue-12-add-gemini-deep-researc-5479c6bd/status.md
+  Age (days): 8
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/12
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019cb622-4d70-7f83-a929-37fe3e291862
+  Zellij Session: add-gemini-to-deep-research
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/add-gemini-to-deep-research
+
+Stale:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/01h16m21sPST-sourya-personal-os-issue-11-research-about-tool-use-e3be0fc4
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-03/01h16m21sPST-sourya-personal-os-issue-11-research-about-tool-use-e3be0fc4/status.md
+  Age (days): 8
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/11
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019cb2ef-cd99-7cb2-b159-64662f31734f
+  Zellij Session: startup-position
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/startup-position
+
+Stale:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-02/15h05m35sPST-sourya-personal-os-issue-9-follow-up-add-email-noti-269b0ba1
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-02/15h05m35sPST-sourya-personal-os-issue-9-follow-up-add-email-noti-269b0ba1/status.md
+  Age (days): 9
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/9
+  Machine: Azure-A100-GPU-VM
+  Coding Agent: codex
+  Agent Session ID: 019cb0bf-def3-7851-811f-503be2976c73
+  Zellij Session: personal-os
+  Zellij Link: https://ladduu-dev-ml-vm.tailaaddce.ts.net:8443/personal-os
+
+... 2 more stale entries omitted
+
+== fail-closed no-match ==
+No task folder matches the current session.
+
+Current Session:
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: does-not-exist
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+Suggestion: use save-task-status on the active task, or start-new-task if this session does not have one yet.
+
+== AGENT_SESSION_ID-only compatibility ==
+Primary:
+  Task Folder: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb
+  Status File: /Users/sourya4/pro/personal_os/context/daily/2026-03-07/14h49m13sPST-sourya-personal-os-issue-16-improve-zellij-session-1ae743cb/status.md
+  Age (days): 4
+  GitHub Issue: https://github.com/ladduu-org/sourya-personal-os/issues/16
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: 019cca7b-bc27-77e3-8f0d-33200d679162
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+== ambiguity handling fixture ==
+Multiple task folders match the current session.
+
+Current Session:
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: duplicate-session-id
+  Zellij Session: personal-os
+  Zellij Link: https://souryas-macbook-pro.tailaaddce.ts.net:8443/personal-os
+
+Match:
+  Task Folder: /private/var/folders/xy/y0j19ks91bn_8t3q1j9m9t100000gp/T/tmp.zCRN2YSJAy/context/daily/2026-03-11/14h00m01sPST-dup-b
+  Status File: /private/var/folders/xy/y0j19ks91bn_8t3q1j9m9t100000gp/T/tmp.zCRN2YSJAy/context/daily/2026-03-11/14h00m01sPST-dup-b/status.md
+  Age (days): 0
+  GitHub Issue: none
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: duplicate-session-id
+  Zellij Session: personal-os
+  Zellij Link: none
+
+Match:
+  Task Folder: /private/var/folders/xy/y0j19ks91bn_8t3q1j9m9t100000gp/T/tmp.zCRN2YSJAy/context/daily/2026-03-11/14h00m00sPST-dup-a
+  Status File: /private/var/folders/xy/y0j19ks91bn_8t3q1j9m9t100000gp/T/tmp.zCRN2YSJAy/context/daily/2026-03-11/14h00m00sPST-dup-a/status.md
+  Age (days): 0
+  GitHub Issue: none
+  Machine: Sourya-Macbook
+  Coding Agent: codex
+  Agent Session ID: duplicate-session-id
+  Zellij Session: personal-os
+  Zellij Link: none
+
+Suggestion: use a narrower task-slug or clean up duplicate task metadata for this session.

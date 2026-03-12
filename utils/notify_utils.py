@@ -8,6 +8,7 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import uuid
 from datetime import datetime
@@ -22,6 +23,23 @@ import requests
 
 _BOTFILES_ROOT = Path(__file__).resolve().parents[1]
 _CLAUDE_HOOKS_DIR = _BOTFILES_ROOT / "claude" / "hooks"
+_TASK_STATUS_SCRIPTS_DIR = _BOTFILES_ROOT / "codex" / "skills" / "_shared" / "task_status" / "scripts"
+if str(_TASK_STATUS_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TASK_STATUS_SCRIPTS_DIR))
+
+from task_status_common import (  # noqa: E402
+    extract_full_task_folder_slug as _shared_extract_full_task_folder_slug,
+    extract_semantic_task_label as _shared_extract_semantic_task_label,
+    infer_project_root_from_path,
+    load_task_candidates,
+    normalize_repo_slug as _shared_normalize_repo_slug,
+    resolve_current_task_pointer,
+    resolve_runtime_task_context,
+    resolve_task_status_root,
+    session_matching_candidates,
+    sort_task_candidates_by_recency,
+)
+
 _ENV_FILES = [
     _BOTFILES_ROOT / "secrets" / "local" / "machine.rc",
     _BOTFILES_ROOT / "secrets" / "local" / "claude-hooks.rc",
@@ -41,8 +59,10 @@ _AGENT_SESSION_ENV_KEYS = (
     "CODEX_THREAD_ID",
     "CODEX_SESSION_ID",
     "AGENT_SESSION_ID",
+    "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
 )
+_ZELLIJ_FOCUSED_TAB_RE = re.compile(r'tab name="(?P<name>[^"]+)"[^\n]*\bfocus=true\b')
 
 _LOG_FILE = _CLAUDE_HOOKS_DIR / "hooks.log"
 
@@ -181,6 +201,39 @@ def build_context_header(system_name: str, session_name: str, agent_session_id: 
     return f"[{system_name} | sid:{resolved_agent_session_id} | zj:{session_name}]"
 
 
+def shorten_session_id(agent_session_id: str, length: int = 8) -> str:
+    """Return a compact display token for a session ID without affecting identity."""
+    resolved = (agent_session_id or "").strip()
+    if not resolved:
+        return ""
+    return resolved[:length]
+
+
+def build_notification_preview_line(
+    *,
+    task_label: str,
+    session_name: str,
+    zellij_tab_name: str,
+    agent_session_id: str,
+) -> str:
+    """Build a task-first preview line shared by email and WhatsApp."""
+    segments: list[str] = [_extract_full_task_folder_slug(task_label) or "unknown-task"]
+
+    resolved_session_name = (session_name or "").strip()
+    if resolved_session_name and resolved_session_name not in {"unknown", "none"}:
+        zellij_segment = f"zj:{resolved_session_name}"
+        resolved_tab_name = (zellij_tab_name or "").strip()
+        if resolved_tab_name:
+            zellij_segment = f"{zellij_segment}/{resolved_tab_name}"
+        segments.append(zellij_segment)
+
+    resolved_agent_session_id = (agent_session_id or "").strip()
+    if resolved_agent_session_id:
+        segments.append(f"sid:{resolved_agent_session_id}")
+
+    return " | ".join(segments)
+
+
 def build_zellij_session_url(
     session_name: str,
     base_url: str,
@@ -217,8 +270,20 @@ def build_email_subject(
     session_name: str,
     subject_prefix: str,
     task_label: str,
+    *,
+    coding_agent: str,
+    agent_session_id: str,
 ) -> str:
     """Build a stable subject for per-session email thread grouping."""
+    resolved_coding_agent = coding_agent.strip() or "unknown"
+    resolved_agent_session_id = agent_session_id.strip()
+    if resolved_agent_session_id:
+        display_session_id = shorten_session_id(resolved_agent_session_id)
+        return (
+            f"{subject_prefix} "
+            f"[{system_name} | {resolved_coding_agent} | sid:{display_session_id}]"
+        )
+
     resolved_session_name = session_name if session_name and session_name != "unknown" else "none"
     return (
         f"{subject_prefix} "
@@ -228,47 +293,37 @@ def build_email_subject(
 
 
 def _sanitize_task_label(raw_value: str) -> str:
-    normalized = re.sub(r"[^a-zA-Z0-9._-]+", "-", raw_value.strip())
-    normalized = re.sub(r"-{2,}", "-", normalized).strip("-")
-    if not normalized:
-        return ""
-    return normalized[:80]
+    return _extract_full_task_folder_slug(raw_value)
+
+
+def _extract_full_task_folder_slug(raw_value: str) -> str:
+    return _shared_extract_full_task_folder_slug(raw_value)
 
 
 def _extract_semantic_task_label(raw_value: str) -> str:
-    """Extract a clean task label while preserving issue prefix + semantic suffix."""
-    sanitized = _sanitize_task_label(raw_value)
-    if not sanitized:
-        return ""
-
-    without_time_prefix = _TASK_FOLDER_TIME_PREFIX_RE.sub("", sanitized)
-
-    candidate = _TASK_HASH_SUFFIX_RE.sub("", without_time_prefix).strip("-")
-    if not candidate:
-        candidate = without_time_prefix
-
-    issue_match = _ISSUE_SLUG_WITH_SEMANTIC_RE.match(candidate)
-    if issue_match:
-        issue_prefix = issue_match.group(1).strip("-")
-        semantic_suffix = (issue_match.group(2) or "").strip("-")
-        if semantic_suffix:
-            candidate = f"{issue_prefix}-{semantic_suffix}"
-        else:
-            candidate = issue_prefix
-
-    return _sanitize_task_label(candidate)
+    return _shared_extract_semantic_task_label(raw_value)
 
 
-def _task_label_from_cwd_context_path() -> str:
+def _normalize_repo_fallback_label(raw_value: str) -> str:
+    return _shared_normalize_repo_slug(raw_value)
+
+
+def _resolve_context_path(working_directory_override: str | os.PathLike[str] | None = None) -> Path:
+    raw_path = working_directory_override if working_directory_override is not None else Path.cwd()
+    return Path(raw_path).expanduser().resolve()
+
+
+def _task_label_from_cwd_context_path(context_path: Path) -> str:
     """
     Resolve task folder label from cwd when running inside context/daily/<date>/<task>/...
     """
-    cwd_parts = Path.cwd().resolve().parts
+    resolved_context = context_path if context_path.is_dir() else context_path.parent
+    cwd_parts = resolved_context.parts
     for index in range(len(cwd_parts) - 3):
         if cwd_parts[index] == "context" and cwd_parts[index + 1] == "daily":
             date_component = cwd_parts[index + 2]
             if _DATE_FOLDER_RE.match(date_component):
-                return _extract_semantic_task_label(cwd_parts[index + 3])
+                return _extract_full_task_folder_slug(cwd_parts[index + 3])
     return ""
 
 
@@ -280,64 +335,127 @@ def _get_agent_session_id() -> str:
     return ""
 
 
-def _task_label_from_status_files(agent_session_id: str) -> str:
+def _task_label_from_status_files(
+    agent_session_id: str,
+    *,
+    project_root: Path,
+    coding_agent: str,
+) -> str:
     """
-    Resolve task label by finding a matching task status file in the current repo.
+    Resolve task label from the current-task pointer, then fall back to the
+    latest same-session task in the current project.
     """
     if not agent_session_id:
         return ""
 
-    context_daily = Path.cwd() / "context" / "daily"
-    if not context_daily.exists():
-        return ""
+    pointer = resolve_current_task_pointer(
+        project_root,
+        coding_agent=coding_agent,
+        agent_session_id=agent_session_id,
+        caller_path=Path(__file__),
+    )
+    if pointer:
+        pointer_label = _extract_full_task_folder_slug(pointer.task_dir.name)
+        if pointer_label:
+            return pointer_label
 
-    date_dirs = [
-        d for d in context_daily.iterdir() if d.is_dir() and _DATE_FOLDER_RE.match(d.name)
-    ]
-    date_dirs.sort(key=lambda d: d.name, reverse=True)
-
-    for date_dir in date_dirs[:14]:
-        status_files = list(date_dir.glob("*/status.md")) + list(date_dir.glob("*/README.md"))
-        status_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-        for status_file in status_files:
-            try:
-                content = status_file.read_text()
-            except Exception:
-                continue
-
-            if agent_session_id in content:
-                return _extract_semantic_task_label(status_file.parent.name)
+    status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
+    candidates = load_task_candidates(status_root)
+    matches = sort_task_candidates_by_recency(
+        session_matching_candidates(candidates, agent_session_id)
+    )
+    if matches:
+        return _extract_full_task_folder_slug(matches[0].task_dir.name)
 
     return ""
 
 
-def get_task_label(config: dict) -> str:
-    """Resolve a task label for email subject/thread grouping."""
+def get_task_label(
+    config: dict,
+    *,
+    working_directory_override: str | os.PathLike[str] | None = None,
+    agent_session_id: str | None = None,
+    coding_agent_override: str | None = None,
+) -> str:
+    """Resolve a task label for email body/context."""
+    context_path = _resolve_context_path(working_directory_override)
     for env_key in ("email_task_label",):
         value = str(config.get(env_key, "")).strip()
-        semantic = _extract_semantic_task_label(value)
-        if semantic:
-            return semantic
+        label = _extract_full_task_folder_slug(value)
+        if label:
+            return label
 
-    cwd_task = _task_label_from_cwd_context_path()
+    cwd_task = _task_label_from_cwd_context_path(context_path)
     if cwd_task:
         return cwd_task
 
-    for env_key in ("TASK_SLUG", "TASK_NAME", "PROJECT_SLUG"):
-        value = os.getenv(env_key, "").strip()
-        semantic = _extract_semantic_task_label(value)
-        if semantic:
-            return semantic
+    project_root = infer_project_root_from_path(context_path)
+    resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
+    resolved_coding_agent = get_coding_agent_name(coding_agent_override)
 
-    status_task = _task_label_from_status_files(_get_agent_session_id())
-    if status_task:
-        return status_task
+    if project_root:
+        status_task = _task_label_from_status_files(
+            resolved_agent_session_id,
+            project_root=project_root,
+            coding_agent=resolved_coding_agent,
+        )
+        if status_task:
+            return status_task
 
-    cwd_name = _extract_semantic_task_label(Path.cwd().name)
+        repo_label = _normalize_repo_fallback_label(project_root.name)
+        if repo_label:
+            return repo_label
+
+    cwd_name = _normalize_repo_fallback_label(context_path.name)
     if cwd_name:
         return cwd_name
 
     return "unknown-task"
+
+
+def get_coding_agent_name(coding_agent_override: str | None = None) -> str:
+    """Resolve the coding-agent label for notification context."""
+    explicit = (coding_agent_override or "").strip().lower()
+    if explicit:
+        return explicit
+
+    runtime_context = resolve_runtime_task_context(caller_path=Path(__file__))
+    resolved = (runtime_context.coding_agent or "").strip().lower()
+    if resolved:
+        return resolved
+    return "unknown"
+
+
+def get_zellij_focused_tab_name() -> str:
+    """Best-effort resolution of the focused zellij tab name."""
+    if not os.getenv("ZELLIJ", "").strip():
+        return ""
+    if which("zellij") is None:
+        return ""
+
+    try:
+        proc = subprocess.run(
+            ["zellij", "action", "dump-layout"],
+            text=True,
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception as exc:
+        _log(f"Zellij: failed to query focused tab name: {exc}")
+        return ""
+
+    if proc.returncode != 0:
+        _log(f"Zellij: dump-layout failed with exit code {proc.returncode}")
+        return ""
+
+    for line in proc.stdout.splitlines():
+        match = _ZELLIJ_FOCUSED_TAB_RE.search(line)
+        if not match:
+            continue
+        return match.group("name").strip()
+
+    return ""
 
 
 def _load_json_file(path: Path) -> dict:
@@ -506,9 +624,11 @@ def send_email_notification(
     system_name: str,
     session_name: str,
     agent_session_id: str,
-    context_header: str,
     session_url: str | None,
     attach_command: str | None,
+    task_label: str,
+    preview_line: str,
+    coding_agent: str,
 ) -> None:
     """Send notification through configured email provider."""
     provider = config["email_provider"] or "gmail"
@@ -528,30 +648,32 @@ def send_email_notification(
         return
 
     from_email = config["email_from"]
-    task_label = get_task_label(config)
     subject = build_email_subject(
         system_name=system_name,
         session_name=session_name,
         subject_prefix=config["email_subject_prefix"],
         task_label=task_label,
+        coding_agent=coding_agent,
+        agent_session_id=agent_session_id,
     )
 
     body_lines = [
-        context_header,
-        f"Agent Session ID: {agent_session_id or 'none'}",
-        f"Title: {title}",
+        preview_line,
+        title,
+        str(message).strip() or None,
         "",
-        str(message).strip(),
-        "",
-        f"Open Session: {session_url or 'n/a'}",
-        f"Attach Command: {attach_command or 'n/a'}",
+        f"Open Session: {session_url}" if session_url else None,
+        f"Attach Command: {attach_command}" if attach_command else None,
     ]
     body_text = "\n".join([line for line in body_lines if line is not None])
 
     thread_state_path = Path(config["gmail_thread_state_path"]).expanduser()
     thread_state = _load_json_file(thread_state_path)
     resolved_session_name = session_name if session_name and session_name != "unknown" else "none"
-    thread_key = f"{system_name}::{resolved_session_name}::{task_label}"
+    if agent_session_id:
+        thread_key = f"{system_name}::{coding_agent}::{agent_session_id}"
+    else:
+        thread_key = f"{system_name}::{resolved_session_name}::{task_label}"
     existing_thread = thread_state.get(thread_key, {})
     thread_id = str(existing_thread.get("thread_id", "")).strip() or None
     last_message_id = str(existing_thread.get("last_message_id", "")).strip() or None
@@ -670,6 +792,8 @@ def send_notification(
     message: str,
     send_local: bool = True,
     agent_session_id_override: str | None = None,
+    coding_agent_override: str | None = None,
+    working_directory_override: str | os.PathLike[str] | None = None,
 ) -> None:
     """Send notification to all enabled channels (local + WhatsApp + Email)."""
     _log(f"send_notification called: title={title}")
@@ -684,7 +808,21 @@ def send_notification(
     system_name = get_system_name()
     session_name = get_zellij_session_name()
     agent_session_id = (agent_session_id_override or "").strip() or _get_agent_session_id()
-    context_header = build_context_header(system_name, session_name, agent_session_id)
+    coding_agent = get_coding_agent_name(coding_agent_override)
+    context_path = _resolve_context_path(working_directory_override)
+    task_label = get_task_label(
+        config,
+        working_directory_override=context_path,
+        agent_session_id=agent_session_id,
+        coding_agent_override=coding_agent,
+    )
+    zellij_tab_name = get_zellij_focused_tab_name()
+    preview_line = build_notification_preview_line(
+        task_label=task_label,
+        session_name=session_name,
+        zellij_tab_name=zellij_tab_name,
+        agent_session_id=agent_session_id,
+    )
     session_url = build_zellij_session_url(
         session_name=session_name,
         base_url=config["zellij_web_base_url"],
@@ -716,10 +854,11 @@ def send_notification(
         else:
             body_text = str(message).strip()
             open_session_line = (
-                f"Open Session: {session_url or 'n/a'}" if config["zellij_web_enable_links"] else None
+                f"Open Session: {session_url}"
+                if config["zellij_web_enable_links"] and session_url
+                else None
             )
-            session_id_line = f"Agent Session ID: {agent_session_id or 'none'}"
-            fixed_lines = [context_header, title, session_id_line]
+            fixed_lines = [preview_line, title]
             if open_session_line:
                 fixed_lines.append(open_session_line)
             fixed_text = "\n".join([line for line in fixed_lines if line])
@@ -735,7 +874,7 @@ def send_notification(
                         body_text = body_text[: available_body_chars - 1].rstrip() + "…"
                     _log("WhatsApp: notification body truncated to preserve context + session link")
 
-            whatsapp_lines = [context_header, title, session_id_line]
+            whatsapp_lines = [preview_line, title]
             if body_text:
                 whatsapp_lines.append(body_text)
             if open_session_line:
@@ -778,9 +917,11 @@ def send_notification(
             system_name=system_name,
             session_name=session_name,
             agent_session_id=agent_session_id,
-            context_header=context_header,
             session_url=session_url,
             attach_command=attach_command,
+            task_label=task_label,
+            preview_line=preview_line,
+            coding_agent=coding_agent,
         )
     else:
         _log("Email not enabled, skipping")

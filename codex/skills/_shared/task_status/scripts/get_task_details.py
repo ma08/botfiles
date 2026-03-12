@@ -14,14 +14,17 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from task_status_common import (  # noqa: E402
-    TASK_METADATA_END,
-    TASK_METADATA_START,
-    extract_marked_block,
-    find_task_dirs,
-    parse_bullet_metadata,
-    read_text,
+    TaskCandidate,
+    RuntimeTaskContext,
+    infer_project_root_from_path,
+    load_task_candidates,
+    read_task_metadata,
+    resolve_current_task_pointer,
     resolve_status_file,
+    resolve_runtime_task_context,
     resolve_task_status_root,
+    session_matching_candidates,
+    sort_task_candidates_by_recency,
     task_age_days,
 )
 
@@ -33,6 +36,8 @@ def parse_args() -> argparse.Namespace:
         default=os.getcwd(),
         help="Project root containing AGENTS.md/CLAUDE.md and task-status root.",
     )
+    parser.add_argument("--status-file", help="Explicit status.md or legacy README.md to inspect.")
+    parser.add_argument("--task-dir", help="Explicit task directory to inspect.")
     parser.add_argument("--task-slug", help="Task slug or keyword for folder matching.")
     parser.add_argument(
         "--max-related",
@@ -43,22 +48,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def read_metadata(status_file: Path | None) -> dict[str, str]:
-    if not status_file:
-        return {}
-    text = read_text(status_file)
-    block = extract_marked_block(
-        text,
-        start_marker=TASK_METADATA_START,
-        end_marker=TASK_METADATA_END,
-    )
-    return parse_bullet_metadata(block)
-
-
-def print_entry(label: str, task_dir: Path, status_file: Path | None, metadata: dict[str, str], age_days: int | None) -> None:
+def print_entry(label: str, candidate: TaskCandidate, age_days: int | None) -> None:
+    metadata = candidate.metadata
     print(f"{label}:")
-    print(f"  Task Folder: {task_dir}")
-    print(f"  Status File: {status_file if status_file else 'none'}")
+    print(f"  Task Folder: {candidate.task_dir}")
+    print(f"  Status File: {candidate.status_file if candidate.status_file else 'none'}")
     if age_days is not None:
         print(f"  Age (days): {age_days}")
     print(f"  GitHub Issue: {metadata.get('GitHub Issue', 'none')}")
@@ -69,72 +63,243 @@ def print_entry(label: str, task_dir: Path, status_file: Path | None, metadata: 
     print(f"  Zellij Link: {metadata.get('Zellij Link', 'none')}")
 
 
-def main() -> int:
-    args = parse_args()
-    project_root = Path(args.project_root).expanduser().resolve()
-    status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
-    today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+def print_runtime_context(context: RuntimeTaskContext) -> None:
+    print("Current Session:")
+    print(f"  Machine: {context.machine}")
+    print(f"  Coding Agent: {context.coding_agent}")
+    print(f"  Agent Session ID: {context.agent_session_id}")
+    print(f"  Zellij Session: {context.zellij_session}")
+    print(f"  Zellij Link: {context.zellij_link}")
 
-    task_dirs = find_task_dirs(status_root, slug=args.task_slug)
-    if not task_dirs:
-        print("No task folder found for the current context.")
-        print("Suggestion: use /start-new-task")
-        return 0
 
-    primary = task_dirs[0]
-    primary_status = resolve_status_file(primary)
-    primary_meta = read_metadata(primary_status)
-    print_entry(
-        "Primary",
-        task_dir=primary,
-        status_file=primary_status,
-        metadata=primary_meta,
-        age_days=task_age_days(primary, today),
+def split_related_and_stale(
+    candidates: list[TaskCandidate],
+    today,
+) -> tuple[list[TaskCandidate], list[TaskCandidate]]:
+    related: list[TaskCandidate] = []
+    stale: list[TaskCandidate] = []
+    for candidate in candidates:
+        age_days = task_age_days(candidate.task_dir, today)
+        if age_days is not None and age_days > 7:
+            stale.append(candidate)
+        else:
+            related.append(candidate)
+    return related, stale
+
+
+def print_candidate_group(
+    label: str,
+    candidates: list[TaskCandidate],
+    today,
+    max_entries: int,
+) -> None:
+    if not candidates:
+        return
+    for candidate in candidates[:max_entries]:
+        print_entry(
+            label,
+            candidate=candidate,
+            age_days=task_age_days(candidate.task_dir, today),
+        )
+        print("")
+    if len(candidates) > max_entries:
+        print(f"... {len(candidates) - max_entries} more {label.lower()} entries omitted")
+
+
+def print_no_session_match(context: RuntimeTaskContext) -> int:
+    print("No current task found for this session.")
+    print("")
+    print_runtime_context(context)
+    print("")
+    print("Suggestion: use save-task-status on the active task, or start-new-task if this session does not have one yet.")
+    return 0
+
+
+def find_pointer_candidate(
+    candidates: list[TaskCandidate],
+    *,
+    task_dir: Path | None,
+    status_file: Path | None,
+) -> TaskCandidate | None:
+    resolved_task_dir = task_dir.resolve() if task_dir else None
+    resolved_status_file = status_file.resolve() if status_file else None
+    for candidate in candidates:
+        if resolved_status_file and candidate.status_file and candidate.status_file.resolve() == resolved_status_file:
+            return candidate
+        if resolved_task_dir and candidate.task_dir.resolve() == resolved_task_dir:
+            return candidate
+    return None
+
+
+def resolve_direct_candidate(args: argparse.Namespace) -> TaskCandidate | None:
+    if not args.status_file and not args.task_dir:
+        return None
+
+    if args.status_file:
+        status_file = Path(args.status_file).expanduser().resolve()
+        if not status_file.is_file():
+            raise FileNotFoundError(f"status file does not exist: {status_file}")
+        task_dir = status_file.parent
+    else:
+        task_dir = Path(args.task_dir).expanduser().resolve()
+        if not task_dir.is_dir():
+            raise FileNotFoundError(f"task directory does not exist: {task_dir}")
+        status_file = resolve_status_file(task_dir)
+
+    return TaskCandidate(
+        task_dir=task_dir,
+        status_file=status_file,
+        metadata=read_task_metadata(status_file),
     )
 
-    related: list[Path] = []
-    stale: list[Path] = []
-    for task_dir in task_dirs[1:]:
-        age_days = task_age_days(task_dir, today)
-        if age_days is not None and age_days > 7:
-            stale.append(task_dir)
-        else:
-            related.append(task_dir)
 
+def handle_current_session_lookup(
+    *,
+    project_root: Path,
+    candidates: list[TaskCandidate],
+    context: RuntimeTaskContext,
+    today,
+) -> int:
+    pointer = resolve_current_task_pointer(
+        project_root,
+        coding_agent=context.coding_agent,
+        agent_session_id=context.agent_session_id,
+        caller_path=Path(__file__),
+    )
+    pointer_candidate = find_pointer_candidate(
+        candidates,
+        task_dir=pointer.task_dir if pointer else None,
+        status_file=pointer.status_file if pointer else None,
+    )
+    if pointer_candidate:
+        print_entry(
+            "Primary",
+            candidate=pointer_candidate,
+            age_days=task_age_days(pointer_candidate.task_dir, today),
+        )
+        return 0
+
+    matches = sort_task_candidates_by_recency(
+        session_matching_candidates(candidates, context.agent_session_id)
+    )
+    if matches:
+        if pointer is None:
+            print("Note: current-task pointer not found; falling back to latest same-session task.")
+        else:
+            print("Note: current-task pointer is stale; falling back to latest same-session task.")
+        print("")
+        print_entry(
+            "Primary",
+            candidate=matches[0],
+            age_days=task_age_days(matches[0].task_dir, today),
+        )
+        return 0
+
+    return print_no_session_match(context)
+
+
+def handle_slug_lookup(
+    *,
+    project_root: Path,
+    candidates: list[TaskCandidate],
+    context: RuntimeTaskContext,
+    today,
+    max_entries: int,
+    task_slug: str,
+) -> int:
+    if not candidates:
+        print(f"No task folder found matching task slug: {task_slug}")
+        print("Suggestion: use start-new-task or choose a narrower task slug.")
+        return 0
+
+    sorted_candidates = sort_task_candidates_by_recency(candidates)
+    pointer = resolve_current_task_pointer(
+        project_root,
+        coding_agent=context.coding_agent,
+        agent_session_id=context.agent_session_id,
+        caller_path=Path(__file__),
+    )
+    primary = find_pointer_candidate(
+        sorted_candidates,
+        task_dir=pointer.task_dir if pointer else None,
+        status_file=pointer.status_file if pointer else None,
+    )
+
+    if primary is None:
+        session_matches = sort_task_candidates_by_recency(
+            session_matching_candidates(sorted_candidates, context.agent_session_id)
+        )
+        if session_matches:
+            primary = session_matches[0]
+        else:
+            primary = sorted_candidates[0]
+
+    remainder = [
+        candidate
+        for candidate in sorted_candidates
+        if candidate.task_dir.resolve() != primary.task_dir.resolve()
+    ]
+
+    print_entry(
+        "Primary",
+        candidate=primary,
+        age_days=task_age_days(primary.task_dir, today),
+    )
+
+    related, stale = split_related_and_stale(remainder, today)
     if related:
         print("")
-        for task_dir in related[: args.max_related]:
-            status_file = resolve_status_file(task_dir)
-            metadata = read_metadata(status_file)
-            print_entry(
-                "Related",
-                task_dir=task_dir,
-                status_file=status_file,
-                metadata=metadata,
-                age_days=task_age_days(task_dir, today),
-            )
-            print("")
-        if len(related) > args.max_related:
-            print(f"... {len(related) - args.max_related} more related entries omitted")
-
+        print_candidate_group("Related", related, today, max_entries)
     if stale:
         if related:
             print("")
-        for task_dir in stale[: args.max_related]:
-            status_file = resolve_status_file(task_dir)
-            metadata = read_metadata(status_file)
-            print_entry(
-                "Stale",
-                task_dir=task_dir,
-                status_file=status_file,
-                metadata=metadata,
-                age_days=task_age_days(task_dir, today),
-            )
-            print("")
-        if len(stale) > args.max_related:
-            print(f"... {len(stale) - args.max_related} more stale entries omitted")
-
+        print_candidate_group("Stale", stale, today, max_entries)
     return 0
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        direct_candidate = resolve_direct_candidate(args)
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    if direct_candidate:
+        today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        print_entry(
+            "Primary",
+            candidate=direct_candidate,
+            age_days=task_age_days(direct_candidate.task_dir, today),
+        )
+        return 0
+
+    project_root = Path(args.project_root).expanduser().resolve()
+    status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
+    today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    context = resolve_runtime_task_context(caller_path=Path(__file__))
+    candidates = load_task_candidates(status_root, slug=args.task_slug)
+    current_project_root = infer_project_root_from_path(project_root) or project_root
+
+    if args.task_slug:
+        return handle_slug_lookup(
+            project_root=current_project_root,
+            candidates=candidates,
+            context=context,
+            today=today,
+            max_entries=args.max_related,
+            task_slug=args.task_slug,
+        )
+
+    if not candidates:
+        return print_no_session_match(context)
+
+    return handle_current_session_lookup(
+        project_root=current_project_root,
+        candidates=candidates,
+        context=context,
+        today=today,
+    )
 
 
 if __name__ == "__main__":
