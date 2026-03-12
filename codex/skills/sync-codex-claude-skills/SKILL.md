@@ -15,7 +15,7 @@ Use:
 python ~/pro/botfiles/codex/skills/sync-codex-claude-skills/scripts/sync_skills.py ...
 ```
 
-The script auto-discovers repo root (`claude/skills` + `codex/skills`) from current directory. If needed, pass an explicit root:
+The script auto-discovers repo root from the current directory. It supports both standard skill directories (`claude/skills`, `codex/skills`) and hidden project skill directories (`.claude/skills`, `.codex/skills`). If needed, pass an explicit root:
 
 ```bash
 python scripts/sync_skills.py --repo-root ~/pro/botfiles ...
@@ -31,8 +31,8 @@ python scripts/sync_skills.py status
 
 This reports:
 
-- skills only in `claude/skills`
-- skills only in `codex/skills`
+- skills only in `claude/skills` or `.claude/skills`
+- skills only in `codex/skills` or `.codex/skills`
 - skills in both but different
 - skills in both and identical
 
@@ -76,9 +76,10 @@ This removes target-side skills absent from source.
 
 - Sync copies full skill directories from source to target
 - Existing target skill directories are replaced when content differs
-- Hidden directories (for example `.system`) are ignored
+- Hidden directories inside the skills root (for example `.system`) are ignored
 - Only directories containing `SKILL.md` are treated as skills
 - Script fails fast if requested `--skills` are missing on source side
+- Status output includes the detected repo layout (`visible` or `hidden`)
 
 ## Post-Sync Checks
 

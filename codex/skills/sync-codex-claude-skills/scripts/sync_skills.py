@@ -2,11 +2,13 @@
 """
 Compare and sync skill folders between claude/skills and codex/skills.
 
+Supports both standard project layouts (`claude/skills`, `codex/skills`) and
+hidden project layouts (`.claude/skills`, `.codex/skills`).
+
 Examples:
   python scripts/sync_skills.py status
   python scripts/sync_skills.py sync --from-side claude --to-side codex --all
-  python scripts/sync_skills.py sync --from-side claude --to-side codex \
-    --skills start-new-task get-task-details --apply
+  python scripts/sync_skills.py sync --from-side claude --to-side codex     --skills start-new-task get-task-details --apply
 """
 from __future__ import annotations
 
@@ -18,6 +20,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+SIDES = ("claude", "codex")
+LAYOUTS = ("visible", "hidden")
+
 
 @dataclass(frozen=True)
 class SkillPlan:
@@ -27,13 +32,43 @@ class SkillPlan:
     action: str  # create | replace | unchanged
 
 
+def _skills_base(repo_root: Path, side: str, layout: str) -> Path:
+    if side not in SIDES:
+        raise ValueError(f"Unsupported side: {side}")
+    if layout == "visible":
+        return repo_root / side / "skills"
+    if layout == "hidden":
+        return repo_root / f".{side}" / "skills"
+    raise ValueError(f"Unsupported layout: {layout}")
+
+
 def _discover_repo_root(start: Path) -> Path:
     for candidate in [start] + list(start.parents):
-        if (candidate / "claude" / "skills").is_dir() and (candidate / "codex" / "skills").is_dir():
+        if any(_skills_base(candidate, side, layout).is_dir() for side in SIDES for layout in LAYOUTS):
             return candidate
     raise FileNotFoundError(
-        "Could not discover repo root with claude/skills and codex/skills from current path"
+        "Could not discover repo root with claude/codex skills directories from current path"
     )
+
+
+def _detect_layout(repo_root: Path) -> str:
+    visible_count = sum(_skills_base(repo_root, side, "visible").is_dir() for side in SIDES)
+    hidden_count = sum(_skills_base(repo_root, side, "hidden").is_dir() for side in SIDES)
+
+    if visible_count == 0 and hidden_count == 0:
+        raise FileNotFoundError(
+            "Could not find any claude/codex skills directories under the repo root"
+        )
+    if visible_count and hidden_count:
+        if visible_count > hidden_count:
+            return "visible"
+        if hidden_count > visible_count:
+            return "hidden"
+        raise ValueError(
+            "Ambiguous repo layout: found both hidden and non-hidden skills directories. "
+            "Use a repo root with one layout at a time."
+        )
+    return "visible" if visible_count else "hidden"
 
 
 def _skill_dirs(base: Path) -> dict[str, Path]:
@@ -71,8 +106,9 @@ def _dir_digest(path: Path) -> str:
 
 
 def build_status(repo_root: Path) -> dict:
-    claude_map = _skill_dirs(repo_root / "claude" / "skills")
-    codex_map = _skill_dirs(repo_root / "codex" / "skills")
+    layout = _detect_layout(repo_root)
+    claude_map = _skill_dirs(_skills_base(repo_root, "claude", layout))
+    codex_map = _skill_dirs(_skills_base(repo_root, "codex", layout))
 
     only_claude = sorted(set(claude_map) - set(codex_map))
     only_codex = sorted(set(codex_map) - set(claude_map))
@@ -88,6 +124,7 @@ def build_status(repo_root: Path) -> dict:
 
     return {
         "repo_root": str(repo_root),
+        "layout": layout,
         "counts": {
             "claude_skills": len(claude_map),
             "codex_skills": len(codex_map),
@@ -106,6 +143,7 @@ def build_status(repo_root: Path) -> dict:
 def _print_status(status: dict) -> None:
     counts = status["counts"]
     print(f"Repo root: {status['repo_root']}")
+    print(f"Layout: {status['layout']}")
     print(f"Claude skills: {counts['claude_skills']}")
     print(f"Codex skills: {counts['codex_skills']}")
     print("")
@@ -144,14 +182,15 @@ def _print_status(status: dict) -> None:
 
 def _build_sync_plan(
     repo_root: Path,
+    layout: str,
     from_side: str,
     to_side: str,
     skills: list[str] | None,
     sync_all: bool,
 ) -> list[SkillPlan]:
-    source_skills = _skill_dirs(repo_root / from_side / "skills")
-    target_skills = _skill_dirs(repo_root / to_side / "skills")
-    target_base = repo_root / to_side / "skills"
+    source_skills = _skill_dirs(_skills_base(repo_root, from_side, layout))
+    target_skills = _skill_dirs(_skills_base(repo_root, to_side, layout))
+    target_base = _skills_base(repo_root, to_side, layout)
 
     if sync_all:
         selected = sorted(source_skills.keys())
@@ -190,7 +229,8 @@ def _build_sync_plan(
     return plan
 
 
-def _print_sync_plan(plan: list[SkillPlan], from_side: str, to_side: str) -> None:
+def _print_sync_plan(plan: list[SkillPlan], from_side: str, to_side: str, layout: str) -> None:
+    print(f"Layout: {layout}")
     print(f"Sync direction: {from_side} -> {to_side}")
     print("Plan:")
     for item in plan:
@@ -201,6 +241,7 @@ def _apply_plan(
     plan: list[SkillPlan],
     delete_target_extras: bool,
     repo_root: Path,
+    layout: str,
     from_side: str,
     to_side: str,
     sync_all: bool,
@@ -210,6 +251,7 @@ def _apply_plan(
     for item in plan:
         if item.action == "unchanged":
             continue
+        item.target_dir.parent.mkdir(parents=True, exist_ok=True)
         if item.target_dir.exists():
             shutil.rmtree(item.target_dir)
         shutil.copytree(item.source_dir, item.target_dir)
@@ -218,8 +260,8 @@ def _apply_plan(
     if delete_target_extras:
         if not sync_all:
             raise ValueError("--delete-target-extras can only be used with --all")
-        source_names = set(_skill_dirs(repo_root / from_side / "skills"))
-        target_map = _skill_dirs(repo_root / to_side / "skills")
+        source_names = set(_skill_dirs(_skills_base(repo_root, from_side, layout)))
+        target_map = _skill_dirs(_skills_base(repo_root, to_side, layout))
         extras = sorted(set(target_map) - source_names)
         for name in extras:
             shutil.rmtree(target_map[name])
@@ -229,11 +271,16 @@ def _apply_plan(
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Compare and sync codex/skills and claude/skills")
+    parser = argparse.ArgumentParser(
+        description="Compare and sync codex/skills and claude/skills (including hidden .codex/.claude layouts)"
+    )
     parser.add_argument(
         "--repo-root",
         default=None,
-        help="Repo root containing claude/skills and codex/skills (default: auto-discover)",
+        help=(
+            "Repo root containing claude/codex skills directories; supports standard "
+            "(claude/skills, codex/skills) and hidden (.claude/skills, .codex/skills) layouts"
+        ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -257,7 +304,12 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else _discover_repo_root(Path.cwd())
+    try:
+        repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else _discover_repo_root(Path.cwd())
+        layout = _detect_layout(repo_root)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     if args.command == "status":
         status = build_status(repo_root)
@@ -275,6 +327,7 @@ def main() -> int:
         try:
             plan = _build_sync_plan(
                 repo_root=repo_root,
+                layout=layout,
                 from_side=args.from_side,
                 to_side=args.to_side,
                 skills=args.skills,
@@ -284,7 +337,7 @@ def main() -> int:
             print(f"Error: {exc}", file=sys.stderr)
             return 2
 
-        _print_sync_plan(plan, args.from_side, args.to_side)
+        _print_sync_plan(plan, args.from_side, args.to_side, layout)
 
         if not args.apply:
             print("")
@@ -300,6 +353,7 @@ def main() -> int:
                 plan=plan,
                 delete_target_extras=args.delete_target_extras,
                 repo_root=repo_root,
+                layout=layout,
                 from_side=args.from_side,
                 to_side=args.to_side,
                 sync_all=args.all,

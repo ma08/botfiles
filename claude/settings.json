@@ -1,9 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "model": "us.anthropic.claude-opus-4-6-v1",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
+  "model": "us.anthropic.claude-opus-4-6-v1",
   "hooks": {
     "Notification": [
       {
@@ -57,9 +57,10 @@
     "hookify@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
+  "autoMemoryEnabled": true,
   "skipDangerousModePermissionPrompt": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754085632943
   },
-  "autoMemoryEnabled": true
+  "effortLevel": "high"
 }
