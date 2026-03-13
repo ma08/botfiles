@@ -107,6 +107,42 @@ host_label() {
   hostname -s 2>/dev/null || hostname 2>/dev/null || printf 'local'
 }
 
+sanitize_terminal_title_text() {
+  local text="${1:-}"
+
+  text="${text//$'\a'/}"
+  text="${text//$'\e'/}"
+  text="${text//$'\r'/}"
+  text="${text//$'\n'/ }"
+
+  printf '%s' "$text"
+}
+
+# Bridge the gap before zellij or shell hooks rename the tab on their own.
+set_terminal_title() {
+  local session_name="${1:-}"
+  local target_label="${2:-}"
+  local tab_title
+  local window_title
+
+  [ -n "$session_name" ] || return 0
+  [ "${TERM:-}" != "dumb" ] || return 0
+  [ -e /dev/tty ] || return 0
+  [ -w /dev/tty ] || return 0
+
+  tab_title="$(sanitize_terminal_title_text "$session_name")"
+  window_title="$tab_title"
+
+  if [ -n "$target_label" ]; then
+    window_title="${tab_title} @ $(sanitize_terminal_title_text "$target_label")"
+  fi
+
+  {
+    printf '\033]2;%s\007' "$window_title"
+    printf '\033]1;%s\007' "$tab_title"
+  } > /dev/tty 2>/dev/null || true
+}
+
 session_name_from_line() {
   local line="$1"
   printf '%s\n' "${line%% \[Created*}"
@@ -387,6 +423,8 @@ run_attach_action() {
   local action_kind="$5"
   local target_label="$6"
   local action_status
+
+  set_terminal_title "$session_name" "$target_label"
 
   set +e
   attach_session "$mode" "$transport" "$host" "$session_name"
