@@ -127,11 +127,17 @@ url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_c
 
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
-http_headers = { "X-Figma-Region" = "us-east-1" }
+
+[mcp_servers.figma.http_headers]
+X-Figma-Region = "us-east-1"
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
 
 [features]
 steer = true
 shell_snapshot = true
 # apps = true
 multi_agent = true
+guardian_approval = true
 # rmcp_client = true

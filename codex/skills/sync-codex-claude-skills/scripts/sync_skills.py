@@ -13,15 +13,13 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-SIDES = ("claude", "codex")
-LAYOUTS = ("visible", "hidden")
+from skill_sync_common import detect_layout, dir_digest, discover_repo_root, skill_dirs, skills_base
 
 
 @dataclass(frozen=True)
@@ -31,84 +29,10 @@ class SkillPlan:
     target_dir: Path
     action: str  # create | replace | unchanged
 
-
-def _skills_base(repo_root: Path, side: str, layout: str) -> Path:
-    if side not in SIDES:
-        raise ValueError(f"Unsupported side: {side}")
-    if layout == "visible":
-        return repo_root / side / "skills"
-    if layout == "hidden":
-        return repo_root / f".{side}" / "skills"
-    raise ValueError(f"Unsupported layout: {layout}")
-
-
-def _discover_repo_root(start: Path) -> Path:
-    for candidate in [start] + list(start.parents):
-        if any(_skills_base(candidate, side, layout).is_dir() for side in SIDES for layout in LAYOUTS):
-            return candidate
-    raise FileNotFoundError(
-        "Could not discover repo root with claude/codex skills directories from current path"
-    )
-
-
-def _detect_layout(repo_root: Path) -> str:
-    visible_count = sum(_skills_base(repo_root, side, "visible").is_dir() for side in SIDES)
-    hidden_count = sum(_skills_base(repo_root, side, "hidden").is_dir() for side in SIDES)
-
-    if visible_count == 0 and hidden_count == 0:
-        raise FileNotFoundError(
-            "Could not find any claude/codex skills directories under the repo root"
-        )
-    if visible_count and hidden_count:
-        if visible_count > hidden_count:
-            return "visible"
-        if hidden_count > visible_count:
-            return "hidden"
-        raise ValueError(
-            "Ambiguous repo layout: found both hidden and non-hidden skills directories. "
-            "Use a repo root with one layout at a time."
-        )
-    return "visible" if visible_count else "hidden"
-
-
-def _skill_dirs(base: Path) -> dict[str, Path]:
-    skills: dict[str, Path] = {}
-    if not base.is_dir():
-        return skills
-    for child in sorted(base.iterdir()):
-        if not child.is_dir():
-            continue
-        if child.name.startswith("."):
-            continue
-        if not (child / "SKILL.md").is_file():
-            continue
-        skills[child.name] = child
-    return skills
-
-
-def _file_digest(path: Path) -> str:
-    hasher = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
-def _dir_digest(path: Path) -> str:
-    hasher = hashlib.sha256()
-    for file_path in sorted(p for p in path.rglob("*") if p.is_file()):
-        rel = file_path.relative_to(path).as_posix()
-        hasher.update(rel.encode("utf-8"))
-        hasher.update(b"\0")
-        hasher.update(_file_digest(file_path).encode("utf-8"))
-        hasher.update(b"\0")
-    return hasher.hexdigest()
-
-
 def build_status(repo_root: Path) -> dict:
-    layout = _detect_layout(repo_root)
-    claude_map = _skill_dirs(_skills_base(repo_root, "claude", layout))
-    codex_map = _skill_dirs(_skills_base(repo_root, "codex", layout))
+    layout = detect_layout(repo_root)
+    claude_map = skill_dirs(skills_base(repo_root, "claude", layout))
+    codex_map = skill_dirs(skills_base(repo_root, "codex", layout))
 
     only_claude = sorted(set(claude_map) - set(codex_map))
     only_codex = sorted(set(codex_map) - set(claude_map))
@@ -117,7 +41,7 @@ def build_status(repo_root: Path) -> dict:
     both_identical: list[str] = []
     both_different: list[str] = []
     for name in both:
-        if _dir_digest(claude_map[name]) == _dir_digest(codex_map[name]):
+        if dir_digest(claude_map[name]) == dir_digest(codex_map[name]):
             both_identical.append(name)
         else:
             both_different.append(name)
@@ -188,9 +112,9 @@ def _build_sync_plan(
     skills: list[str] | None,
     sync_all: bool,
 ) -> list[SkillPlan]:
-    source_skills = _skill_dirs(_skills_base(repo_root, from_side, layout))
-    target_skills = _skill_dirs(_skills_base(repo_root, to_side, layout))
-    target_base = _skills_base(repo_root, to_side, layout)
+    source_skills = skill_dirs(skills_base(repo_root, from_side, layout))
+    target_skills = skill_dirs(skills_base(repo_root, to_side, layout))
+    target_base = skills_base(repo_root, to_side, layout)
 
     if sync_all:
         selected = sorted(source_skills.keys())
@@ -217,7 +141,7 @@ def _build_sync_plan(
         if skill not in target_skills:
             action = "create"
         else:
-            action = "replace" if _dir_digest(source_dir) != _dir_digest(target_skills[skill]) else "unchanged"
+            action = "replace" if dir_digest(source_dir) != dir_digest(target_skills[skill]) else "unchanged"
         plan.append(
             SkillPlan(
                 name=skill,
@@ -260,8 +184,8 @@ def _apply_plan(
     if delete_target_extras:
         if not sync_all:
             raise ValueError("--delete-target-extras can only be used with --all")
-        source_names = set(_skill_dirs(_skills_base(repo_root, from_side, layout)))
-        target_map = _skill_dirs(_skills_base(repo_root, to_side, layout))
+        source_names = set(skill_dirs(skills_base(repo_root, from_side, layout)))
+        target_map = skill_dirs(skills_base(repo_root, to_side, layout))
         extras = sorted(set(target_map) - source_names)
         for name in extras:
             shutil.rmtree(target_map[name])
@@ -305,8 +229,8 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     try:
-        repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else _discover_repo_root(Path.cwd())
-        layout = _detect_layout(repo_root)
+        repo_root = Path(args.repo_root).expanduser().resolve() if args.repo_root else discover_repo_root(Path.cwd())
+        layout = detect_layout(repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2

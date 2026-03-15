@@ -1,9 +1,21 @@
 # Codex Global Instructions
 
-These are user-level instructions shared across machines via:
+These are user-level instructions for the Codex agent shared across all projects/sessions on all machines via:
 
 - `~/pro/botfiles/codex/AGENTS.md`
 - `~/.codex/AGENTS.md` (symlink created by `setup.sh`)
+
+## Persistent Global Preferences
+
+- For any long-lived behavior preference that should apply across projects and sessions, update both `~/pro/botfiles/codex/AGENTS.md` and `~/pro/botfiles/claude/CLAUDE.md`.
+- If the preference changes a skill's behavior or workflow, update the matching files in both `~/pro/botfiles/codex/skills/` and `~/pro/botfiles/claude/skills/`.
+- If the preference is only for one repo, one task, or a temporary session, keep it in the local project instructions or task notes instead of the global botfiles.
+
+## GitHub Authorship
+
+- Any GitHub write performed by a coding agent, including new or edited issues, PRs, reviews, comments, or similar changes, should use the authenticated human developer account provided by the default GitHub auth flow rather than a separate bot identity.
+- Add a short byline in the written GitHub content naming the coding agent. Preferred examples: `_Written by Codex via the developer's authenticated GitHub account._` and `_Written by Claude Code via the developer's authenticated GitHub account._`
+- If a GitHub action has no natural body field, put the attribution in the nearest editable text field or a companion comment. When editing existing agent-authored GitHub content, preserve or refresh the byline so the latest agent remains visible.
 
 ## Paths and Conventions
 

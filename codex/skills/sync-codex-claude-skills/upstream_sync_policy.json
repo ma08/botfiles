@@ -1,0 +1,9 @@
+{
+  "repo": "openai/skills",
+  "ref": "main",
+  "path": "skills/.curated",
+  "protected_skills": [
+    "transcribe"
+  ],
+  "mirror_to_claude": true
+}
