@@ -61,7 +61,7 @@ What this does:
   - Zellij session (`ZELLIJ_SESSION_NAME` or `none`)
   - Zellij link (`ZELLIJ_WEB_ENABLE_LINKS` + `ZELLIJ_WEB_BASE_URL` + session)
   - Linked issue metadata
-- If issue-linked and `gh` auth available, upserts top live-session issue block.
+- If issue-linked and `gh` auth available, upserts top live-session issue block including the absolute task folder and status-file paths.
 
 ### Step 4: Degraded-Mode Handling
 If dependencies are missing:
@@ -109,6 +109,8 @@ If dependencies are missing:
 - Agent Session ID: `id|none`
 - Zellij Session: `session|none`
 - Zellij Link: https://...|none
+- Task Folder: `/abs/path/to/task-folder`|`none`
+- Status File: `/abs/path/to/status.md`|`none`
 - Attach Command: `zellij attach ...|none`
 - Last Updated: `YYYY-MM-DD ~HH:MMam/pm PST`
 <!-- LIVE-SESSION:END -->

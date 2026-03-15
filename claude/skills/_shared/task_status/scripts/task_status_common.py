@@ -22,6 +22,10 @@ from zoneinfo import ZoneInfo
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 URL_RE = re.compile(r"https?://[^\s<>()]+")
+MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+ATX_HEADING_RE = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<title>.*?)\s*$")
+BULLET_PREFIX_RE = re.compile(r"^[-*+]\s+")
+NUMBERED_PREFIX_RE = re.compile(r"^\d+\.\s+")
 GITHUB_ISSUE_RE = re.compile(
     r"^https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)(?:[/?#].*)?$",
     re.IGNORECASE,
@@ -452,6 +456,8 @@ def build_live_session_block(
     agent_session_id: str,
     zellij_session: str,
     zellij_link: str,
+    task_dir: str,
+    status_file: str,
     attach_command: str,
     last_updated: str,
 ) -> str:
@@ -466,6 +472,8 @@ def build_live_session_block(
         f"- Agent Session ID: `{plain_value(agent_session_id)}`",
         f"- Zellij Session: `{plain_value(zellij_session)}`",
         f"- Zellij Link: {plain_value(zellij_link)}",
+        f"- Task Folder: `{plain_value(task_dir)}`",
+        f"- Status File: `{plain_value(status_file)}`",
         f"- Attach Command: `{plain_value(attach_command)}`",
         f"- Last Updated: `{plain_value(last_updated)}`",
         LIVE_SESSION_END,
@@ -581,6 +589,182 @@ def task_age_days(task_dir: Path, today: date) -> int | None:
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
+def normalize_markdown_heading(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").strip().lower()).strip()
+
+
+def heading_matches(heading: str, target: str) -> bool:
+    return heading == target or heading.startswith(f"{target} ")
+
+
+def clean_summary_text(text: str) -> str:
+    value = text.strip()
+    if not value:
+        return ""
+    value = MARKDOWN_LINK_RE.sub(r"\1", value)
+    value = re.sub(r"`([^`]*)`", r"\1", value)
+    value = re.sub(r"\*\*(.*?)\*\*", r"\1", value)
+    value = re.sub(r"__(.*?)__", r"\1", value)
+    value = re.sub(r"\*(.*?)\*", r"\1", value)
+    value = re.sub(r"_(.*?)_", r"\1", value)
+    value = re.sub(r"<[^>]+>", "", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def extract_markdown_title(text: str) -> str | None:
+    in_code_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        match = ATX_HEADING_RE.match(stripped)
+        if not match or len(match.group("hashes")) != 1:
+            continue
+        title = clean_summary_text(match.group("title"))
+        if title:
+            return title
+    return None
+
+
+def extract_markdown_inline_field(text: str, field_name: str) -> str | None:
+    pattern = re.compile(rf"^\*\*{re.escape(field_name)}\*\*:\s*(?P<value>.+?)\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return None
+    value = clean_summary_text(match.group("value"))
+    return value or None
+
+
+def extract_markdown_section(text: str, headings: Iterable[str]) -> str | None:
+    targets = [normalize_markdown_heading(heading) for heading in headings if heading]
+    if not targets:
+        return None
+
+    capture = False
+    capture_level = 0
+    in_code_block = False
+    captured: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            if capture:
+                captured.append(line)
+            continue
+        if in_code_block:
+            if capture:
+                captured.append(line)
+            continue
+
+        match = ATX_HEADING_RE.match(stripped)
+        if match:
+            level = len(match.group("hashes"))
+            heading = normalize_markdown_heading(match.group("title"))
+            if capture and level <= capture_level:
+                break
+            if not capture and any(heading_matches(heading, target) for target in targets):
+                capture = True
+                capture_level = level
+                continue
+
+        if capture:
+            captured.append(line)
+
+    section_text = "\n".join(captured).strip()
+    return section_text or None
+
+
+def collect_markdown_items(section_text: str | None) -> list[str]:
+    if not section_text:
+        return []
+
+    items: list[str] = []
+    in_code_block = False
+    in_comment_block = False
+
+    for raw_line in section_text.splitlines():
+        stripped = raw_line.strip()
+        if in_comment_block:
+            if "-->" in stripped:
+                in_comment_block = False
+            continue
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped:
+                in_comment_block = True
+            continue
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block or not stripped:
+            continue
+        if stripped in {"---", "***"} or stripped.startswith("|"):
+            continue
+
+        text = BULLET_PREFIX_RE.sub("", stripped)
+        text = NUMBERED_PREFIX_RE.sub("", text)
+        text = clean_summary_text(text)
+        if text:
+            items.append(text)
+
+    return items
+
+
+def ensure_sentence(text: str) -> str:
+    value = clean_summary_text(text)
+    if not value:
+        return ""
+    if value.endswith((".", "!", "?", "…")):
+        return value
+    return f"{value}."
+
+
+def truncate_summary(text: str, *, max_chars: int = 240) -> str:
+    value = clean_summary_text(text)
+    if len(value) <= max_chars:
+        return value
+    clipped = value[: max_chars - 3].rsplit(" ", 1)[0].strip()
+    if not clipped:
+        clipped = value[: max_chars - 3].strip()
+    return f"{clipped}..."
+
+
+def build_task_recap(status_file: Path | None) -> list[str]:
+    if not status_file or not status_file.is_file():
+        return [
+            "What this task is about: Task summary is not available yet.",
+            "Current status: Current status is not recorded yet.",
+            "Next steps: Add or update the task status file before relying on this recap.",
+        ]
+
+    text = read_text(status_file)
+    title = extract_markdown_title(text)
+    goal = extract_markdown_inline_field(text, "Goal")
+    status = extract_markdown_inline_field(text, "Status")
+    current_items = collect_markdown_items(extract_markdown_section(text, ["Current State"]))
+    next_items = collect_markdown_items(extract_markdown_section(text, ["Next Steps"]))
+
+    about_value = goal or title or (current_items[0] if current_items else "Task summary is not available yet")
+    current_value = status or (
+        " ".join(current_items[:2]) if current_items else "Current status is not recorded yet"
+    )
+    next_value = (
+        " ".join(next_items[:2])
+        if next_items
+        else "Review the status file and add the next steps if this task needs a fresh handoff."
+    )
+
+    return [
+        f"What this task is about: {truncate_summary(ensure_sentence(about_value))}",
+        f"Current status: {truncate_summary(ensure_sentence(current_value))}",
+        f"Next steps: {truncate_summary(ensure_sentence(next_value))}",
+    ]
 
 
 def sanitize_task_label(raw_value: str) -> str:

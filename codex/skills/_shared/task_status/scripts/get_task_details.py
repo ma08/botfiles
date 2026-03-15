@@ -16,6 +16,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from task_status_common import (  # noqa: E402
     TaskCandidate,
     RuntimeTaskContext,
+    build_task_recap,
     infer_project_root_from_path,
     load_task_candidates,
     read_task_metadata,
@@ -48,7 +49,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def print_entry(label: str, candidate: TaskCandidate, age_days: int | None) -> None:
+def print_entry(
+    label: str,
+    candidate: TaskCandidate,
+    age_days: int | None,
+    *,
+    include_recap: bool = False,
+) -> None:
     metadata = candidate.metadata
     print(f"{label}:")
     print(f"  Task Folder: {candidate.task_dir}")
@@ -61,6 +68,10 @@ def print_entry(label: str, candidate: TaskCandidate, age_days: int | None) -> N
     print(f"  Agent Session ID: {metadata.get('Agent Session ID', 'none')}")
     print(f"  Zellij Session: {metadata.get('Zellij Session', 'none')}")
     print(f"  Zellij Link: {metadata.get('Zellij Link', 'none')}")
+    if include_recap:
+        print("  Recap:")
+        for line in build_task_recap(candidate.status_file):
+            print(f"    - {line}")
 
 
 def print_runtime_context(context: RuntimeTaskContext) -> None:
@@ -176,6 +187,7 @@ def handle_current_session_lookup(
             "Primary",
             candidate=pointer_candidate,
             age_days=task_age_days(pointer_candidate.task_dir, today),
+            include_recap=True,
         )
         return 0
 
@@ -192,6 +204,7 @@ def handle_current_session_lookup(
             "Primary",
             candidate=matches[0],
             age_days=task_age_days(matches[0].task_dir, today),
+            include_recap=True,
         )
         return 0
 
@@ -244,6 +257,7 @@ def handle_slug_lookup(
         "Primary",
         candidate=primary,
         age_days=task_age_days(primary.task_dir, today),
+        include_recap=True,
     )
 
     related, stale = split_related_and_stale(remainder, today)
@@ -271,6 +285,7 @@ def main() -> int:
             "Primary",
             candidate=direct_candidate,
             age_days=task_age_days(direct_candidate.task_dir, today),
+            include_recap=True,
         )
         return 0
 

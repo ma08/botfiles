@@ -178,6 +178,8 @@ def main() -> int:
         agent_session_id=agent_session_id,
         zellij_session=zellij_session,
         zellij_link=zellij_link,
+        task_dir=str(status_file.parent),
+        status_file=str(status_file),
         attach_command=build_attach_command(zellij_session),
         last_updated=now_pst_label(),
     )
