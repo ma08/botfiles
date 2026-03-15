@@ -33,8 +33,10 @@ from task_status_common import (  # noqa: E402
     infer_project_root_from_path,
     load_task_candidates,
     normalize_repo_slug as _shared_normalize_repo_slug,
+    read_task_metadata,
     resolve_current_task_pointer,
     resolve_runtime_task_context,
+    resolve_status_file,
     resolve_task_status_root,
     session_matching_candidates,
     sort_task_candidates_by_recency,
@@ -313,17 +315,29 @@ def _resolve_context_path(working_directory_override: str | os.PathLike[str] | N
     return Path(raw_path).expanduser().resolve()
 
 
+def _task_dir_from_context_path(context_path: Path) -> Path | None:
+    """Resolve the task folder when cwd is somewhere under context/daily/<date>/<task>/..."""
+    resolved_context = context_path if context_path.is_dir() else context_path.parent
+    for candidate in [resolved_context] + list(resolved_context.parents):
+        parent = candidate.parent
+        grandparent = parent.parent
+        great_grandparent = grandparent.parent
+        if (
+            _DATE_FOLDER_RE.match(parent.name)
+            and grandparent.name == "daily"
+            and great_grandparent.name == "context"
+        ):
+            return candidate
+    return None
+
+
 def _task_label_from_cwd_context_path(context_path: Path) -> str:
     """
     Resolve task folder label from cwd when running inside context/daily/<date>/<task>/...
     """
-    resolved_context = context_path if context_path.is_dir() else context_path.parent
-    cwd_parts = resolved_context.parts
-    for index in range(len(cwd_parts) - 3):
-        if cwd_parts[index] == "context" and cwd_parts[index + 1] == "daily":
-            date_component = cwd_parts[index + 2]
-            if _DATE_FOLDER_RE.match(date_component):
-                return _extract_full_task_folder_slug(cwd_parts[index + 3])
+    task_dir = _task_dir_from_context_path(context_path)
+    if task_dir:
+        return _extract_full_task_folder_slug(task_dir.name)
     return ""
 
 
@@ -370,6 +384,55 @@ def _task_label_from_status_files(
     return ""
 
 
+def _normalize_github_issue_url(raw_value: str) -> str:
+    value = str(raw_value or "").strip()
+    if not value or value == "none":
+        return ""
+    return value
+
+
+def _task_issue_url_from_context_path(context_path: Path) -> str:
+    task_dir = _task_dir_from_context_path(context_path)
+    if not task_dir:
+        return ""
+    status_file = resolve_status_file(task_dir)
+    metadata = read_task_metadata(status_file)
+    return _normalize_github_issue_url(metadata.get("GitHub Issue", ""))
+
+
+def _task_issue_url_from_status_files(
+    agent_session_id: str,
+    *,
+    project_root: Path,
+    coding_agent: str,
+) -> str:
+    if not agent_session_id:
+        return ""
+
+    pointer = resolve_current_task_pointer(
+        project_root,
+        coding_agent=coding_agent,
+        agent_session_id=agent_session_id,
+        caller_path=Path(__file__),
+    )
+    if pointer:
+        issue_url = _normalize_github_issue_url(
+            read_task_metadata(pointer.status_file).get("GitHub Issue", "")
+        )
+        if issue_url:
+            return issue_url
+
+    status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
+    candidates = load_task_candidates(status_root)
+    matches = sort_task_candidates_by_recency(
+        session_matching_candidates(candidates, agent_session_id)
+    )
+    if matches:
+        return _normalize_github_issue_url(matches[0].metadata.get("GitHub Issue", ""))
+
+    return ""
+
+
 def get_task_label(
     config: dict,
     *,
@@ -411,6 +474,32 @@ def get_task_label(
         return cwd_name
 
     return "unknown-task"
+
+
+def get_task_github_issue_url(
+    *,
+    working_directory_override: str | os.PathLike[str] | None = None,
+    agent_session_id: str | None = None,
+    coding_agent_override: str | None = None,
+) -> str:
+    """Resolve the current task's GitHub issue URL when one exists."""
+    context_path = _resolve_context_path(working_directory_override)
+    cwd_issue_url = _task_issue_url_from_context_path(context_path)
+    if cwd_issue_url:
+        return cwd_issue_url
+
+    project_root = infer_project_root_from_path(context_path)
+    resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
+    resolved_coding_agent = get_coding_agent_name(coding_agent_override)
+
+    if project_root:
+        return _task_issue_url_from_status_files(
+            resolved_agent_session_id,
+            project_root=project_root,
+            coding_agent=resolved_coding_agent,
+        )
+
+    return ""
 
 
 def get_coding_agent_name(coding_agent_override: str | None = None) -> str:
@@ -625,6 +714,7 @@ def send_email_notification(
     session_name: str,
     agent_session_id: str,
     session_url: str | None,
+    github_issue_url: str | None,
     attach_command: str | None,
     task_label: str,
     preview_line: str,
@@ -663,6 +753,7 @@ def send_email_notification(
         str(message).strip() or None,
         "",
         f"Open Session: {session_url}" if session_url else None,
+        f"GitHub Issue: {github_issue_url}" if github_issue_url else None,
         f"Attach Command: {attach_command}" if attach_command else None,
     ]
     body_text = "\n".join([line for line in body_lines if line is not None])
@@ -816,6 +907,11 @@ def send_notification(
         agent_session_id=agent_session_id,
         coding_agent_override=coding_agent,
     )
+    github_issue_url = get_task_github_issue_url(
+        working_directory_override=context_path,
+        agent_session_id=agent_session_id,
+        coding_agent_override=coding_agent,
+    )
     zellij_tab_name = get_zellij_focused_tab_name()
     preview_line = build_notification_preview_line(
         task_label=task_label,
@@ -858,9 +954,12 @@ def send_notification(
                 if config["zellij_web_enable_links"] and session_url
                 else None
             )
+            github_issue_line = f"GitHub Issue: {github_issue_url}" if github_issue_url else None
             fixed_lines = [preview_line, title]
             if open_session_line:
                 fixed_lines.append(open_session_line)
+            if github_issue_line:
+                fixed_lines.append(github_issue_line)
             fixed_text = "\n".join([line for line in fixed_lines if line])
 
             if body_text:
@@ -879,6 +978,8 @@ def send_notification(
                 whatsapp_lines.append(body_text)
             if open_session_line:
                 whatsapp_lines.append(open_session_line)
+            if github_issue_line:
+                whatsapp_lines.append(github_issue_line)
 
             whatsapp_message = "\n".join([line for line in whatsapp_lines if line])
             _log(
@@ -896,16 +997,6 @@ def send_notification(
                 token=config["whatsapp_token"],
                 phone_number_id=config["phone_number_id"],
             )
-
-            # Send a second standalone message so it can be copied directly in SSH/Termius.
-            if config["zellij_send_attach_command"] and attach_command:
-                _log("Sending WhatsApp attach command message")
-                send_whatsapp_message(
-                    message=attach_command,
-                    to_phone=config["notify_phone_number"],
-                    token=config["whatsapp_token"],
-                    phone_number_id=config["phone_number_id"],
-                )
     else:
         _log("WhatsApp not enabled, skipping")
 
@@ -918,6 +1009,7 @@ def send_notification(
             session_name=session_name,
             agent_session_id=agent_session_id,
             session_url=session_url,
+            github_issue_url=github_issue_url,
             attach_command=attach_command,
             task_label=task_label,
             preview_line=preview_line,
