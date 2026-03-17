@@ -104,6 +104,9 @@ If dependencies are missing:
 ```markdown
 <!-- LIVE-SESSION:START -->
 ## Live Session
+
+_Written by Claude Code via the developer's authenticated GitHub account._
+
 - Machine: `machine-name`
 - Coding Agent: `codex|claude|unknown`
 - Agent Session ID: `id|none`

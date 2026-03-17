@@ -449,6 +449,15 @@ def build_task_metadata_block(
     return "\n".join(lines)
 
 
+def build_github_authorship_byline(coding_agent: str) -> str | None:
+    normalized = (coding_agent or "").strip().lower()
+    if normalized == "codex":
+        return "_Written by Codex via the developer's authenticated GitHub account._"
+    if normalized == "claude":
+        return "_Written by Claude Code via the developer's authenticated GitHub account._"
+    return None
+
+
 def build_live_session_block(
     *,
     machine: str,
@@ -464,20 +473,27 @@ def build_live_session_block(
     def plain_value(value: str) -> str:
         return (value or "none").replace("`", "").strip() or "none"
 
+    authorship_byline = build_github_authorship_byline(coding_agent)
     lines = [
         LIVE_SESSION_START,
         "## Live Session",
-        f"- Machine: `{plain_value(machine)}`",
-        f"- Coding Agent: `{plain_value(coding_agent)}`",
-        f"- Agent Session ID: `{plain_value(agent_session_id)}`",
-        f"- Zellij Session: `{plain_value(zellij_session)}`",
-        f"- Zellij Link: {plain_value(zellij_link)}",
-        f"- Task Folder: `{plain_value(task_dir)}`",
-        f"- Status File: `{plain_value(status_file)}`",
-        f"- Attach Command: `{plain_value(attach_command)}`",
-        f"- Last Updated: `{plain_value(last_updated)}`",
-        LIVE_SESSION_END,
     ]
+    if authorship_byline:
+        lines.extend(["", authorship_byline, ""])
+    lines.extend(
+        [
+            f"- Machine: `{plain_value(machine)}`",
+            f"- Coding Agent: `{plain_value(coding_agent)}`",
+            f"- Agent Session ID: `{plain_value(agent_session_id)}`",
+            f"- Zellij Session: `{plain_value(zellij_session)}`",
+            f"- Zellij Link: {plain_value(zellij_link)}",
+            f"- Task Folder: `{plain_value(task_dir)}`",
+            f"- Status File: `{plain_value(status_file)}`",
+            f"- Attach Command: `{plain_value(attach_command)}`",
+            f"- Last Updated: `{plain_value(last_updated)}`",
+            LIVE_SESSION_END,
+        ]
+    )
     return "\n".join(lines)
 
 
