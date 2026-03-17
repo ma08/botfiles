@@ -86,6 +86,37 @@ check_ssh_workflow_tools() {
     echo ""
 }
 
+# Check PDF workflow tool availability (warn-only).
+check_pdf_workflow_tools() {
+    local pdf_skill_path="$SCRIPT_DIR/codex/skills/pdf/SKILL.md"
+
+    echo "Checking PDF workflow tools..."
+    echo ""
+    echo "=== PDF Workflow Tools (recommended) ==="
+
+    if [ ! -f "$pdf_skill_path" ]; then
+        echo "  [SKIP] Curated pdf skill not present in this checkout."
+        echo ""
+        return
+    fi
+
+    if command -v pdfinfo &> /dev/null && command -v pdftoppm &> /dev/null && command -v pdftotext &> /dev/null; then
+        echo "  [OK] Poppler CLI tools (pdfinfo, pdftoppm, pdftotext)"
+    else
+        echo "  [MISSING] Poppler CLI tools (pdfinfo, pdftoppm, pdftotext)"
+        if [[ "$OSTYPE" == darwin* ]]; then
+            echo "    Install with: brew install poppler"
+        elif command -v apt-get &> /dev/null; then
+            echo "    Install with: sudo apt-get install -y poppler-utils"
+        else
+            echo "    Install Poppler using your OS package manager."
+        fi
+    fi
+
+    echo "  [INFO] Keep the curated pdf skill unchanged; use uv run --with ... for one-off Python PDF scripts."
+    echo ""
+}
+
 # Backup existing files (if not already symlinks)
 backup_existing() {
     echo "Checking for existing files to backup..."
@@ -353,6 +384,7 @@ main() {
     check_prerequisites
     setup_git_identity
     check_ssh_workflow_tools
+    check_pdf_workflow_tools
     backup_existing
     create_symlinks
     install_deps

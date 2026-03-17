@@ -30,6 +30,25 @@ These are user-level instructions for the Codex agent shared across all projects
 - Keep Codex/Claude skill counterparts aligned to avoid drift
 - Codex system skills in `~/.codex/skills/.system/` are machine-managed and should not be source-controlled in `botfiles`
 
+## Curated Skills
+
+- Keep upstream curated skill directories unchanged unless you are intentionally creating a protected local fork.
+- For the curated `pdf` skill, do not hand-edit files under `~/pro/botfiles/codex/skills/pdf/` for local workflow preferences; keep that directory pullable from upstream.
+- Put local PDF workflow preferences in `AGENTS.md` / `CLAUDE.md`, `README.md`, and `setup.sh`, not inside the curated skill directory.
+- Treat Poppler CLI tools (`pdfinfo`, `pdftoppm`, `pdftotext`) as machine-level prerequisites handled via botfiles setup/docs.
+- When a PDF task needs Python packages such as `reportlab`, `pdfplumber`, or `pypdf`, prefer task-local scratchpad scripts run with `uv run --with ...` instead of installing those packages into the active project's environment.
+
+## Oracle Skill
+
+- `~/pro/botfiles/codex/skills/oracle` and `~/pro/botfiles/claude/skills/oracle` are kept as verbatim upstream copies of `steipete/oracle/skills/oracle`.
+- Do not hand-edit the Oracle skill directory for local preferences; refresh it by replacing it from upstream, and keep local Oracle behavior in `AGENTS.md` / `CLAUDE.md` or botfiles shell modules instead.
+- On machines where the default Node runtime is below 22, use the shell wrappers `oracle` and `oracle-mcp` loaded from `~/pro/botfiles/.botrc` instead of raw `npx -y @steipete/oracle`.
+- In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, pass `--engine api` instead of relying on upstream defaults.
+- When invoking Oracle from an agent workflow, be explicit about the engine choice rather than assuming Oracle's default mode matches local expectations.
+- On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
+- Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
+- For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
+
 ## Task Status Files
 
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session

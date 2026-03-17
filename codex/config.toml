@@ -100,6 +100,12 @@ trust_level = "trusted"
 [projects."/Users/sourya4/pro/screenshot-to-s3"]
 trust_level = "trusted"
 
+[projects."/home/azureuser/pro/codex-mini-paper-game-creator"]
+trust_level = "trusted"
+
+[projects."/home/azureuser"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
@@ -141,3 +147,6 @@ shell_snapshot = true
 multi_agent = true
 guardian_approval = true
 # rmcp_client = true
+
+# https://github.com/openai/codex/issues/10384
+default_mode_request_user_input = true

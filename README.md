@@ -25,6 +25,7 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
 - [terminal-notifier](https://github.com/julienXX/terminal-notifier) - macOS notifications (optional)
 - [fzf](https://github.com/junegunn/fzf) - interactive session picker for `work-*` SSH workflows (optional but recommended)
 - [mosh](https://mosh.org/) - mobile shell transport for mosh-first workflows (optional; SSH fallback remains available)
+- [Poppler](https://poppler.freedesktop.org/) - PDF CLI tools such as `pdfinfo`, `pdftoppm`, and `pdftotext` used by PDF workflows (recommended)
 
 ```bash
 # Install uv
@@ -35,7 +36,18 @@ brew install terminal-notifier
 
 # Install optional SSH workflow tools (macOS)
 brew install fzf mosh
+
+# Install PDF workflow tools (macOS)
+brew install poppler
 ```
+
+Ubuntu/Debian PDF workflow install:
+
+```bash
+sudo apt-get install -y poppler-utils
+```
+
+Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream pulls stay simple. Install Poppler at the machine level, and for one-off Python PDF work prefer `uv run --with reportlab,pdfplumber,pypdf ...` from a task scratchpad instead of mutating arbitrary project environments.
 
 ## Quick Setup
 
@@ -49,7 +61,7 @@ brew install fzf mosh
    ```bash
    ./setup.sh
    ```
-   The script now also performs warn-only checks for SSH workflow dependencies (`ssh`, `fzf`, `mosh`) and `~/.ssh/config`.
+   The script now also performs warn-only checks for SSH workflow dependencies (`ssh`, `fzf`, `mosh`), `~/.ssh/config`, and machine-appropriate PDF tooling hints.
 
 3. **Create local secret files from templates**
    ```bash
