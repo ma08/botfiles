@@ -544,7 +544,7 @@ It does **not** automatically apply to:
   ```ini
   Environment=BASH_ENV=/home/<user>/pro/botfiles/.botenv
   ```
-- **cron jobs** — cron typically runs `/bin/sh`, so use POSIX syntax: prepend `. ~/pro/botfiles/.botenv &&` to the command, or set `SHELL=/bin/bash` and `BASH_ENV=~/pro/botfiles/.botenv` in the crontab header
+- **cron jobs** — `.botenv` is sh-safe (falls back to `$HOME/pro/botfiles` for path resolution under plain `/bin/sh`). Prepend `. ~/pro/botfiles/.botenv &&` to the command. Alternatively, set `SHELL=/bin/bash` and `BASH_ENV=/home/<user>/pro/botfiles/.botenv` in the crontab header
 
 ### Adding the machine to SSH workflows
 

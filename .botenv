@@ -20,7 +20,9 @@ if [ -n "${BASH_SOURCE:-}" ]; then
 elif [ -n "${ZSH_VERSION:-}" ]; then
   _botenv_source="${(%):-%x}"
 else
-  _botenv_source="$0"
+  # Plain /bin/sh: $0 is the shell binary, not this file.  Fall back to
+  # the canonical botfiles location.
+  _botenv_source="$HOME/pro/botfiles/.botenv"
 fi
 
 BOTFILES_ROOT="$(cd "$(dirname "$_botenv_source")" && pwd)"
