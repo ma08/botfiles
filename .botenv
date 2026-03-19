@@ -1,0 +1,73 @@
+# .botenv — Non-interactive-safe core bootstrap for botfiles.
+#
+# This file sets up the minimal environment (secrets, PATH, EDITOR, TERM,
+# UV_BIN) needed by any shell context: interactive terminals, SSH commands,
+# agent exec paths, cron jobs, and non-interactive hooks.
+#
+# It is POSIX-compatible and safe for both bash and zsh.  The interactive
+# layer (.botrc) should source this file and then add aliases, prompts,
+# and other interactive-only configuration on top.
+#
+# Double-source guard: idempotent — returns immediately if already loaded.
+
+if [ "${_BOTENV_LOADED:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
+# --- Resolve BOTFILES_ROOT from this file's own location ---------------
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _botenv_source="${BASH_SOURCE[0]}"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  _botenv_source="${(%):-%x}"
+else
+  _botenv_source="$0"
+fi
+
+BOTFILES_ROOT="$(cd "$(dirname "$_botenv_source")" && pwd)"
+export BOTFILES_ROOT
+unset _botenv_source
+
+# --- Source local secrets in a fixed, deterministic order ---------------
+if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
+  for _botenv_secret in \
+    "$BOTFILES_ROOT/secrets/local/machine.rc" \
+    "$BOTFILES_ROOT/secrets/local/claude-bedrock.rc" \
+    "$BOTFILES_ROOT/secrets/local/claude-vertex.rc" \
+    "$BOTFILES_ROOT/secrets/local/codex-azure.rc" \
+    "$BOTFILES_ROOT/secrets/local/codex-openai.rc" \
+    "$BOTFILES_ROOT/secrets/local/opencode-azure.rc" \
+    "$BOTFILES_ROOT/secrets/local/claude-hooks.rc"; do
+    [ -f "$_botenv_secret" ] && . "$_botenv_secret"
+  done
+  unset _botenv_secret
+fi
+
+# --- Default editor for CLI tools (Codex, git, etc.) -------------------
+export EDITOR=vim
+export VISUAL=vim
+
+# --- Fix TERM for headless / non-interactive shells --------------------
+# Ink-based CLIs (Claude Code, etc.) need a valid TERM value.
+if [ -z "$TERM" ] || [ "$TERM" = "dumb" ]; then
+  export TERM=xterm-256color
+fi
+
+# --- PATH: idempotently add common bin directories ---------------------
+case ":${PATH}:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
+case ":${PATH}:" in
+  *":/usr/local/bin:"*) ;;
+  *) export PATH="/usr/local/bin:$PATH" ;;
+esac
+
+# --- UV_BIN resolution -------------------------------------------------
+if [ -f "$BOTFILES_ROOT/shell/10-uv-bin.sh" ]; then
+  . "$BOTFILES_ROOT/shell/10-uv-bin.sh"
+fi
+
+# --- Mark loaded -------------------------------------------------------
+_BOTENV_LOADED=1
+export _BOTENV_LOADED
