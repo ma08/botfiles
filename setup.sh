@@ -282,54 +282,86 @@ check_secrets() {
     echo ""
 }
 
-# Setup shell rc file to source .botrc
+# Setup shell rc files for the two-layer bootstrap model:
+#   .botenv  — core env (secrets, PATH, EDITOR, TERM, UV_BIN) for ALL contexts
+#   .botrc   — interactive layer (aliases, functions) that sources .botenv
 setup_shell_rc() {
-    echo "Checking shell configuration..."
+    echo "Checking shell configuration (two-layer bootstrap)..."
 
-    # Determine rc file based on current shell
+    # Helper: ensure a source line is present in a target file, prompting the user.
+    # Usage: _ensure_sourced <label> <target_file> <line_to_add> <grep_pattern>
+    _ensure_sourced() {
+        local label="$1"
+        local target_file="$2"
+        local line_to_add="$3"
+        local grep_pattern="$4"
+
+        if [ -f "$target_file" ] && grep -qF "$grep_pattern" "$target_file"; then
+            echo "  [OK] $label already present in $target_file"
+            return
+        fi
+
+        echo ""
+        echo "  $label is not sourced in $target_file"
+        read -p "  Add to $target_file? [Y/n] " response
+
+        case "$response" in
+            [nN]*)
+                echo "  Skipped. To add manually:"
+                echo "    echo '$line_to_add' >> $target_file"
+                ;;
+            *)
+                [ -f "$target_file" ] || touch "$target_file"
+                echo "" >> "$target_file"
+                echo "# Botfiles: $label" >> "$target_file"
+                echo "$line_to_add" >> "$target_file"
+                echo "  [ADDED] $label added to $target_file"
+                ;;
+        esac
+    }
+
     case "$SHELL" in
-        */zsh)  RC_FILE="$HOME/.zshrc" ;;
-        */bash) RC_FILE="$HOME/.bashrc" ;;
-        *)      RC_FILE="" ;;
-    esac
+        */zsh)
+            # Layer 1: .botenv in ~/.zshenv (all zsh invocations, including non-interactive)
+            _ensure_sourced ".botenv (core env)" \
+                "$HOME/.zshenv" \
+                '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' \
+                ".botenv"
 
-    if [ -z "$RC_FILE" ]; then
-        echo "  Unknown shell: $SHELL"
-        echo "  Please manually add to your shell rc file:"
-        echo "    source $SCRIPT_DIR/.botrc"
-        echo ""
-        return
-    fi
-
-    BOTRC_LINE="source $SCRIPT_DIR/.botrc"
-
-    # Check if already present
-    if [ -f "$RC_FILE" ] && grep -qF ".botrc" "$RC_FILE"; then
-        echo "  [OK] .botrc already sourced in $RC_FILE"
-        echo ""
-        return
-    fi
-
-    # Ask user for confirmation
-    echo ""
-    echo "  .botrc is not sourced in $RC_FILE"
-    echo "  This loads environment variables for Claude Code and Codex."
-    echo ""
-    read -p "  Add 'source $SCRIPT_DIR/.botrc' to $RC_FILE? [Y/n] " response
-
-    case "$response" in
-        [nN]*)
-            echo "  Skipped. To add manually:"
-            echo "    echo 'source $SCRIPT_DIR/.botrc' >> $RC_FILE"
+            # Layer 2: .botrc in ~/.zshrc (interactive only)
+            _ensure_sourced ".botrc (interactive)" \
+                "$HOME/.zshrc" \
+                "source $SCRIPT_DIR/.botrc" \
+                ".botrc"
             ;;
+
+        */bash)
+            # Layer 1: BASH_ENV in ~/.profile (non-interactive children inherit it)
+            _ensure_sourced ".botenv via BASH_ENV" \
+                "$HOME/.profile" \
+                "export BASH_ENV=\"$SCRIPT_DIR/.botenv\"" \
+                "BASH_ENV"
+
+            # Layer 2: .botrc in ~/.bashrc (interactive only)
+            _ensure_sourced ".botrc (interactive)" \
+                "$HOME/.bashrc" \
+                "source $SCRIPT_DIR/.botrc" \
+                ".botrc"
+            ;;
+
         *)
-            echo "" >> "$RC_FILE"
-            echo "# Config files and env vars for Claude/Codex from botfiles" >> "$RC_FILE"
-            echo "$BOTRC_LINE" >> "$RC_FILE"
-            echo "  [ADDED] source line added to $RC_FILE"
-            echo "  Run 'source $RC_FILE' or restart your terminal to apply."
+            echo "  Unknown shell: $SHELL"
+            echo "  Please manually configure the two-layer bootstrap:"
+            echo ""
+            echo "  Layer 1 (all contexts — non-interactive entrypoint):"
+            echo "    source $SCRIPT_DIR/.botenv"
+            echo ""
+            echo "  Layer 2 (interactive shell rc):"
+            echo "    source $SCRIPT_DIR/.botrc"
             ;;
     esac
+
+    unset -f _ensure_sourced
     echo ""
 }
 
@@ -396,7 +428,12 @@ main() {
     echo "Claude Code configuration is now symlinked to botfiles."
     echo "Codex CLI configuration, skills, and AGENTS.md are now symlinked to botfiles."
     echo "Zellij config is now symlinked to botfiles."
-    echo "Restart Claude Code for changes to take effect."
+    echo ""
+    echo "Shell bootstrap (two-layer model):"
+    echo "  .botenv  -> core env (secrets, PATH, UV_BIN) loaded for ALL shell contexts"
+    echo "  .botrc   -> interactive layer (aliases, functions) loaded for interactive shells"
+    echo ""
+    echo "Restart your terminal (or source the relevant rc files) for changes to take effect."
 }
 
 main "$@"
