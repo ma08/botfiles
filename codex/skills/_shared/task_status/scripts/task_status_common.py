@@ -204,7 +204,11 @@ def resolve_agent_name(
     return default_agent
 
 
-def resolve_agent_session_id(env: dict[str, str] | None = None) -> str:
+def resolve_agent_session_id(
+    env: dict[str, str] | None = None,
+    *,
+    project_root: str | None = None,
+) -> str:
     source = env or {}
     for key in (
         "CODEX_THREAD_ID",
@@ -217,6 +221,12 @@ def resolve_agent_session_id(env: dict[str, str] | None = None) -> str:
         value = source.get(key, "").strip()
         if value:
             return value
+    # Claude Code doesn't export a session ID env var, so fall back to
+    # the most recent history.jsonl entry for the project.
+    if source.get("CLAUDECODE", "").strip() in TRUE_VALUES:
+        resolved = _resolve_claude_session_from_history(project_root)
+        if resolved and resolved != "none":
+            return resolved
     return "none"
 
 
@@ -239,6 +249,7 @@ def resolve_runtime_task_context(
     *,
     env: dict[str, str] | None = None,
     caller_path: Path | None = None,
+    project_root: str | None = None,
 ) -> RuntimeTaskContext:
     merged = merged_env_with_botfiles_defaults(env or dict(os.environ), caller_path=caller_path)
     default_agent = infer_agent_from_script(caller_path or Path(__file__))
@@ -246,7 +257,7 @@ def resolve_runtime_task_context(
     return RuntimeTaskContext(
         machine=resolve_machine_name(merged),
         coding_agent=resolve_agent_name(merged, default_agent=default_agent),
-        agent_session_id=resolve_agent_session_id(merged),
+        agent_session_id=resolve_agent_session_id(merged, project_root=project_root),
         zellij_session=zellij_session,
         zellij_link=build_zellij_link(zellij_session, merged),
     )
@@ -258,6 +269,61 @@ def resolve_codex_home(env: dict[str, str] | None = None) -> Path:
     if raw_value:
         return Path(raw_value).expanduser()
     return Path.home() / ".codex"
+
+
+def _encode_claude_project_dir(project_root: str) -> str:
+    """Encode a project root path to Claude's project directory name.
+
+    Claude stores per-project data under ``~/.claude/projects/<encoded>/``
+    where ``<encoded>`` is the absolute path with every character that is
+    not alphanumeric or ``-`` replaced by ``-``.  The leading ``-`` (from
+    the root ``/``) is kept.
+    """
+    resolved = Path(project_root).expanduser().resolve()
+    return re.sub(r"[^a-zA-Z0-9-]", "-", str(resolved))
+
+
+def _resolve_claude_session_from_history(project_root: str | None) -> str:
+    """Identify the current Claude session via ``~/.claude/history.jsonl``.
+
+    Claude appends a ``{sessionId, project, timestamp, ...}`` entry to
+    ``history.jsonl`` when the user submits a prompt, *before* tool
+    execution begins.  The most recent entry whose ``project`` matches
+    *project_root* therefore identifies the session that is currently
+    executing.
+
+    This is preferred over file-mtime heuristics because it is scoped to
+    the prompt that triggered the current tool call.  A narrow race
+    exists when a second concurrent session submits a prompt between the
+    history write and this read, but that window is typically
+    sub-second.
+    """
+    history_path = Path.home() / ".claude" / "history.jsonl"
+    if not history_path.is_file():
+        return "none"
+
+    root = str(Path(project_root or os.getcwd()).expanduser().resolve())
+
+    try:
+        lines = history_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return "none"
+
+    for line in reversed(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            entry = json.loads(stripped)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if entry.get("project") != root:
+            continue
+        session_id = (entry.get("sessionId") or "").strip()
+        if session_id:
+            return session_id
+
+    return "none"
 
 
 def resolve_codex_transcript_path(
@@ -278,15 +344,37 @@ def resolve_codex_transcript_path(
     return str(matches[0].resolve())
 
 
-def resolve_claude_transcript_path(agent_session_id: str) -> str:
+def resolve_claude_transcript_path(
+    agent_session_id: str,
+    *,
+    project_root: str | None = None,
+) -> str:
     normalized = (agent_session_id or "").strip()
     if not normalized or normalized == "none":
         return "none"
 
+    # Try per-session JSONL in the project directory first.
+    if project_root:
+        encoded = _encode_claude_project_dir(project_root)
+        session_file = Path.home() / ".claude" / "projects" / encoded / f"{normalized}.jsonl"
+        if session_file.is_file():
+            return str(session_file.resolve())
+
+    # Fall back: scan all project dirs for a matching session file.
+    projects_root = Path.home() / ".claude" / "projects"
+    if projects_root.is_dir():
+        for project_dir in projects_root.iterdir():
+            if not project_dir.is_dir():
+                continue
+            candidate = project_dir / f"{normalized}.jsonl"
+            if candidate.is_file():
+                return str(candidate.resolve())
+
+    # Last resort: global history file.
     history_path = Path.home() / ".claude" / "history.jsonl"
-    if not history_path.is_file():
-        return "none"
-    return str(history_path.resolve())
+    if history_path.is_file():
+        return str(history_path.resolve())
+    return "none"
 
 
 def resolve_transcript_path(
@@ -294,6 +382,7 @@ def resolve_transcript_path(
     agent_session_id: str,
     *,
     env: dict[str, str] | None = None,
+    project_root: str | None = None,
 ) -> str:
     normalized_agent = (coding_agent or "").strip().lower()
     normalized_session_id = (agent_session_id or "").strip()
@@ -302,7 +391,7 @@ def resolve_transcript_path(
     if normalized_agent == "codex":
         return resolve_codex_transcript_path(normalized_session_id, env)
     if normalized_agent == "claude":
-        return resolve_claude_transcript_path(normalized_session_id)
+        return resolve_claude_transcript_path(normalized_session_id, project_root=project_root)
     return "none"
 
 
@@ -523,12 +612,13 @@ def build_live_session_block(
     status_file: str,
     attach_command: str,
     last_updated: str,
+    project_root: str | None = None,
 ) -> str:
     def plain_value(value: str) -> str:
         return (value or "none").replace("`", "").strip() or "none"
 
     authorship_byline = build_github_authorship_byline(coding_agent)
-    transcript_path = resolve_transcript_path(coding_agent, agent_session_id)
+    transcript_path = resolve_transcript_path(coding_agent, agent_session_id, project_root=project_root)
     lines = [
         LIVE_SESSION_START,
         "## Live Session",

@@ -25,6 +25,7 @@ from task_status_common import (  # noqa: E402
     gh_authenticated,
     gh_available,
     infer_agent_from_script,
+    infer_project_root_from_path,
     merged_env_with_botfiles_defaults,
     now_pst_label,
     parse_bullet_metadata,
@@ -101,10 +102,13 @@ def main() -> int:
     )
     existing = parse_bullet_metadata(existing_block)
 
+    project_root = infer_project_root_from_path(status_file)
+    project_root_str = str(project_root) if project_root else None
+
     machine = args.machine or resolve_machine_name(env)
     default_agent = infer_agent_from_script(Path(__file__))
     coding_agent = args.coding_agent or resolve_agent_name(env, default_agent=default_agent)
-    agent_session_id = args.agent_session_id or resolve_agent_session_id(env)
+    agent_session_id = args.agent_session_id or resolve_agent_session_id(env, project_root=project_root_str)
     zellij_session = args.zellij_session or resolve_zellij_session(env)
     zellij_link = args.zellij_link or build_zellij_link(zellij_session, env)
 
@@ -182,6 +186,7 @@ def main() -> int:
         status_file=str(status_file),
         attach_command=build_attach_command(zellij_session),
         last_updated=now_pst_label(),
+        project_root=project_root_str,
     )
     new_issue_body = upsert_marked_block(
         issue_data.body,

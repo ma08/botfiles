@@ -56,11 +56,13 @@ def print_entry(
     age_days: int | None,
     *,
     include_recap: bool = False,
+    project_root: str | None = None,
 ) -> None:
     metadata = candidate.metadata
     transcript_path = resolve_transcript_path(
         metadata.get("Coding Agent", "none"),
         metadata.get("Agent Session ID", "none"),
+        project_root=project_root,
     )
     print(f"{label}:")
     print(f"  Task Folder: {candidate.task_dir}")
@@ -109,6 +111,7 @@ def print_candidate_group(
     candidates: list[TaskCandidate],
     today,
     max_entries: int,
+    project_root: str | None = None,
 ) -> None:
     if not candidates:
         return
@@ -117,6 +120,7 @@ def print_candidate_group(
             label,
             candidate=candidate,
             age_days=task_age_days(candidate.task_dir, today),
+            project_root=project_root,
         )
         print("")
     if len(candidates) > max_entries:
@@ -188,12 +192,14 @@ def handle_current_session_lookup(
         task_dir=pointer.task_dir if pointer else None,
         status_file=pointer.status_file if pointer else None,
     )
+    project_root_str = str(project_root) if project_root else None
     if pointer_candidate:
         print_entry(
             "Primary",
             candidate=pointer_candidate,
             age_days=task_age_days(pointer_candidate.task_dir, today),
             include_recap=True,
+            project_root=project_root_str,
         )
         return 0
 
@@ -211,6 +217,7 @@ def handle_current_session_lookup(
             candidate=matches[0],
             age_days=task_age_days(matches[0].task_dir, today),
             include_recap=True,
+            project_root=project_root_str,
         )
         return 0
 
@@ -259,21 +266,23 @@ def handle_slug_lookup(
         if candidate.task_dir.resolve() != primary.task_dir.resolve()
     ]
 
+    project_root_str = str(project_root) if project_root else None
     print_entry(
         "Primary",
         candidate=primary,
         age_days=task_age_days(primary.task_dir, today),
         include_recap=True,
+        project_root=project_root_str,
     )
 
     related, stale = split_related_and_stale(remainder, today)
     if related:
         print("")
-        print_candidate_group("Related", related, today, max_entries)
+        print_candidate_group("Related", related, today, max_entries, project_root=project_root_str)
     if stale:
         if related:
             print("")
-        print_candidate_group("Stale", stale, today, max_entries)
+        print_candidate_group("Stale", stale, today, max_entries, project_root=project_root_str)
     return 0
 
 
@@ -287,18 +296,20 @@ def main() -> int:
 
     if direct_candidate:
         today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        direct_project_root = infer_project_root_from_path(direct_candidate.task_dir)
         print_entry(
             "Primary",
             candidate=direct_candidate,
             age_days=task_age_days(direct_candidate.task_dir, today),
             include_recap=True,
+            project_root=str(direct_project_root) if direct_project_root else None,
         )
         return 0
 
     project_root = Path(args.project_root).expanduser().resolve()
     status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
     today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
-    context = resolve_runtime_task_context(caller_path=Path(__file__))
+    context = resolve_runtime_task_context(caller_path=Path(__file__), project_root=str(project_root))
     candidates = load_task_candidates(status_root, slug=args.task_slug)
     current_project_root = infer_project_root_from_path(project_root) or project_root
 
