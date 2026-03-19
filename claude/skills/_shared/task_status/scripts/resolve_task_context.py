@@ -68,7 +68,7 @@ def main() -> int:
     machine = resolve_machine_name(env)
     default_agent = infer_agent_from_script(Path(__file__))
     coding_agent = resolve_agent_name(env, default_agent=default_agent)
-    agent_session_id = resolve_agent_session_id(env)
+    agent_session_id = resolve_agent_session_id(env, project_root=str(current_project_root))
     zellij_session = resolve_zellij_session(env)
     zellij_link = build_zellij_link(zellij_session, env)
 
