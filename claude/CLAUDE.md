@@ -12,6 +12,17 @@
 - Add a short byline in the written GitHub content naming the coding agent. Preferred examples: `_Written by Codex via the developer's authenticated GitHub account._` and `_Written by Claude Code via the developer's authenticated GitHub account._`
 - If a GitHub action has no natural body field, put the attribution in the nearest editable text field or a companion comment. When editing existing agent-authored GitHub content, preserve or refresh the byline so the latest agent remains visible.
 
+## Shell Environment (two-layer bootstrap)
+
+Botfiles uses a two-layer shell model:
+
+- **`.botenv`** — Non-interactive-safe core: secrets, PATH (`~/.local/bin`, `/usr/local/bin`), `BOTFILES_ROOT`, `EDITOR`, `TERM`, `UV_BIN`. Sourced for ALL shell contexts (interactive, SSH commands, agent exec, cron). This is what non-interactive scripts and hooks should source.
+- **`.botrc`** — Interactive layer: sources `.botenv`, then adds aliases (`cc`, `bedcc`, `zj`), shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`), and functions (`oracle`, `work-ml`).
+
+When writing scripts or hooks that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load.
+
+On **bash** machines, `BASH_ENV` is set in `~/.profile` to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
+
 ## Curated Skills
 
 - Keep upstream curated skill directories unchanged unless you are intentionally creating a protected local fork.

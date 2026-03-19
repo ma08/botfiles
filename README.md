@@ -352,12 +352,12 @@ I created this myself to have a skill-only Notion-Claude Code integration that a
    - Create a new integration
    - Copy the "Internal Integration Token" (starts with `ntn_`)
 
-3. Set environment variables in a botfiles secret file (e.g., `secrets/local/claude-hooks.rc` or a dedicated `secrets/local/notion.rc`):
+3. Set environment variables in an existing botfiles secret file (e.g., append to `secrets/local/claude-hooks.rc`):
    ```bash
    export NOTION_API_KEY="ntn_your_token_here"  # read/write permissions to target pages/databases
    export NOTION_UPDATES_DB_ID="your_database_id"  # Optional
    ```
-   These will be sourced by `.botenv` if placed in `secrets/local/`. Alternatively, set them in `~/.zshrc` or `~/.bashrc`.
+   `.botenv` sources the files listed in its fixed sourcing loop. To add a new standalone file like `secrets/local/notion.rc`, you would also need to add it to `.botenv`'s loop. The simplest path is appending to an existing file like `claude-hooks.rc`.
 
 4. Share pages/databases with your integration in Notion
 

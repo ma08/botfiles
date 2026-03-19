@@ -23,6 +23,17 @@ These are user-level instructions for the Codex agent shared across all projects
 - Assume personal OS lives at `~/pro/personal_os`
 - Prefer reusable, machine-agnostic paths (`~/pro/...`) over machine-specific absolute paths
 
+## Shell Environment (two-layer bootstrap)
+
+Botfiles uses a two-layer shell model:
+
+- **`.botenv`** — Non-interactive-safe core: secrets, PATH (`~/.local/bin`, `/usr/local/bin`), `BOTFILES_ROOT`, `EDITOR`, `TERM`, `UV_BIN`. Sourced for ALL shell contexts (interactive, SSH commands, agent exec, cron). This is what non-interactive scripts and hooks should source.
+- **`.botrc`** — Interactive layer: sources `.botenv`, then adds aliases (`cc`, `bedcc`, `zj`), shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`), and functions (`oracle`, `work-ml`).
+
+When writing scripts, hooks, or runner wrappers that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load. The Codex notify hook (`codex/hooks/run-codex-notify.sh`) is an example — it sources `.botrc` for historical reasons but only needs `.botenv`.
+
+On **bash** machines, `BASH_ENV` is set in `~/.profile` to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
+
 ## Skills
 
 - Codex skills are stored in `~/pro/botfiles/codex/skills`
