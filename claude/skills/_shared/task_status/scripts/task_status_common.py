@@ -252,6 +252,60 @@ def resolve_runtime_task_context(
     )
 
 
+def resolve_codex_home(env: dict[str, str] | None = None) -> Path:
+    source = env or {}
+    raw_value = source.get("CODEX_HOME", "").strip()
+    if raw_value:
+        return Path(raw_value).expanduser()
+    return Path.home() / ".codex"
+
+
+def resolve_codex_transcript_path(
+    agent_session_id: str,
+    env: dict[str, str] | None = None,
+) -> str:
+    normalized = (agent_session_id or "").strip()
+    if not normalized or normalized == "none":
+        return "none"
+
+    sessions_root = resolve_codex_home(env) / "sessions"
+    if not sessions_root.is_dir():
+        return "none"
+
+    matches = sorted(sessions_root.rglob(f"*{normalized}*.jsonl"))
+    if not matches:
+        return "none"
+    return str(matches[0].resolve())
+
+
+def resolve_claude_transcript_path(agent_session_id: str) -> str:
+    normalized = (agent_session_id or "").strip()
+    if not normalized or normalized == "none":
+        return "none"
+
+    history_path = Path.home() / ".claude" / "history.jsonl"
+    if not history_path.is_file():
+        return "none"
+    return str(history_path.resolve())
+
+
+def resolve_transcript_path(
+    coding_agent: str,
+    agent_session_id: str,
+    *,
+    env: dict[str, str] | None = None,
+) -> str:
+    normalized_agent = (coding_agent or "").strip().lower()
+    normalized_session_id = (agent_session_id or "").strip()
+    if not normalized_session_id or normalized_session_id == "none":
+        return "none"
+    if normalized_agent == "codex":
+        return resolve_codex_transcript_path(normalized_session_id, env)
+    if normalized_agent == "claude":
+        return resolve_claude_transcript_path(normalized_session_id)
+    return "none"
+
+
 def slugify(value: str) -> str:
     normalized = value.encode("ascii", errors="ignore").decode("ascii")
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", normalized.lower()).strip("-")
@@ -474,6 +528,7 @@ def build_live_session_block(
         return (value or "none").replace("`", "").strip() or "none"
 
     authorship_byline = build_github_authorship_byline(coding_agent)
+    transcript_path = resolve_transcript_path(coding_agent, agent_session_id)
     lines = [
         LIVE_SESSION_START,
         "## Live Session",
@@ -485,6 +540,7 @@ def build_live_session_block(
             f"- Machine: `{plain_value(machine)}`",
             f"- Coding Agent: `{plain_value(coding_agent)}`",
             f"- Agent Session ID: `{plain_value(agent_session_id)}`",
+            f"- Transcript Path: `{plain_value(transcript_path)}`",
             f"- Zellij Session: `{plain_value(zellij_session)}`",
             f"- Zellij Link: {plain_value(zellij_link)}",
             f"- Task Folder: `{plain_value(task_dir)}`",

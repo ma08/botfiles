@@ -110,6 +110,7 @@ _Written by Codex via the developer's authenticated GitHub account._
 - Machine: `machine-name`
 - Coding Agent: `codex|claude|unknown`
 - Agent Session ID: `id|none`
+- Transcript Path: `/abs/path/to/transcript`|`none`
 - Zellij Session: `session|none`
 - Zellij Link: https://...|none
 - Task Folder: `/abs/path/to/task-folder`|`none`

@@ -2,8 +2,8 @@
 name: get-task-details
 description: >-
   Print rich task details for the current task context: status file path,
-  full GitHub issue URL, machine name, coding agent/session id, zellij
-  session, zellij link, and a short task recap. Replaces the old
+  full GitHub issue URL, machine name, coding agent/session id, transcript
+  path, zellij session, zellij link, and a short task recap. Replaces the old
   get-task-status-file interface.
 ---
 
@@ -41,6 +41,7 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/get_task_details.
   - Machine
   - Coding agent
   - Agent session ID
+  - Transcript path
   - Zellij session
   - Zellij link
   - Recap block with three bullets:

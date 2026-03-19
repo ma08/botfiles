@@ -21,6 +21,7 @@ from task_status_common import (  # noqa: E402
     load_task_candidates,
     read_task_metadata,
     resolve_current_task_pointer,
+    resolve_transcript_path,
     resolve_status_file,
     resolve_runtime_task_context,
     resolve_task_status_root,
@@ -57,6 +58,10 @@ def print_entry(
     include_recap: bool = False,
 ) -> None:
     metadata = candidate.metadata
+    transcript_path = resolve_transcript_path(
+        metadata.get("Coding Agent", "none"),
+        metadata.get("Agent Session ID", "none"),
+    )
     print(f"{label}:")
     print(f"  Task Folder: {candidate.task_dir}")
     print(f"  Status File: {candidate.status_file if candidate.status_file else 'none'}")
@@ -66,6 +71,7 @@ def print_entry(
     print(f"  Machine: {metadata.get('Machine', 'none')}")
     print(f"  Coding Agent: {metadata.get('Coding Agent', 'none')}")
     print(f"  Agent Session ID: {metadata.get('Agent Session ID', 'none')}")
+    print(f"  Transcript Path: {transcript_path}")
     print(f"  Zellij Session: {metadata.get('Zellij Session', 'none')}")
     print(f"  Zellij Link: {metadata.get('Zellij Link', 'none')}")
     if include_recap:
