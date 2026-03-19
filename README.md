@@ -14,7 +14,8 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - **notion/** - Notion workspace integration
 - **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
 - **secrets/** - Centralized secret templates and local runtime secret files
-- **.botrc** - Shell loader that sources centralized secret rc files and modular shell scripts
+- **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
+- **.botrc** - Interactive shell layer (aliases, functions) that sources `.botenv`
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 - **zellij/** - Canonical Zellij config (including lock key remap away from `Ctrl+g`)
 
@@ -77,10 +78,16 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    # Edit secrets/local/*.rc with your values
    ```
 
-4. **Load shared env config**
+4. **Load shared env config** (setup.sh does this automatically)
    ```bash
+   # For zsh (macOS):
+   echo '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' >> ~/.zshenv
    echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
-   source ~/.zshrc
+
+   # For bash (Linux) — append to whichever login file bash reads first
+   # (~/.bash_profile > ~/.bash_login > ~/.profile; usually ~/.profile on Ubuntu)
+   echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile  # or ~/.bash_profile
+   echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
    ```
 
 5. **Restart Claude Code**
@@ -106,17 +113,51 @@ cd ~/pro/botfiles/claude/hooks
 uv sync
 ```
 
+Then wire the two-layer bootstrap into your shell entrypoints (see [Shell Environment](#shell-environment-two-layer-bootstrap) below).
+
 ## Configuration
 
-### Shell Environment (.botrc)
+### Shell Environment (two-layer bootstrap)
 
-`.botrc` sources centralized runtime secrets from `secrets/local/*.rc` and then loads modular scripts from `shell/*.sh` in lexical order.
-`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
-Add it to your shell startup file:
+Botfiles uses a two-layer shell environment model:
 
+**`.botenv` (core, non-interactive safe)**
+- Secrets from `secrets/local/*.rc`
+- PATH additions (`~/.local/bin`, `/usr/local/bin`)
+- Core env: `BOTFILES_ROOT`, `EDITOR`, `VISUAL`, `TERM`, `UV_BIN`
+- Safe to source from any context: SSH commands, cron, systemd, agent exec
+
+**`.botrc` (interactive layer)**
+- Sources `.botenv` first (idempotent via double-source guard)
+- Adds aliases (`cc`, `bedcc`, `zj`, etc.)
+- Loads interactive shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`)
+- Defines workflow functions (`work-ml`, `oracle`, etc.)
+
+**Shell entrypoint wiring:**
+
+For **zsh** (macOS):
 ```bash
+# ~/.zshenv (ALL zsh contexts, including non-interactive)
+[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"
+
+# ~/.zshrc (interactive only)
 source ~/pro/botfiles/.botrc
 ```
+
+For **bash** (Linux):
+```bash
+# Effective login file (login shells — sets BASH_ENV for non-interactive children).
+# Bash reads the first of ~/.bash_profile, ~/.bash_login, ~/.profile.
+# Add this to whichever one your system uses (usually ~/.profile on Ubuntu).
+export BASH_ENV="$HOME/pro/botfiles/.botenv"
+
+# ~/.bashrc (interactive shells)
+source ~/pro/botfiles/.botrc
+```
+
+`setup.sh` configures these entrypoints automatically.
+
+`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 
 Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
@@ -286,7 +327,7 @@ Create `secrets/local/codex-azure.rc` from the template:
 cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
 ```
 
-This file is ignored by git and sourced via `.botrc`.
+This file is ignored by git and sourced via `.botenv`.
 
 ## Skills
 
@@ -314,11 +355,12 @@ I created this myself to have a skill-only Notion-Claude Code integration that a
    - Create a new integration
    - Copy the "Internal Integration Token" (starts with `ntn_`)
 
-3. Set environment variables (either in ~/.zshrc or ~/.bashrc or have a start session hook load them up):
+3. Set environment variables in an existing botfiles secret file (e.g., append to `secrets/local/claude-hooks.rc`):
    ```bash
-   export NOTION_API_KEY="ntn_your_token_here" #Make sure that API key has read/write permissions to the pages/databases you want to access
+   export NOTION_API_KEY="ntn_your_token_here"  # read/write permissions to target pages/databases
    export NOTION_UPDATES_DB_ID="your_database_id"  # Optional
    ```
+   `.botenv` sources the files listed in its fixed sourcing loop. To add a new standalone file like `secrets/local/notion.rc`, you would also need to add it to `.botenv`'s loop. The simplest path is appending to an existing file like `claude-hooks.rc`.
 
 4. Share pages/databases with your integration in Notion
 
@@ -333,6 +375,7 @@ See `claude/skills/notion/README.md` for detailed usage.
 
 ```
 botfiles/
+├── .botenv
 ├── .botrc
 ├── README.md
 ├── .gitignore
@@ -340,6 +383,7 @@ botfiles/
 ├── shell/
 │   ├── 10-uv-bin.sh
 │   ├── 20-ssh-workflows.sh
+│   ├── 30-oracle.sh
 │   ├── clipboard-copy
 │   └── work-zellij
 ├── zellij/
@@ -391,10 +435,131 @@ Restart Claude Code after pulling updates.
 
 ## Adding New Machines
 
-1. Clone this repo to `~/pro/botfiles`
-2. Run `./setup.sh`
-3. Create `secrets/local/*.rc` from `secrets/templates/*.rc.example`
-4. Restart Claude Code
+### Quick path (interactive)
+
+```bash
+git clone <repo-url> ~/pro/botfiles
+cd ~/pro/botfiles
+./setup.sh
+```
+
+`setup.sh` handles symlinks, Python deps, shell entrypoint wiring, and secret file checks interactively.
+
+### Step-by-step (any platform)
+
+**1. Clone and run setup**
+
+```bash
+git clone <repo-url> ~/pro/botfiles
+cd ~/pro/botfiles
+./setup.sh
+```
+
+**2. Create secret files from templates**
+
+```bash
+mkdir -p secrets/local
+cp secrets/templates/machine.rc.example        secrets/local/machine.rc
+cp secrets/templates/claude-bedrock.rc.example  secrets/local/claude-bedrock.rc
+cp secrets/templates/claude-hooks.rc.example    secrets/local/claude-hooks.rc
+# Copy others as needed:
+cp secrets/templates/codex-azure.rc.example     secrets/local/codex-azure.rc
+cp secrets/templates/codex-openai.rc.example    secrets/local/codex-openai.rc
+cp secrets/templates/claude-vertex.rc.example   secrets/local/claude-vertex.rc
+cp secrets/templates/opencode-azure.rc.example  secrets/local/opencode-azure.rc
+```
+
+Edit each file and fill in real values. At minimum, create `machine.rc`:
+
+```bash
+# secrets/local/machine.rc
+export SYSTEM_NAME="My-Machine-Name"
+```
+
+**3. Wire shell entrypoints** (if `setup.sh` didn't do it)
+
+For **macOS / zsh**:
+```bash
+# ~/.zshenv — core env for ALL zsh invocations (interactive + non-interactive)
+echo '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' >> ~/.zshenv
+
+# ~/.zshrc — interactive aliases and functions
+echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
+```
+
+For **Linux (Ubuntu, Debian, Azure VMs, etc.) / bash**:
+```bash
+# Add BASH_ENV to whichever login file bash reads first.
+# Bash checks ~/.bash_profile, ~/.bash_login, ~/.profile in order and
+# reads ONLY the first one found. If you have ~/.bash_profile, use that
+# instead of ~/.profile.
+echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile  # or ~/.bash_profile
+
+# ~/.bashrc — interactive aliases and functions
+echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
+```
+
+**4. Restart your shell and verify**
+
+```bash
+# Verify core env loads:
+echo "BOTFILES_ROOT=$BOTFILES_ROOT"
+echo "SYSTEM_NAME=$SYSTEM_NAME"
+echo "UV_BIN=$UV_BIN"
+
+# Verify interactive layer (aliases, functions):
+alias cc
+type oracle
+```
+
+**5. Verify non-interactive env parity**
+
+This is the whole point of the two-layer model — non-interactive processes should get the same core env:
+
+For **zsh** machines (test via SSH or a non-interactive zsh):
+```bash
+zsh -c 'echo "BOTFILES_ROOT=$BOTFILES_ROOT SYSTEM_NAME=$SYSTEM_NAME"'
+```
+
+For **bash** machines (test that BASH_ENV propagates):
+```bash
+bash -c 'echo "BOTFILES_ROOT=$BOTFILES_ROOT SYSTEM_NAME=$SYSTEM_NAME"'
+```
+
+Both should show the values from your secret files.
+
+### BASH_ENV caveat: systemd and cron
+
+`BASH_ENV` propagates through the process tree from login shells, so it works for:
+- Interactive terminals and their child processes
+- SSH command execution (bash on Linux sources `.bashrc` for remote commands)
+- Agent-spawned subprocesses (as long as the parent had BASH_ENV set)
+
+It does **not** automatically apply to:
+- **systemd services** — `.botenv` is a shell script (conditionals, loops), not a plain `KEY=VALUE` file, so `EnvironmentFile=` cannot parse it. Instead, source it from your service command:
+  ```ini
+  ExecStart=/bin/bash -c '. /home/<user>/pro/botfiles/.botenv && exec <actual-command>'
+  ```
+  Or if you only need `BASH_ENV` propagation for bash subprocesses:
+  ```ini
+  Environment=BASH_ENV=/home/<user>/pro/botfiles/.botenv
+  ```
+- **cron jobs** — `.botenv` is sh-safe (falls back to `$HOME/pro/botfiles` for path resolution under plain `/bin/sh`). Prepend `. ~/pro/botfiles/.botenv &&` to the command. Alternatively, set `SHELL=/bin/bash` and `BASH_ENV=/home/<user>/pro/botfiles/.botenv` in the crontab header
+
+### Adding the machine to SSH workflows
+
+If other machines should be able to connect to this one using the `work-*` commands:
+
+1. Add an SSH host alias in `~/.ssh/config` on the connecting machines
+2. Ensure `zellij` is installed on the new machine (required for `work-*` attach/create)
+3. Optionally set `BOT_*_HOST` env vars (see [SSH Workflow Commands](#ssh-workflow-commands))
+
+### Current fleet
+
+| Machine | OS | Shell | SYSTEM_NAME | Role |
+|---------|-----|-------|-------------|------|
+| sourya-mac | macOS (zsh) | zsh | Sourya-Macbook | Primary dev |
+| ladduu-dev-ml-vm | Ubuntu (bash) | bash | Azure-A100-GPU-VM | GPU VM, agents |
 
 ## License
 
