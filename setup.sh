@@ -289,16 +289,25 @@ setup_shell_rc() {
     echo "Checking shell configuration (two-layer bootstrap)..."
 
     # Helper: ensure a source line is present in a target file, prompting the user.
-    # Usage: _ensure_sourced <label> <target_file> <line_to_add> <grep_pattern>
+    # Usage: _ensure_sourced <label> <target_file> <line_to_add> <exact_check_pattern>
+    # exact_check_pattern is a fixed string that must appear verbatim (uncommented)
+    # in the target file for the check to pass.
     _ensure_sourced() {
         local label="$1"
         local target_file="$2"
         local line_to_add="$3"
-        local grep_pattern="$4"
+        local exact_check="$4"
 
-        if [ -f "$target_file" ] && grep -qF "$grep_pattern" "$target_file"; then
+        # Check for the exact managed line (uncommented) rather than a loose substring.
+        if [ -f "$target_file" ] && grep -qxF "$exact_check" "$target_file"; then
             echo "  [OK] $label already present in $target_file"
             return
+        fi
+
+        # Warn if a stale or commented-out mention exists.
+        if [ -f "$target_file" ] && grep -q 'bot\(env\|rc\)\|BASH_ENV' "$target_file"; then
+            echo "  [WARN] $target_file mentions botenv/botrc/BASH_ENV but not the exact managed line."
+            echo "         Please review after setup to remove stale entries."
         fi
 
         echo ""
@@ -320,33 +329,52 @@ setup_shell_rc() {
         esac
     }
 
+    # Helper: find the effective bash login startup file.
+    # Bash reads the first readable file among ~/.bash_profile, ~/.bash_login, ~/.profile.
+    # Returns the path of the first existing one, or ~/.profile as the default.
+    _bash_login_file() {
+        for f in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+            if [ -f "$f" ]; then
+                echo "$f"
+                return
+            fi
+        done
+        echo "$HOME/.profile"
+    }
+
     case "$SHELL" in
         */zsh)
             # Layer 1: .botenv in ~/.zshenv (all zsh invocations, including non-interactive)
             _ensure_sourced ".botenv (core env)" \
                 "$HOME/.zshenv" \
                 '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' \
-                ".botenv"
+                '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"'
 
             # Layer 2: .botrc in ~/.zshrc (interactive only)
             _ensure_sourced ".botrc (interactive)" \
                 "$HOME/.zshrc" \
                 "source $SCRIPT_DIR/.botrc" \
-                ".botrc"
+                "source $SCRIPT_DIR/.botrc"
             ;;
 
         */bash)
-            # Layer 1: BASH_ENV in ~/.profile (non-interactive children inherit it)
+            # Layer 1: BASH_ENV in the effective bash login file.
+            # Bash reads the first of ~/.bash_profile, ~/.bash_login, ~/.profile — we
+            # must patch whichever one exists (or default to ~/.profile).
+            local bash_login_file
+            bash_login_file="$(_bash_login_file)"
+            echo "  Effective bash login file: $bash_login_file"
+
             _ensure_sourced ".botenv via BASH_ENV" \
-                "$HOME/.profile" \
+                "$bash_login_file" \
                 "export BASH_ENV=\"$SCRIPT_DIR/.botenv\"" \
-                "BASH_ENV"
+                "export BASH_ENV=\"$SCRIPT_DIR/.botenv\""
 
             # Layer 2: .botrc in ~/.bashrc (interactive only)
             _ensure_sourced ".botrc (interactive)" \
                 "$HOME/.bashrc" \
                 "source $SCRIPT_DIR/.botrc" \
-                ".botrc"
+                "source $SCRIPT_DIR/.botrc"
             ;;
 
         *)
@@ -362,6 +390,7 @@ setup_shell_rc() {
     esac
 
     unset -f _ensure_sourced
+    unset -f _bash_login_file
     echo ""
 }
 

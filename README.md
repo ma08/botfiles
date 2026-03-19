@@ -84,7 +84,8 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    echo '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' >> ~/.zshenv
    echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
 
-   # For bash (Linux):
+   # For bash (Linux) — use whichever login file bash reads first:
+   # (~/.bash_profile > ~/.bash_login > ~/.profile)
    echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile
    echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
    ```
@@ -145,7 +146,9 @@ source ~/pro/botfiles/.botrc
 
 For **bash** (Linux):
 ```bash
-# ~/.profile (login shells — sets BASH_ENV for non-interactive children)
+# Effective login file (login shells — sets BASH_ENV for non-interactive children).
+# Bash reads the first of ~/.bash_profile, ~/.bash_login, ~/.profile.
+# Add this to whichever one your system uses (usually ~/.profile on Ubuntu).
 export BASH_ENV="$HOME/pro/botfiles/.botenv"
 
 # ~/.bashrc (interactive shells)
@@ -486,7 +489,10 @@ echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
 
 For **Linux (Ubuntu, Debian, Azure VMs, etc.) / bash**:
 ```bash
-# ~/.profile — BASH_ENV propagates core env to non-interactive children
+# Add BASH_ENV to whichever login file bash reads first.
+# Bash checks ~/.bash_profile, ~/.bash_login, ~/.profile in order and
+# reads ONLY the first one found. If you have ~/.bash_profile, use that
+# instead of ~/.profile.
 echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile
 
 # ~/.bashrc — interactive aliases and functions
@@ -530,7 +536,14 @@ Both should show the values from your secret files.
 - Agent-spawned subprocesses (as long as the parent had BASH_ENV set)
 
 It does **not** automatically apply to:
-- **systemd services** — add `Environment=BASH_ENV=/home/<user>/pro/botfiles/.botenv` to the unit file, or use `EnvironmentFile=` pointing to `.botenv`
+- **systemd services** — `.botenv` is a shell script (conditionals, loops), not a plain `KEY=VALUE` file, so `EnvironmentFile=` cannot parse it. Instead, source it from your service command:
+  ```ini
+  ExecStart=/bin/bash -c '. /home/<user>/pro/botfiles/.botenv && exec <actual-command>'
+  ```
+  Or if you only need `BASH_ENV` propagation for bash subprocesses:
+  ```ini
+  Environment=BASH_ENV=/home/<user>/pro/botfiles/.botenv
+  ```
 - **cron jobs** — prepend `source ~/pro/botfiles/.botenv &&` to the command, or set `BASH_ENV` in the crontab header
 
 ### Adding the machine to SSH workflows
