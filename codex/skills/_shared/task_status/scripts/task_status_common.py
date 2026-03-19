@@ -222,9 +222,9 @@ def resolve_agent_session_id(
         if value:
             return value
     # Claude Code doesn't export a session ID env var, so fall back to
-    # resolving the most recent session from local project storage.
+    # the most recent history.jsonl entry for the project.
     if source.get("CLAUDECODE", "").strip() in TRUE_VALUES:
-        resolved = _resolve_claude_session_from_project(project_root)
+        resolved = _resolve_claude_session_from_history(project_root)
         if resolved and resolved != "none":
             return resolved
     return "none"
@@ -275,38 +275,55 @@ def _encode_claude_project_dir(project_root: str) -> str:
     """Encode a project root path to Claude's project directory name.
 
     Claude stores per-project data under ``~/.claude/projects/<encoded>/``
-    where ``<encoded>`` is the absolute path with path separators and
-    underscores replaced by ``-``, keeping the leading ``-``.
+    where ``<encoded>`` is the absolute path with every character that is
+    not alphanumeric or ``-`` replaced by ``-``.  The leading ``-`` (from
+    the root ``/``) is kept.
     """
     resolved = Path(project_root).expanduser().resolve()
-    return str(resolved).replace(os.sep, "-").replace("_", "-")
+    return re.sub(r"[^a-zA-Z0-9-]", "-", str(resolved))
 
 
-def _resolve_claude_session_from_project(project_root: str | None) -> str:
-    """Find the most recent Claude session ID for a project from local storage.
+def _resolve_claude_session_from_history(project_root: str | None) -> str:
+    """Identify the current Claude session via ``~/.claude/history.jsonl``.
 
-    Looks at ``~/.claude/projects/<encoded>/`` for the most recently
-    modified top-level ``.jsonl`` file and returns its stem (the UUID).
+    Claude appends a ``{sessionId, project, timestamp, ...}`` entry to
+    ``history.jsonl`` when the user submits a prompt, *before* tool
+    execution begins.  The most recent entry whose ``project`` matches
+    *project_root* therefore identifies the session that is currently
+    executing.
+
+    This is preferred over file-mtime heuristics because it is scoped to
+    the prompt that triggered the current tool call.  A narrow race
+    exists when a second concurrent session submits a prompt between the
+    history write and this read, but that window is typically
+    sub-second.
     """
-    root = project_root or os.getcwd()
-    encoded = _encode_claude_project_dir(root)
-    project_dir = Path.home() / ".claude" / "projects" / encoded
-    if not project_dir.is_dir():
+    history_path = Path.home() / ".claude" / "history.jsonl"
+    if not history_path.is_file():
         return "none"
 
-    best_mtime = 0.0
-    best_stem = "none"
-    for entry in project_dir.iterdir():
-        if not entry.is_file() or entry.suffix != ".jsonl":
+    root = str(Path(project_root or os.getcwd()).expanduser().resolve())
+
+    try:
+        lines = history_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return "none"
+
+    for line in reversed(lines):
+        stripped = line.strip()
+        if not stripped:
             continue
         try:
-            mtime = entry.stat().st_mtime
-        except OSError:
+            entry = json.loads(stripped)
+        except (json.JSONDecodeError, ValueError):
             continue
-        if mtime > best_mtime:
-            best_mtime = mtime
-            best_stem = entry.stem
-    return best_stem
+        if entry.get("project") != root:
+            continue
+        session_id = (entry.get("sessionId") or "").strip()
+        if session_id:
+            return session_id
+
+    return "none"
 
 
 def resolve_codex_transcript_path(
