@@ -7,7 +7,8 @@ This repository is public. Runtime secrets must never be committed.
 - `secrets/templates/` contains safe, tracked templates (`*.rc.example`).
 - `secrets/local/` contains real local secret files (`*.rc`) and is git-ignored.
 
-`.botrc` only loads runtime secrets from `secrets/local/*.rc` (strict cutover).
+`.botenv` loads runtime secrets from `secrets/local/*.rc` in a fixed deterministic order.
+`.botrc` sources `.botenv`, so interactive shells also get them.
 
 ## Setup
 
