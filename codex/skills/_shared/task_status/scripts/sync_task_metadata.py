@@ -12,6 +12,10 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from task_status_common import (  # noqa: E402
+    TRACKER_KIND_GITHUB,
+    TRACKER_KIND_LINEAR,
+    TRACKER_KIND_NONE,
+    TRACKER_REMOTE_SESSION_MARKER,
     LIVE_SESSION_END,
     LIVE_SESSION_START,
     TASK_METADATA_END,
@@ -25,14 +29,19 @@ from task_status_common import (  # noqa: E402
     gh_authenticated,
     gh_available,
     infer_agent_from_script,
+    infer_project_root_from_path,
     merged_env_with_botfiles_defaults,
+    normalize_task_metadata,
     now_pst_label,
     parse_bullet_metadata,
     parse_github_issue_url,
+    parse_tracker_url,
     read_text,
     resolve_agent_name,
     resolve_agent_session_id,
     resolve_machine_name,
+    resolve_transcript_path,
+    resolve_tracker_title,
     resolve_status_file,
     resolve_zellij_session,
     upsert_current_task_pointer,
@@ -45,12 +54,40 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--status-file", help="Path to status.md or legacy README.md.")
     parser.add_argument("--task-dir", help="Task folder containing status.md/README.md.")
+    parser.add_argument(
+        "--tracker-url",
+        help="Primary tracker URL override (Linear takes precedence when both Linear and GitHub exist).",
+    )
+    parser.add_argument(
+        "--tracker-kind",
+        help="Explicit primary tracker kind override (for example linear or github).",
+    )
+    parser.add_argument(
+        "--tracker-human-id",
+        help="Explicit primary tracker human ID override (for example ZON-8 or owner/repo#123).",
+    )
+    parser.add_argument("--tracker-title", help="Explicit primary tracker title override.")
     parser.add_argument("--github-issue-url", help="Explicit GitHub issue URL override.")
+    parser.add_argument("--workspace-path", help="Explicit workspace/project root path override.")
     parser.add_argument("--machine", help="Explicit machine name override.")
     parser.add_argument("--coding-agent", help="Explicit coding-agent name override (e.g. codex, claude).")
     parser.add_argument("--agent-session-id", help="Explicit coding-agent session id override.")
     parser.add_argument("--zellij-session", help="Explicit zellij session override.")
     parser.add_argument("--zellij-link", help="Explicit zellij link override.")
+    parser.add_argument(
+        "--remote-session-anchor-kind",
+        help="Explicit remote-session anchor kind override (for example linear_issue_body).",
+    )
+    parser.add_argument(
+        "--remote-session-anchor-id",
+        help="Explicit remote-session anchor identifier override.",
+    )
+    parser.add_argument("--linear-issue-id", help="Explicit Linear issue UUID override.")
+    parser.add_argument("--linear-issue-identifier", help="Explicit Linear issue identifier override (for example ZON-8).")
+    parser.add_argument("--linear-team-id", help="Explicit Linear team UUID override.")
+    parser.add_argument("--linear-team-name", help="Explicit Linear team name override.")
+    parser.add_argument("--linear-project-id", help="Explicit Linear project UUID override.")
+    parser.add_argument("--linear-project-name", help="Explicit Linear project name override.")
     parser.add_argument(
         "--sync-github-issue",
         action="store_true",
@@ -79,6 +116,14 @@ def warn(msg: str) -> None:
     print(f"WARNING: {msg}", file=sys.stderr)
 
 
+def pick_value(*values: str | None) -> str:
+    for value in values:
+        resolved = str(value or "").strip()
+        if resolved and resolved.lower() != TRACKER_KIND_NONE:
+            return resolved
+    return TRACKER_KIND_NONE
+
+
 def main() -> int:
     args = parse_args()
     env = merged_env_with_botfiles_defaults(dict(os.environ), caller_path=Path(__file__))
@@ -100,6 +145,7 @@ def main() -> int:
         end_marker=TASK_METADATA_END,
     )
     existing = parse_bullet_metadata(existing_block)
+    normalized_existing = normalize_task_metadata(existing, status_file=status_file)
 
     machine = args.machine or resolve_machine_name(env)
     default_agent = infer_agent_from_script(Path(__file__))
@@ -107,25 +153,126 @@ def main() -> int:
     agent_session_id = args.agent_session_id or resolve_agent_session_id(env)
     zellij_session = args.zellij_session or resolve_zellij_session(env)
     zellij_link = args.zellij_link or build_zellij_link(zellij_session, env)
+    project_root = infer_project_root_from_path(status_file)
+    project_root_str = str(project_root) if project_root else TRACKER_KIND_NONE
+    task_folder = str(status_file.parent.resolve())
+    task_status_path = str(status_file.resolve())
+    transcript_path = resolve_transcript_path(
+        coding_agent,
+        agent_session_id,
+        project_root=project_root_str if project_root else None,
+    )
 
-    issue_url = args.github_issue_url or existing.get("GitHub Issue", "none")
-    if issue_url in {"", "none"}:
-        issue_url = "none"
+    tracker_url = pick_value(
+        args.tracker_url,
+        normalized_existing.get("tracker_url"),
+        args.github_issue_url,
+        normalized_existing.get("github_issue"),
+    )
+    tracker_ref = parse_tracker_url(tracker_url) if tracker_url != TRACKER_KIND_NONE else None
+    if tracker_ref:
+        tracker_url = tracker_ref.url
 
-    issue_ref = parse_github_issue_url(issue_url) if issue_url != "none" else None
-    issue_repo = issue_ref.repo_key if issue_ref else existing.get("GitHub Repo", "none")
-    issue_number = str(issue_ref.number) if issue_ref else existing.get("GitHub Issue Number", "none")
+    tracker_kind = pick_value(
+        args.tracker_kind,
+        tracker_ref.kind if tracker_ref else None,
+        normalized_existing.get("tracker_kind"),
+        TRACKER_KIND_GITHUB if args.github_issue_url else None,
+    ).lower()
+    if tracker_kind not in {TRACKER_KIND_GITHUB, TRACKER_KIND_LINEAR}:
+        tracker_kind = TRACKER_KIND_NONE
+
+    tracker_human_id = pick_value(
+        args.tracker_human_id,
+        tracker_ref.human_id if tracker_ref else None,
+        normalized_existing.get("tracker_human_id"),
+    )
+    tracker_title = pick_value(
+        args.tracker_title,
+        normalized_existing.get("tracker_title"),
+        resolve_tracker_title(tracker_ref) if tracker_ref else None,
+    )
+
+    workspace_path = pick_value(
+        args.workspace_path,
+        normalized_existing.get("workspace_path"),
+        project_root_str if project_root else None,
+    )
+    issue_url = pick_value(
+        args.github_issue_url,
+        normalized_existing.get("github_issue"),
+        tracker_ref.url if tracker_kind == TRACKER_KIND_GITHUB and tracker_ref else None,
+    )
+    issue_ref = parse_github_issue_url(issue_url) if issue_url != TRACKER_KIND_NONE else None
+    issue_repo = pick_value(
+        issue_ref.repo_key if issue_ref else None,
+        normalized_existing.get("github_repo"),
+    )
+    issue_number = pick_value(
+        str(issue_ref.number) if issue_ref else None,
+        normalized_existing.get("github_issue_number"),
+    )
+
+    linear_ref = tracker_ref.linear_issue if tracker_ref and tracker_ref.kind == TRACKER_KIND_LINEAR else None
+    linear_issue_id = pick_value(
+        args.linear_issue_id,
+        normalized_existing.get("linear_issue_id"),
+    )
+    linear_issue_identifier = pick_value(
+        args.linear_issue_identifier,
+        normalized_existing.get("linear_issue_identifier"),
+        linear_ref.identifier if linear_ref else None,
+    )
+    linear_team_id = pick_value(args.linear_team_id, normalized_existing.get("linear_team_id"))
+    linear_team_name = pick_value(args.linear_team_name, normalized_existing.get("linear_team_name"))
+    linear_project_id = pick_value(args.linear_project_id, normalized_existing.get("linear_project_id"))
+    linear_project_name = pick_value(
+        args.linear_project_name,
+        normalized_existing.get("linear_project_name"),
+    )
+
+    remote_session_anchor_kind = pick_value(
+        args.remote_session_anchor_kind,
+        normalized_existing.get("remote_session_anchor_kind"),
+    )
+    if remote_session_anchor_kind == TRACKER_KIND_NONE:
+        if tracker_kind == TRACKER_KIND_LINEAR and tracker_url != TRACKER_KIND_NONE:
+            remote_session_anchor_kind = "linear_issue_body"
+        elif issue_ref:
+            remote_session_anchor_kind = "github_issue_body"
+
+    remote_session_anchor_id = pick_value(
+        args.remote_session_anchor_id,
+        normalized_existing.get("remote_session_anchor_id"),
+        TRACKER_REMOTE_SESSION_MARKER if remote_session_anchor_kind != TRACKER_KIND_NONE else None,
+    )
 
     metadata_block = build_task_metadata_block(
+        tracker_kind=tracker_kind,
+        tracker_url=tracker_url,
+        tracker_human_id=tracker_human_id,
+        tracker_title=tracker_title,
         machine=machine,
         coding_agent=coding_agent,
         agent_session_id=agent_session_id,
-        issue_url=issue_url,
-        issue_repo=issue_repo or "none",
-        issue_number=issue_number or "none",
+        task_folder=task_folder,
+        task_status_path=task_status_path,
+        transcript_path=transcript_path,
+        last_synced_at=now_pst_label(),
+        workspace_path=workspace_path,
         zellij_session=zellij_session,
         zellij_link=zellij_link,
-        last_synced=now_pst_label(),
+        remote_session_anchor_kind=remote_session_anchor_kind,
+        remote_session_anchor_id=remote_session_anchor_id,
+        github_issue=issue_url,
+        github_repo=issue_repo,
+        github_issue_number=issue_number,
+        linear_issue_id=linear_issue_id,
+        linear_issue_identifier=linear_issue_identifier,
+        linear_team_id=linear_team_id,
+        linear_team_name=linear_team_name,
+        linear_project_id=linear_project_id,
+        linear_project_name=linear_project_name,
     )
 
     updated_status = upsert_marked_block(

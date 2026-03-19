@@ -2,9 +2,9 @@
 name: get-task-details
 description: >-
   Print rich task details for the current task context: status file path,
-  full GitHub issue URL, machine name, coding agent/session id, transcript
-  path, zellij session, zellij link, and a short task recap. Replaces the old
-  get-task-status-file interface.
+  primary tracker URL, machine name, coding agent/session id, transcript
+  path, zellij session, zellij link, and a short task recap. Replaces the
+  old get-task-status-file interface.
 ---
 
 # Get Task Details
@@ -36,7 +36,11 @@ python ~/pro/botfiles/claude/skills/_shared/task_status/scripts/get_task_details
 - Primary task:
   - Task folder
   - Status file path
-  - Full GitHub issue URL
+  - Primary tracker kind
+  - Full primary tracker URL
+  - Tracker human ID
+  - Tracker title
+  - GitHub compatibility URL when present
   - Machine
   - Coding agent
   - Agent session ID
@@ -56,7 +60,8 @@ If no task is found for the current session, print a clear message and suggest `
 ## Notes
 - Read-only: this skill never edits files.
 - If recent conversation already includes an exact task folder path or `status.md` path, pass it directly with `--task-dir` or `--status-file` instead of relying on repo/session inference.
-- Preserve the full GitHub issue URL in the output; do not collapse it to `owner/repo#number` shorthand.
+- Preserve the full primary tracker URL in the output; do not collapse it to shorthand.
+- The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`](../../../docs/task-status-tracker-contract.md).
 - Default mode is current-task-for-this-session; use `task-slug` when you intentionally want cross-session lookup.
 - Multiple tasks in one agent session are supported: the current task is whichever task was most recently touched by `start-new-task` or `save-task-status` in this session.
 - Legacy or unsynced task folders without a managed `Task Metadata` block cannot be auto-resolved as the current session task.

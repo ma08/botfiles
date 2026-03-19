@@ -4,13 +4,13 @@ description: >-
   Initialize a new task folder with status.md, user_inputs/initial.md,
   user_inputs/input_artifacts/, task-progress-artifacts/, and
   task-progress-artifacts/scratchpad/. Supports GitHub issue URL inputs,
-  issue-informed slugs (`repo-issue-number-title`), and machine/zellij
+  Linear issue URL inputs, tracker-informed slugs, and machine/zellij
   metadata capture with optional live-session issue block sync.
 ---
 
 # Start New Task
 
-Create a task folder and capture durable metadata for machine, session, and GitHub linkage.
+Create a task folder and capture durable metadata for machine, session, and tracker linkage.
 
 ## Invocation
 
@@ -27,7 +27,11 @@ If no description is provided, ask for one.
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_context.py \
   --project-root "<project-root>" \
   --description "<text>"
-python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py --status-file "<status-file>" --sync-github-issue
+python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py \
+  --status-file "<status-file>" \
+  --tracker-url "<tracker-url-if-any>" \
+  --github-issue-url "<github-issue-url-if-any>" \
+  --sync-github-issue
 ```
 
 ## Process
@@ -50,7 +54,11 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/resolve_task_cont
 
 Use output fields:
 - `Task Slug`
-- `GitHub Issue` (if detected)
+- `Tracker Kind`
+- `Tracker URL`
+- `Tracker Human ID`
+- `Tracker Title`
+- `GitHub Issue` (compatibility, when detected)
 - `Canonical Project Root`
 - `Canonical Task Status Root`
 - `Machine`
@@ -60,15 +68,16 @@ Use output fields:
 - `Zellij Link`
 
 ### Step 3: Slug and Folder Naming
-- If a GitHub issue URL exists, slug format is `repo-issue-<number>-<title>`.
-- If `Canonical Project Root` / `Canonical Task Status Root` are emitted for an issue-linked task, create or resume the task there instead of the current repo.
+- If the primary tracker is GitHub, slug format is `repo-issue-<number>-<title>`.
+- If the primary tracker is Linear, slug format is `<linear-id>-<title>`.
+- If `Canonical Project Root` / `Canonical Task Status Root` are emitted for a GitHub issue-linked task, create or resume the task there instead of the current repo.
 - Enforce max slug length `60`; truncation appends a stable hash suffix.
 - Folder format remains `<HH>h<MM>m<SS>sPST-<slug>`.
 
 ### Step 4: Existing Task Check
 Search for an existing task folder with the same slug:
 - If found, ask resume vs create-new.
-- For issue-linked work, search the canonical issue-owning repo task root first.
+- For GitHub issue-linked work, search the canonical issue-owning repo task root first.
 - If resume, hand off to `$save-task-status`.
 
 ### Step 5: Create Folder Structure
@@ -98,14 +107,15 @@ After creating `status.md`, run:
 ```bash
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py \
   --status-file "<abs-status-file-path>" \
+  --tracker-url "<tracker-url-if-any>" \
   --github-issue-url "<issue-url-if-any>" \
   --sync-github-issue
 ```
 
 Behavior:
-- Always upserts managed task metadata in status file.
+- Always upserts managed tracker-aware task metadata in the status file.
 - Sets this task as the current task for the active `{project, coding-agent, agent-session}` context.
-- If issue-linked and GitHub CLI auth is available, upserts managed live-session block at top of issue body.
+- If `--sync-github-issue` is set and GitHub CLI auth is available, upserts the managed live-session block at the top of the GitHub issue body.
 - If dependencies are missing (`gh`, auth, zellij env), core task creation still succeeds.
 
 ### Step 8: Confirm and Continue
@@ -117,15 +127,33 @@ Ask the user to confirm scope; proceed if they say to continue.
 
 ## Managed Metadata Contract
 
+The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`](../../../docs/task-status-tracker-contract.md).
+
 ```markdown
 <!-- TASK-METADATA:START -->
 ## Task Metadata
+- Tracker Kind: <linear|github|none>
+- Tracker URL: <url|none>
+- Tracker Human ID: <ZON-8|owner/repo#123|none>
+- Tracker Title: <title|none>
 - Machine: <SYSTEM_NAME|hostname|unknown>
 - Coding Agent: <codex|claude|unknown>
 - Agent Session ID: <id|none>
+- Task Folder: </abs/task/folder|none>
+- Task Status Path: </abs/task/status.md|none>
+- Transcript Path: </abs/transcript|none>
+- Workspace Path: </abs/workspace|none>
+- Remote Session Anchor Kind: <linear_issue_body|github_issue_body|none>
+- Remote Session Anchor ID: <LIVE-SESSION|none>
 - GitHub Issue: <url|none>
 - GitHub Repo: <owner/repo|none>
 - GitHub Issue Number: <number|none>
+- Linear Issue ID: <uuid|none>
+- Linear Issue Identifier: <ZON-8|none>
+- Linear Team ID: <uuid|none>
+- Linear Team Name: <Zone|none>
+- Linear Project ID: <uuid|none>
+- Linear Project Name: <Project|none>
 - Zellij Session: <name|none>
 - Zellij Link: <url|none>
 - Last Synced: YYYY-MM-DD ~HH:MMam/pm PST
@@ -136,4 +164,4 @@ Ask the user to confirm scope; proceed if they say to continue.
 - No `SYSTEM_NAME`: fallback to hostname, then `unknown`.
 - No zellij session: `Zellij Session: none`, `Zellij Link: none`.
 - No GitHub CLI/auth: skip issue-body update, keep local metadata.
-- No GitHub issue URL: local workflow only.
+- No tracker URL: local workflow only.

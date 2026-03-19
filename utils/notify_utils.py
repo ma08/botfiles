@@ -32,6 +32,7 @@ from task_status_common import (  # noqa: E402
     extract_semantic_task_label as _shared_extract_semantic_task_label,
     infer_project_root_from_path,
     load_task_candidates,
+    normalize_task_metadata,
     normalize_repo_slug as _shared_normalize_repo_slug,
     read_task_metadata,
     resolve_current_task_pointer,
@@ -384,23 +385,23 @@ def _task_label_from_status_files(
     return ""
 
 
-def _normalize_github_issue_url(raw_value: str) -> str:
+def _normalize_tracker_url(raw_value: str) -> str:
     value = str(raw_value or "").strip()
     if not value or value == "none":
         return ""
     return value
 
 
-def _task_issue_url_from_context_path(context_path: Path) -> str:
+def _task_tracker_url_from_context_path(context_path: Path) -> str:
     task_dir = _task_dir_from_context_path(context_path)
     if not task_dir:
         return ""
     status_file = resolve_status_file(task_dir)
-    metadata = read_task_metadata(status_file)
-    return _normalize_github_issue_url(metadata.get("GitHub Issue", ""))
+    metadata = normalize_task_metadata(read_task_metadata(status_file), status_file=status_file)
+    return _normalize_tracker_url(metadata.get("tracker_url", ""))
 
 
-def _task_issue_url_from_status_files(
+def _task_tracker_url_from_status_files(
     agent_session_id: str,
     *,
     project_root: Path,
@@ -416,11 +417,14 @@ def _task_issue_url_from_status_files(
         caller_path=Path(__file__),
     )
     if pointer:
-        issue_url = _normalize_github_issue_url(
-            read_task_metadata(pointer.status_file).get("GitHub Issue", "")
+        tracker_url = _normalize_tracker_url(
+            normalize_task_metadata(
+                read_task_metadata(pointer.status_file),
+                status_file=pointer.status_file,
+            ).get("tracker_url", "")
         )
-        if issue_url:
-            return issue_url
+        if tracker_url:
+            return tracker_url
 
     status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
     candidates = load_task_candidates(status_root)
@@ -428,7 +432,12 @@ def _task_issue_url_from_status_files(
         session_matching_candidates(candidates, agent_session_id)
     )
     if matches:
-        return _normalize_github_issue_url(matches[0].metadata.get("GitHub Issue", ""))
+        return _normalize_tracker_url(
+            normalize_task_metadata(
+                matches[0].metadata,
+                status_file=matches[0].status_file,
+            ).get("tracker_url", "")
+        )
 
     return ""
 
@@ -476,30 +485,43 @@ def get_task_label(
     return "unknown-task"
 
 
-def get_task_github_issue_url(
+def get_task_tracker_url(
     *,
     working_directory_override: str | os.PathLike[str] | None = None,
     agent_session_id: str | None = None,
     coding_agent_override: str | None = None,
 ) -> str:
-    """Resolve the current task's GitHub issue URL when one exists."""
+    """Resolve the current task's primary tracker URL when one exists."""
     context_path = _resolve_context_path(working_directory_override)
-    cwd_issue_url = _task_issue_url_from_context_path(context_path)
-    if cwd_issue_url:
-        return cwd_issue_url
+    cwd_tracker_url = _task_tracker_url_from_context_path(context_path)
+    if cwd_tracker_url:
+        return cwd_tracker_url
 
     project_root = infer_project_root_from_path(context_path)
     resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
     resolved_coding_agent = get_coding_agent_name(coding_agent_override)
 
     if project_root:
-        return _task_issue_url_from_status_files(
+        return _task_tracker_url_from_status_files(
             resolved_agent_session_id,
             project_root=project_root,
             coding_agent=resolved_coding_agent,
         )
 
     return ""
+
+
+def get_task_github_issue_url(
+    *,
+    working_directory_override: str | os.PathLike[str] | None = None,
+    agent_session_id: str | None = None,
+    coding_agent_override: str | None = None,
+) -> str:
+    return get_task_tracker_url(
+        working_directory_override=working_directory_override,
+        agent_session_id=agent_session_id,
+        coding_agent_override=coding_agent_override,
+    )
 
 
 def get_coding_agent_name(coding_agent_override: str | None = None) -> str:
@@ -714,7 +736,7 @@ def send_email_notification(
     session_name: str,
     agent_session_id: str,
     session_url: str | None,
-    github_issue_url: str | None,
+    tracker_url: str | None,
     attach_command: str | None,
     task_label: str,
     preview_line: str,
@@ -753,7 +775,7 @@ def send_email_notification(
         str(message).strip() or None,
         "",
         f"Open Session: {session_url}" if session_url else None,
-        f"GitHub Issue: {github_issue_url}" if github_issue_url else None,
+        f"Tracker: {tracker_url}" if tracker_url else None,
         f"Attach Command: {attach_command}" if attach_command else None,
     ]
     body_text = "\n".join([line for line in body_lines if line is not None])
@@ -907,7 +929,7 @@ def send_notification(
         agent_session_id=agent_session_id,
         coding_agent_override=coding_agent,
     )
-    github_issue_url = get_task_github_issue_url(
+    tracker_url = get_task_tracker_url(
         working_directory_override=context_path,
         agent_session_id=agent_session_id,
         coding_agent_override=coding_agent,
@@ -954,12 +976,12 @@ def send_notification(
                 if config["zellij_web_enable_links"] and session_url
                 else None
             )
-            github_issue_line = f"GitHub Issue: {github_issue_url}" if github_issue_url else None
+            tracker_line = f"Tracker: {tracker_url}" if tracker_url else None
             fixed_lines = [preview_line, title]
             if open_session_line:
                 fixed_lines.append(open_session_line)
-            if github_issue_line:
-                fixed_lines.append(github_issue_line)
+            if tracker_line:
+                fixed_lines.append(tracker_line)
             fixed_text = "\n".join([line for line in fixed_lines if line])
 
             if body_text:
@@ -978,8 +1000,8 @@ def send_notification(
                 whatsapp_lines.append(body_text)
             if open_session_line:
                 whatsapp_lines.append(open_session_line)
-            if github_issue_line:
-                whatsapp_lines.append(github_issue_line)
+            if tracker_line:
+                whatsapp_lines.append(tracker_line)
 
             whatsapp_message = "\n".join([line for line in whatsapp_lines if line])
             _log(
@@ -1009,7 +1031,7 @@ def send_notification(
             session_name=session_name,
             agent_session_id=agent_session_id,
             session_url=session_url,
-            github_issue_url=github_issue_url,
+            tracker_url=tracker_url,
             attach_command=attach_command,
             task_label=task_label,
             preview_line=preview_line,

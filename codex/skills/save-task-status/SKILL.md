@@ -2,8 +2,8 @@
 name: save-task-status
 description: >-
   Save current task status, plan, or bug report to the project's task-tracking
-  folder. Reconciles machine/zellij/issue metadata and optionally refreshes
-  linked GitHub live-session block when context drifts.
+  folder. Reconciles machine/zellij/tracker metadata and optionally refreshes
+  linked GitHub live-session compatibility blocks when context drifts.
 source: personal
 ---
 
@@ -22,6 +22,8 @@ Update the current task status file and keep task metadata aligned with the acti
 ```bash
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py \
   --status-file "<status-file>" \
+  --tracker-url "<tracker-url-if-any>" \
+  --github-issue-url "<github-issue-url-if-any>" \
   --sync-github-issue
 ```
 
@@ -48,20 +50,26 @@ Run:
 ```bash
 python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadata.py \
   --status-file "<abs-status-file-path>" \
+  --tracker-url "<tracker-url-if-any>" \
+  --github-issue-url "<github-issue-url-if-any>" \
   --sync-github-issue
 ```
 
 What this does:
-- Upserts managed `TASK-METADATA` block in status file.
+- Upserts the managed tracker-aware `TASK-METADATA` block in the status file.
 - Updates the machine-local current-task pointer for this `{project, coding-agent, agent-session}` so later `get-task-details` resolves this task as current.
 - Recomputes:
+  - Primary tracker kind/url/human ID/title
   - Machine (`SYSTEM_NAME` -> hostname -> `unknown`)
   - Coding agent (`codex|claude|unknown`)
   - Agent session ID (for example `CODEX_THREAD_ID` when available)
+  - Task folder / task status path / transcript path
+  - Workspace path
   - Zellij session (`ZELLIJ_SESSION_NAME` or `none`)
   - Zellij link (`ZELLIJ_WEB_ENABLE_LINKS` + `ZELLIJ_WEB_BASE_URL` + session)
-  - Linked issue metadata
-- If issue-linked and `gh` auth available, upserts top live-session issue block including the absolute task folder and status-file paths.
+  - Remote-session anchor metadata
+  - GitHub and Linear compatibility fields
+- If `--sync-github-issue` is set and `gh` auth is available, upserts the managed GitHub live-session block including the absolute task folder and status-file paths.
 
 ### Step 4: Degraded-Mode Handling
 If dependencies are missing:
@@ -84,15 +92,33 @@ If dependencies are missing:
 
 ## Managed Metadata Block
 
+The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`](../../../docs/task-status-tracker-contract.md).
+
 ```markdown
 <!-- TASK-METADATA:START -->
 ## Task Metadata
+- Tracker Kind: <linear|github|none>
+- Tracker URL: <url|none>
+- Tracker Human ID: <ZON-8|owner/repo#123|none>
+- Tracker Title: <title|none>
 - Machine: <SYSTEM_NAME|hostname|unknown>
 - Coding Agent: <codex|claude|unknown>
 - Agent Session ID: <id|none>
+- Task Folder: </abs/task/folder|none>
+- Task Status Path: </abs/task/status.md|none>
+- Transcript Path: </abs/transcript|none>
+- Workspace Path: </abs/workspace|none>
+- Remote Session Anchor Kind: <linear_issue_body|github_issue_body|none>
+- Remote Session Anchor ID: <LIVE-SESSION|none>
 - GitHub Issue: <url|none>
 - GitHub Repo: <owner/repo|none>
 - GitHub Issue Number: <number|none>
+- Linear Issue ID: <uuid|none>
+- Linear Issue Identifier: <ZON-8|none>
+- Linear Team ID: <uuid|none>
+- Linear Team Name: <Zone|none>
+- Linear Project ID: <uuid|none>
+- Linear Project Name: <Project|none>
 - Zellij Session: <name|none>
 - Zellij Link: <url|none>
 - Last Synced: YYYY-MM-DD ~HH:MMam/pm PST
