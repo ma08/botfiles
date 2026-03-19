@@ -43,11 +43,14 @@ These are user-level instructions for the Codex agent shared across all projects
 - `~/pro/botfiles/codex/skills/oracle` and `~/pro/botfiles/claude/skills/oracle` are kept as verbatim upstream copies of `steipete/oracle/skills/oracle`.
 - Do not hand-edit the Oracle skill directory for local preferences; refresh it by replacing it from upstream, and keep local Oracle behavior in `AGENTS.md` / `CLAUDE.md` or botfiles shell modules instead.
 - On machines where the default Node runtime is below 22, use the shell wrappers `oracle` and `oracle-mcp` loaded from `~/pro/botfiles/.botrc` instead of raw `npx -y @steipete/oracle`.
-- In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, pass `--engine api` instead of relying on upstream defaults.
+- In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, use `--engine api` instead of relying on upstream defaults.
+- In this environment, Oracle should target `gpt-5.4-pro` by default. Unless the user explicitly asks for another model or a multi-model run, use `--model gpt-5.4-pro`.
 - When invoking Oracle from an agent workflow, be explicit about the engine choice rather than assuming Oracle's default mode matches local expectations.
+- Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
 - Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
 - For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
+- Oracle API runs on non-Pro models may still inherit shorter auto timeouts from the CLI. If you intentionally use a non-Pro model for a long run, pass an explicit `--timeout` or use background mode rather than relying on `auto`.
 
 ## Task Status Files
 

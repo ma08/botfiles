@@ -140,6 +140,9 @@ X-Figma-Region = "us-east-1"
 [mcp_servers.openaiDeveloperDocs]
 url = "https://developers.openai.com/mcp"
 
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+
 [features]
 steer = true
 shell_snapshot = true

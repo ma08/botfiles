@@ -59,12 +59,90 @@ _botfiles_oracle_browser_requested() {
   return 1
 }
 
+_botfiles_oracle_engine_specified() {
+  local expect_engine_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_engine_value" -eq 1 ]; then
+      return 0
+    fi
+    case "$arg" in
+      --engine| -e)
+        expect_engine_value=1
+        ;;
+      --engine=*|--browser|--remote-chrome|--remote-host|-e*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+_botfiles_oracle_model_specified() {
+  local expect_model_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_model_value" -eq 1 ]; then
+      return 0
+    fi
+    case "$arg" in
+      --model|--models|-m)
+        expect_model_value=1
+        ;;
+      --model=*|--models=*|-m*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+_botfiles_oracle_is_subcommand_invocation() {
+  local expect_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_value" -eq 1 ]; then
+      expect_value=0
+      continue
+    fi
+
+    case "$arg" in
+      --prompt|--followup|--followup-model|--file|--slug|--model|--models|--engine|--timeout|--http-timeout|--zombie-timeout|--write-output|--base-url|--azure-endpoint|--azure-deployment|--azure-api-version|--browser-cookie-path|--chatgpt-url|--browser-port|--browser-model-strategy|--browser-attachments|--remote-chrome|--remote-host|--remote-token|--youtube|--generate-image|--edit-image|--output|--aspect|--retain-hours|--heartbeat)
+        expect_value=1
+        continue
+        ;;
+      --*=*|-*|--help|--version)
+        continue
+        ;;
+      serve|bridge|tui|session|status|restart)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
+  return 1
+}
+
 oracle() {
-  if [ -z "${DISPLAY:-}" ] && _botfiles_oracle_browser_requested "$@" && command -v xvfb-run >/dev/null 2>&1; then
-    _botfiles_oracle_exec_node22 xvfb-run -a npx -y @steipete/oracle "$@"
+  local args=("$@")
+  local defaults=()
+
+  if ! _botfiles_oracle_is_subcommand_invocation "${args[@]}"; then
+    if ! _botfiles_oracle_engine_specified "${args[@]}" && ! _botfiles_oracle_browser_requested "${args[@]}"; then
+      defaults+=(--engine api)
+    fi
+    if ! _botfiles_oracle_model_specified "${args[@]}"; then
+      defaults+=(--model gpt-5.4-pro)
+    fi
+  fi
+
+  if [ -z "${DISPLAY:-}" ] && _botfiles_oracle_browser_requested "${args[@]}" && command -v xvfb-run >/dev/null 2>&1; then
+    _botfiles_oracle_exec_node22 xvfb-run -a npx -y @steipete/oracle "${defaults[@]}" "${args[@]}"
     return
   fi
-  _botfiles_oracle_exec_node22 npx -y @steipete/oracle "$@"
+  _botfiles_oracle_exec_node22 npx -y @steipete/oracle "${defaults[@]}" "${args[@]}"
 }
 
 oracle-mcp() {
