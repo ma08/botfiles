@@ -33,7 +33,7 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 1. Check `AGENTS.md` `task-status-root` override.
 2. Fall back to `CLAUDE.md` override.
 3. Default to `context/daily/YYYY-MM-DD/<task-slug>/`.
-4. If the task is linked to a GitHub issue and the canonical issue-owning repo checkout is known, update that canonical task folder instead of a same-session duplicate in the current repo.
+4. If the task is tracker-linked and a canonical task root is already known, update that canonical task folder instead of a same-session duplicate in the current repo.
 5. Update existing task folder when possible; do not create duplicates for resumed work.
 
 ### Step 2: Update Core Status Content

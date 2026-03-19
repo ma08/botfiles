@@ -22,6 +22,7 @@ from task_status_common import (  # noqa: E402
     extract_urls,
     fetch_issue_data,
     fetch_page_title,
+    find_local_task_homes_for_tracker,
     find_local_repo_roots_for_github_repo,
     infer_agent_from_script,
     infer_project_root_from_path,
@@ -86,6 +87,7 @@ def main() -> int:
     canonical_status_root = resolve_task_status_root(current_project_root, caller_path=Path(__file__))
     canonical_resolution = "current-project"
     canonical_matches: list[Path] = []
+    existing_tracker_task_homes = []
 
     if github_issue_ref:
         issue_data = fetch_issue_data(github_issue_ref)
@@ -122,6 +124,21 @@ def main() -> int:
                 canonical_project_root = None
                 canonical_status_root = None
                 canonical_resolution = "issue-repo-ambiguous"
+
+        if canonical_resolution == "current-project":
+            existing_tracker_task_homes = find_local_task_homes_for_tracker(
+                tracker_ref,
+                current_project_root=current_project_root,
+                caller_path=Path(__file__),
+            )
+            if len(existing_tracker_task_homes) == 1:
+                canonical_project_root = existing_tracker_task_homes[0].project_root
+                canonical_status_root = existing_tracker_task_homes[0].task_status_root
+                canonical_resolution = "existing-tracker-task-match"
+            elif len(existing_tracker_task_homes) > 1:
+                canonical_project_root = None
+                canonical_status_root = None
+                canonical_resolution = "existing-tracker-task-ambiguous"
     else:
         tracker_slug = enforce_slug_length(slugify(args.description), args.max_slug_length)
 
@@ -163,6 +180,11 @@ def main() -> int:
         print("Canonical Repo Matches:")
         for match in canonical_matches:
             print(f"- {match}")
+
+    if existing_tracker_task_homes:
+        print("Existing Tracker Task Homes:")
+        for match in existing_tracker_task_homes:
+            print(f"- {match.project_root} -> {match.candidate.task_dir}")
 
     if (
         tracker_ref

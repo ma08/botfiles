@@ -58,7 +58,11 @@ def print_entry(
     *,
     include_recap: bool = False,
 ) -> None:
-    metadata = normalize_task_metadata(candidate.metadata, status_file=candidate.status_file)
+    metadata = normalize_task_metadata(
+        candidate.metadata,
+        status_file=candidate.status_file,
+        hydrate_transcript_path=True,
+    )
     print(f"{label}:")
     print(f"  Task Folder: {candidate.task_dir}")
     print(f"  Status File: {candidate.status_file if candidate.status_file else 'none'}")

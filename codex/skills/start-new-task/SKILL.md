@@ -70,14 +70,14 @@ Use output fields:
 ### Step 3: Slug and Folder Naming
 - If the primary tracker is GitHub, slug format is `repo-issue-<number>-<title>`.
 - If the primary tracker is Linear, slug format is `<linear-id>-<title>`.
-- If `Canonical Project Root` / `Canonical Task Status Root` are emitted for a GitHub issue-linked task, create or resume the task there instead of the current repo.
+- If `Canonical Project Root` / `Canonical Task Status Root` are emitted for a tracker-linked task, create or resume the task there instead of the current repo.
 - Enforce max slug length `60`; truncation appends a stable hash suffix.
 - Folder format remains `<HH>h<MM>m<SS>sPST-<slug>`.
 
 ### Step 4: Existing Task Check
 Search for an existing task folder with the same slug:
 - If found, ask resume vs create-new.
-- For GitHub issue-linked work, search the canonical issue-owning repo task root first.
+- For tracker-linked work, search the canonical task root first when one is emitted by `resolve_task_context.py`.
 - If resume, hand off to `$save-task-status`.
 
 ### Step 5: Create Folder Structure

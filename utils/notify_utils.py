@@ -392,20 +392,21 @@ def _normalize_tracker_url(raw_value: str) -> str:
     return value
 
 
-def _task_tracker_url_from_context_path(context_path: Path) -> str:
+def _task_metadata_value_from_context_path(context_path: Path, field_name: str) -> str:
     task_dir = _task_dir_from_context_path(context_path)
     if not task_dir:
         return ""
     status_file = resolve_status_file(task_dir)
     metadata = normalize_task_metadata(read_task_metadata(status_file), status_file=status_file)
-    return _normalize_tracker_url(metadata.get("tracker_url", ""))
+    return _normalize_tracker_url(metadata.get(field_name, ""))
 
 
-def _task_tracker_url_from_status_files(
+def _task_metadata_value_from_status_files(
     agent_session_id: str,
     *,
     project_root: Path,
     coding_agent: str,
+    field_name: str,
 ) -> str:
     if not agent_session_id:
         return ""
@@ -417,14 +418,14 @@ def _task_tracker_url_from_status_files(
         caller_path=Path(__file__),
     )
     if pointer:
-        tracker_url = _normalize_tracker_url(
+        metadata_value = _normalize_tracker_url(
             normalize_task_metadata(
                 read_task_metadata(pointer.status_file),
                 status_file=pointer.status_file,
-            ).get("tracker_url", "")
+            ).get(field_name, "")
         )
-        if tracker_url:
-            return tracker_url
+        if metadata_value:
+            return metadata_value
 
     status_root = resolve_task_status_root(project_root, caller_path=Path(__file__))
     candidates = load_task_candidates(status_root)
@@ -436,7 +437,7 @@ def _task_tracker_url_from_status_files(
             normalize_task_metadata(
                 matches[0].metadata,
                 status_file=matches[0].status_file,
-            ).get("tracker_url", "")
+            ).get(field_name, "")
         )
 
     return ""
@@ -493,7 +494,7 @@ def get_task_tracker_url(
 ) -> str:
     """Resolve the current task's primary tracker URL when one exists."""
     context_path = _resolve_context_path(working_directory_override)
-    cwd_tracker_url = _task_tracker_url_from_context_path(context_path)
+    cwd_tracker_url = _task_metadata_value_from_context_path(context_path, "tracker_url")
     if cwd_tracker_url:
         return cwd_tracker_url
 
@@ -502,10 +503,11 @@ def get_task_tracker_url(
     resolved_coding_agent = get_coding_agent_name(coding_agent_override)
 
     if project_root:
-        return _task_tracker_url_from_status_files(
+        return _task_metadata_value_from_status_files(
             resolved_agent_session_id,
             project_root=project_root,
             coding_agent=resolved_coding_agent,
+            field_name="tracker_url",
         )
 
     return ""
@@ -517,11 +519,24 @@ def get_task_github_issue_url(
     agent_session_id: str | None = None,
     coding_agent_override: str | None = None,
 ) -> str:
-    return get_task_tracker_url(
-        working_directory_override=working_directory_override,
-        agent_session_id=agent_session_id,
-        coding_agent_override=coding_agent_override,
-    )
+    context_path = _resolve_context_path(working_directory_override)
+    cwd_github_issue_url = _task_metadata_value_from_context_path(context_path, "github_issue")
+    if cwd_github_issue_url:
+        return cwd_github_issue_url
+
+    project_root = infer_project_root_from_path(context_path)
+    resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
+    resolved_coding_agent = get_coding_agent_name(coding_agent_override)
+
+    if project_root:
+        return _task_metadata_value_from_status_files(
+            resolved_agent_session_id,
+            project_root=project_root,
+            coding_agent=resolved_coding_agent,
+            field_name="github_issue",
+        )
+
+    return ""
 
 
 def get_coding_agent_name(coding_agent_override: str | None = None) -> str:

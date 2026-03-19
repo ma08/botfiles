@@ -187,6 +187,13 @@ class TaskCandidate:
 
 
 @dataclass(frozen=True)
+class TrackerTaskHome:
+    project_root: Path
+    task_status_root: Path
+    candidate: TaskCandidate
+
+
+@dataclass(frozen=True)
 class CurrentTaskPointer:
     project_root: Path
     task_dir: Path
@@ -1005,6 +1012,7 @@ def normalize_task_metadata(
     metadata: dict[str, str] | None,
     *,
     status_file: Path | None = None,
+    hydrate_transcript_path: bool = False,
 ) -> dict[str, str]:
     raw = metadata or {}
     tracker_url = _first_metadata_value(raw, "Tracker URL", "GitHub Issue")
@@ -1048,6 +1056,14 @@ def normalize_task_metadata(
         if project_root:
             workspace_path = str(project_root)
 
+    transcript_path = _first_metadata_value(raw, "Transcript Path")
+    if transcript_path == TRACKER_KIND_NONE and hydrate_transcript_path:
+        transcript_path = resolve_transcript_path(
+            _first_metadata_value(raw, "Coding Agent"),
+            _first_metadata_value(raw, "Agent Session ID"),
+            project_root=workspace_path if workspace_path != TRACKER_KIND_NONE else None,
+        )
+
     github_issue = _first_metadata_value(raw, "GitHub Issue")
     github_repo = _first_metadata_value(raw, "GitHub Repo")
     github_issue_number = _first_metadata_value(raw, "GitHub Issue Number")
@@ -1078,7 +1094,7 @@ def normalize_task_metadata(
         "agent_session_id": _first_metadata_value(raw, "Agent Session ID"),
         "task_folder": resolved_task_folder,
         "task_status_path": resolved_status_path,
-        "transcript_path": _first_metadata_value(raw, "Transcript Path"),
+        "transcript_path": transcript_path,
         "last_synced_at": _first_metadata_value(raw, "Last Synced", "Last Synced At"),
         "workspace_path": workspace_path,
         "zellij_session": _first_metadata_value(raw, "Zellij Session"),
@@ -1425,6 +1441,96 @@ def find_local_repo_roots_for_github_repo(
                 continue
             maybe_add(child)
 
+    return matches
+
+
+def local_project_roots(current_project_root: Path | None = None) -> list[Path]:
+    matches: list[Path] = []
+    seen: set[Path] = set()
+
+    def maybe_add(candidate: Path) -> None:
+        resolved = candidate.expanduser().resolve()
+        project_root = infer_project_root_from_path(resolved) or resolved
+        project_root = project_root.expanduser().resolve()
+        if project_root in seen or not project_root.is_dir():
+            return
+        if not (
+            (project_root / "AGENTS.md").is_file()
+            or (project_root / "CLAUDE.md").is_file()
+            or (project_root / ".botrc").is_file()
+            or (project_root / ".git").exists()
+        ):
+            return
+        seen.add(project_root)
+        matches.append(project_root)
+
+    if current_project_root:
+        maybe_add(current_project_root)
+
+    for search_root in local_repo_search_roots(current_project_root):
+        for child in sorted(search_root.iterdir()):
+            if not child.is_dir():
+                continue
+            maybe_add(child)
+
+    return matches
+
+
+def task_candidate_matches_tracker(candidate: TaskCandidate, tracker_ref: TrackerRef) -> bool:
+    metadata = normalize_task_metadata(candidate.metadata, status_file=candidate.status_file)
+    tracker_url = metadata.get("tracker_url", TRACKER_KIND_NONE).strip().lower()
+    if tracker_url and tracker_url != TRACKER_KIND_NONE and tracker_url == tracker_ref.url.lower():
+        return True
+
+    if metadata.get("tracker_kind", TRACKER_KIND_NONE).strip().lower() != tracker_ref.kind.lower():
+        return False
+
+    tracker_human_id = metadata.get("tracker_human_id", TRACKER_KIND_NONE).strip().lower()
+    if tracker_human_id and tracker_human_id != TRACKER_KIND_NONE and tracker_human_id == tracker_ref.human_id.lower():
+        return True
+
+    if tracker_ref.kind == TRACKER_KIND_GITHUB and tracker_ref.github_issue:
+        github_issue = metadata.get("github_issue", TRACKER_KIND_NONE).strip().lower()
+        if github_issue and github_issue != TRACKER_KIND_NONE and github_issue == tracker_ref.github_issue.url.lower():
+            return True
+        github_repo = metadata.get("github_repo", TRACKER_KIND_NONE).strip().lower()
+        github_issue_number = metadata.get("github_issue_number", TRACKER_KIND_NONE).strip()
+        return github_repo == tracker_ref.github_issue.repo_key.lower() and github_issue_number == str(
+            tracker_ref.github_issue.number
+        )
+
+    if tracker_ref.kind == TRACKER_KIND_LINEAR and tracker_ref.linear_issue:
+        linear_issue_identifier = metadata.get("linear_issue_identifier", TRACKER_KIND_NONE).strip().lower()
+        return (
+            linear_issue_identifier
+            and linear_issue_identifier != TRACKER_KIND_NONE
+            and linear_issue_identifier == tracker_ref.linear_issue.identifier.lower()
+        )
+
+    return False
+
+
+def find_local_task_homes_for_tracker(
+    tracker_ref: TrackerRef,
+    *,
+    current_project_root: Path | None = None,
+    caller_path: Path | None = None,
+) -> list[TrackerTaskHome]:
+    matches: list[TrackerTaskHome] = []
+    for project_root in local_project_roots(current_project_root):
+        task_status_root = resolve_task_status_root(project_root, caller_path=caller_path)
+        candidates = sort_task_candidates_by_recency(load_task_candidates(task_status_root))
+        for candidate in candidates:
+            if not task_candidate_matches_tracker(candidate, tracker_ref):
+                continue
+            matches.append(
+                TrackerTaskHome(
+                    project_root=project_root,
+                    task_status_root=task_status_root,
+                    candidate=candidate,
+                )
+            )
+            break
     return matches
 
 
