@@ -14,7 +14,8 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - **notion/** - Notion workspace integration
 - **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
 - **secrets/** - Centralized secret templates and local runtime secret files
-- **.botrc** - Shell loader that sources centralized secret rc files and modular shell scripts
+- **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
+- **.botrc** - Interactive shell layer (aliases, functions) that sources `.botenv`
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 - **zellij/** - Canonical Zellij config (including lock key remap away from `Ctrl+g`)
 
@@ -77,10 +78,15 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    # Edit secrets/local/*.rc with your values
    ```
 
-4. **Load shared env config**
+4. **Load shared env config** (setup.sh does this automatically)
    ```bash
+   # For zsh (macOS):
+   echo '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' >> ~/.zshenv
    echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
-   source ~/.zshrc
+
+   # For bash (Linux):
+   echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile
+   echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
    ```
 
 5. **Restart Claude Code**
@@ -108,15 +114,45 @@ uv sync
 
 ## Configuration
 
-### Shell Environment (.botrc)
+### Shell Environment (two-layer bootstrap)
 
-`.botrc` sources centralized runtime secrets from `secrets/local/*.rc` and then loads modular scripts from `shell/*.sh` in lexical order.
-`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
-Add it to your shell startup file:
+Botfiles uses a two-layer shell environment model:
 
+**`.botenv` (core, non-interactive safe)**
+- Secrets from `secrets/local/*.rc`
+- PATH additions (`~/.local/bin`, `/usr/local/bin`)
+- Core env: `BOTFILES_ROOT`, `EDITOR`, `VISUAL`, `TERM`, `UV_BIN`
+- Safe to source from any context: SSH commands, cron, systemd, agent exec
+
+**`.botrc` (interactive layer)**
+- Sources `.botenv` first (idempotent via double-source guard)
+- Adds aliases (`cc`, `bedcc`, `zj`, etc.)
+- Loads interactive shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`)
+- Defines workflow functions (`work-ml`, `oracle`, etc.)
+
+**Shell entrypoint wiring:**
+
+For **zsh** (macOS):
 ```bash
+# ~/.zshenv (ALL zsh contexts, including non-interactive)
+[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"
+
+# ~/.zshrc (interactive only)
 source ~/pro/botfiles/.botrc
 ```
+
+For **bash** (Linux):
+```bash
+# ~/.profile (login shells — sets BASH_ENV for non-interactive children)
+export BASH_ENV="$HOME/pro/botfiles/.botenv"
+
+# ~/.bashrc (interactive shells)
+source ~/pro/botfiles/.botrc
+```
+
+`setup.sh` configures these entrypoints automatically.
+
+`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 
 Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
@@ -333,6 +369,7 @@ See `claude/skills/notion/README.md` for detailed usage.
 
 ```
 botfiles/
+├── .botenv
 ├── .botrc
 ├── README.md
 ├── .gitignore
@@ -392,9 +429,10 @@ Restart Claude Code after pulling updates.
 ## Adding New Machines
 
 1. Clone this repo to `~/pro/botfiles`
-2. Run `./setup.sh`
+2. Run `./setup.sh` (configures symlinks, shell entrypoints, and dependencies)
 3. Create `secrets/local/*.rc` from `secrets/templates/*.rc.example`
-4. Restart Claude Code
+4. **Important:** Create `secrets/local/machine.rc` with your machine's `SYSTEM_NAME`
+5. Restart your shell and Claude Code
 
 ## License
 
