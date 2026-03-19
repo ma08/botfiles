@@ -32,7 +32,7 @@ Botfiles uses a two-layer shell model:
 
 When writing scripts, hooks, or runner wrappers that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load. The Codex notify hook (`codex/hooks/run-codex-notify.sh`) is an example — it sources `.botrc` for historical reasons but only needs `.botenv`.
 
-On **bash** machines, `BASH_ENV` is set in `~/.profile` to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
+On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_profile` > `~/.bash_login` > `~/.profile`, whichever bash reads first) to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
 
 ## Skills
 

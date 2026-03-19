@@ -21,7 +21,7 @@ Botfiles uses a two-layer shell model:
 
 When writing scripts or hooks that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load.
 
-On **bash** machines, `BASH_ENV` is set in `~/.profile` to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
+On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_profile` > `~/.bash_login` > `~/.profile`, whichever bash reads first) to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
 
 ## Curated Skills
 

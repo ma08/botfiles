@@ -84,9 +84,9 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    echo '[ -f "$HOME/pro/botfiles/.botenv" ] && . "$HOME/pro/botfiles/.botenv"' >> ~/.zshenv
    echo 'source ~/pro/botfiles/.botrc' >> ~/.zshrc
 
-   # For bash (Linux) — use whichever login file bash reads first:
-   # (~/.bash_profile > ~/.bash_login > ~/.profile)
-   echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile
+   # For bash (Linux) — append to whichever login file bash reads first
+   # (~/.bash_profile > ~/.bash_login > ~/.profile; usually ~/.profile on Ubuntu)
+   echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile  # or ~/.bash_profile
    echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
    ```
 
@@ -493,7 +493,7 @@ For **Linux (Ubuntu, Debian, Azure VMs, etc.) / bash**:
 # Bash checks ~/.bash_profile, ~/.bash_login, ~/.profile in order and
 # reads ONLY the first one found. If you have ~/.bash_profile, use that
 # instead of ~/.profile.
-echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile
+echo 'export BASH_ENV="$HOME/pro/botfiles/.botenv"' >> ~/.profile  # or ~/.bash_profile
 
 # ~/.bashrc — interactive aliases and functions
 echo 'source ~/pro/botfiles/.botrc' >> ~/.bashrc
@@ -544,7 +544,7 @@ It does **not** automatically apply to:
   ```ini
   Environment=BASH_ENV=/home/<user>/pro/botfiles/.botenv
   ```
-- **cron jobs** — prepend `source ~/pro/botfiles/.botenv &&` to the command, or set `BASH_ENV` in the crontab header
+- **cron jobs** — cron typically runs `/bin/sh`, so use POSIX syntax: prepend `. ~/pro/botfiles/.botenv &&` to the command, or set `SHELL=/bin/bash` and `BASH_ENV=~/pro/botfiles/.botenv` in the crontab header
 
 ### Adding the machine to SSH workflows
 
