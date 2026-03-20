@@ -25,6 +25,7 @@ from task_status_common import (  # noqa: E402
     build_task_metadata_block,
     build_zellij_link,
     extract_marked_block,
+    fetch_linear_issue_data,
     fetch_issue_data,
     gh_authenticated,
     gh_available,
@@ -46,6 +47,7 @@ from task_status_common import (  # noqa: E402
     resolve_zellij_session,
     upsert_current_task_pointer,
     update_issue_body,
+    update_linear_issue_body,
     upsert_marked_block,
 )
 
@@ -91,7 +93,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sync-github-issue",
         action="store_true",
-        help="If enabled, upsert managed live-session block into linked issue body.",
+        help="If enabled, upsert the managed live-session block into the primary tracker body (GitHub name retained for compatibility).",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print actions without writing changes.")
     return parser.parse_args()
@@ -214,22 +216,40 @@ def main() -> int:
     )
 
     linear_ref = tracker_ref.linear_issue if tracker_ref and tracker_ref.kind == TRACKER_KIND_LINEAR else None
+    linear_issue_data = fetch_linear_issue_data(linear_ref, env=env, caller_path=Path(__file__)) if linear_ref else None
     linear_issue_id = pick_value(
         args.linear_issue_id,
+        linear_issue_data.id if linear_issue_data else None,
         normalized_existing.get("linear_issue_id"),
     )
     linear_issue_identifier = pick_value(
         args.linear_issue_identifier,
+        linear_issue_data.identifier if linear_issue_data else None,
         normalized_existing.get("linear_issue_identifier"),
         linear_ref.identifier if linear_ref else None,
     )
-    linear_team_id = pick_value(args.linear_team_id, normalized_existing.get("linear_team_id"))
-    linear_team_name = pick_value(args.linear_team_name, normalized_existing.get("linear_team_name"))
-    linear_project_id = pick_value(args.linear_project_id, normalized_existing.get("linear_project_id"))
+    linear_team_id = pick_value(
+        args.linear_team_id,
+        linear_issue_data.team_id if linear_issue_data else None,
+        normalized_existing.get("linear_team_id"),
+    )
+    linear_team_name = pick_value(
+        args.linear_team_name,
+        linear_issue_data.team_name if linear_issue_data else None,
+        normalized_existing.get("linear_team_name"),
+    )
+    linear_project_id = pick_value(
+        args.linear_project_id,
+        linear_issue_data.project_id if linear_issue_data else None,
+        normalized_existing.get("linear_project_id"),
+    )
     linear_project_name = pick_value(
         args.linear_project_name,
+        linear_issue_data.project_name if linear_issue_data else None,
         normalized_existing.get("linear_project_name"),
     )
+    if linear_issue_data and not args.tracker_title and linear_issue_data.title:
+        tracker_title = linear_issue_data.title
 
     remote_session_anchor_kind = pick_value(
         args.remote_session_anchor_kind,
@@ -296,12 +316,65 @@ def main() -> int:
             status_file,
             coding_agent=coding_agent,
             agent_session_id=agent_session_id,
+            workspace_path=workspace_path,
             caller_path=Path(__file__),
         )
         if pointer_updated:
             log(f"Updated current-task pointer for session {agent_session_id}")
 
     if not args.sync_github_issue:
+        return 0
+
+    live_block = build_live_session_block(
+        machine=machine,
+        coding_agent=coding_agent,
+        agent_session_id=agent_session_id,
+        zellij_session=zellij_session,
+        zellij_link=zellij_link,
+        task_dir=str(status_file.parent),
+        status_file=str(status_file),
+        attach_command=build_attach_command(zellij_session),
+        last_updated=now_pst_label(),
+        project_root=workspace_path if workspace_path != TRACKER_KIND_NONE else None,
+        include_authorship_byline=tracker_kind == TRACKER_KIND_GITHUB,
+    )
+
+    if tracker_kind == TRACKER_KIND_LINEAR and linear_ref:
+        issue_data = linear_issue_data or fetch_linear_issue_data(
+            linear_ref,
+            env=env,
+            caller_path=Path(__file__),
+        )
+        if not issue_data:
+            warn(f"Unable to fetch Linear issue {linear_ref.url}; skipping issue-body sync.")
+            return 0
+
+        new_issue_body = upsert_marked_block(
+            issue_data.description,
+            live_block,
+            start_marker=LIVE_SESSION_START,
+            end_marker=LIVE_SESSION_END,
+            prefer_top=True,
+            include_surrounding_rules=True,
+        )
+        if new_issue_body == issue_data.description:
+            log(f"No issue-body changes needed for {linear_ref.url}")
+            return 0
+        if args.dry_run:
+            log(f"Dry-run: would update live-session block in {linear_ref.url}")
+            return 0
+
+        ok, message = update_linear_issue_body(
+            issue_data.id,
+            new_issue_body,
+            env=env,
+            caller_path=Path(__file__),
+        )
+        if not ok:
+            warn(f"Failed to update issue body for {linear_ref.url}: {message}")
+            return 0
+
+        log(f"Updated live-session block in {linear_ref.url}")
         return 0
 
     if not issue_ref:
@@ -319,23 +392,13 @@ def main() -> int:
         warn(f"Unable to fetch issue {issue_ref.url}; skipping issue-body sync.")
         return 0
 
-    live_block = build_live_session_block(
-        machine=machine,
-        coding_agent=coding_agent,
-        agent_session_id=agent_session_id,
-        zellij_session=zellij_session,
-        zellij_link=zellij_link,
-        task_dir=str(status_file.parent),
-        status_file=str(status_file),
-        attach_command=build_attach_command(zellij_session),
-        last_updated=now_pst_label(),
-    )
     new_issue_body = upsert_marked_block(
         issue_data.body,
         live_block,
         start_marker=LIVE_SESSION_START,
         end_marker=LIVE_SESSION_END,
         prefer_top=True,
+        include_surrounding_rules=True,
     )
 
     if new_issue_body == issue_data.body:

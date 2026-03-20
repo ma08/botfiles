@@ -69,7 +69,9 @@ What this does:
   - Zellij link (`ZELLIJ_WEB_ENABLE_LINKS` + `ZELLIJ_WEB_BASE_URL` + session)
   - Remote-session anchor metadata
   - GitHub and Linear compatibility fields
-- If `--sync-github-issue` is set and `gh` auth is available, upserts the managed GitHub live-session block including the absolute task folder and status-file paths.
+- If `--sync-github-issue` is set, upserts the managed live-session block on the primary tracker.
+- For GitHub trackers, this targets the issue body and requires `gh` auth.
+- For Linear trackers, this targets the issue description and requires `LINEAR_API_KEY`.
 
 ### Step 4: Degraded-Mode Handling
 If dependencies are missing:

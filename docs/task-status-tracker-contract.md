@@ -83,4 +83,6 @@ Rules:
 
 - `sync_task_metadata.py` writes the shared tracker-aware metadata block locally.
 - `resolve_task_context.py`, `get_task_details.py`, and `utils/notify_utils.py` prefer the common tracker fields.
-- `--sync-github-issue` remains the explicit remote-write path in the current implementation. Linear body sync is a later rollout item that should follow this contract rather than inventing a second schema.
+- `--sync-github-issue` remains the compatibility flag that triggers managed remote live-session publication on the primary tracker.
+- For GitHub trackers, the managed block is written to the issue body via `gh`.
+- For Linear trackers, the managed block is written to the issue description via `LINEAR_API_KEY`.
