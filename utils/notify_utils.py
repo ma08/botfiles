@@ -45,6 +45,7 @@ from task_status_common import (  # noqa: E402
 
 _ENV_FILES = [
     _BOTFILES_ROOT / "secrets" / "local" / "machine.rc",
+    _BOTFILES_ROOT / "secrets" / "local" / "linear.rc",
     _BOTFILES_ROOT / "secrets" / "local" / "claude-hooks.rc",
 ]
 WHATSAPP_TEXT_MAX_CHARS = 4096

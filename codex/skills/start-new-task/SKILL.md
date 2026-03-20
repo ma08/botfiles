@@ -115,7 +115,9 @@ python ~/pro/botfiles/codex/skills/_shared/task_status/scripts/sync_task_metadat
 Behavior:
 - Always upserts managed tracker-aware task metadata in the status file.
 - Sets this task as the current task for the active `{project, coding-agent, agent-session}` context.
-- If `--sync-github-issue` is set and GitHub CLI auth is available, upserts the managed live-session block at the top of the GitHub issue body.
+- If `--sync-github-issue` is set, upserts the managed live-session block on the primary tracker.
+- For GitHub trackers, this targets the issue body and requires GitHub CLI auth.
+- For Linear trackers, this targets the issue description and requires `LINEAR_API_KEY`.
 - If dependencies are missing (`gh`, auth, zellij env), core task creation still succeeds.
 
 ### Step 8: Confirm and Continue

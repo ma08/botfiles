@@ -60,6 +60,7 @@ TRACKER_KIND_GITHUB = "github"
 TRACKER_KIND_LINEAR = "linear"
 TRACKER_KIND_NONE = "none"
 TRACKER_REMOTE_SESSION_MARKER = "LIVE-SESSION"
+LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql"
 
 TASK_METADATA_REQUIRED_FIELDS = (
     "tracker_kind",
@@ -161,6 +162,23 @@ class LinearIssueRef:
 
 
 @dataclass(frozen=True)
+class LinearIssueData:
+    ref: LinearIssueRef
+    id: str
+    identifier: str
+    title: str
+    url: str
+    description: str
+    updated_at: str
+    created_at: str
+    state_name: str
+    team_id: str
+    team_name: str
+    project_id: str
+    project_name: str
+
+
+@dataclass(frozen=True)
 class TrackerRef:
     kind: str
     url: str
@@ -196,6 +214,7 @@ class TrackerTaskHome:
 @dataclass(frozen=True)
 class CurrentTaskPointer:
     project_root: Path
+    workspace_path: Path | None
     task_dir: Path
     status_file: Path
     task_label: str
@@ -257,7 +276,7 @@ def merged_env_with_botfiles_defaults(
         return merged
 
     local_dir = root / "secrets" / "local"
-    for rc_name in ("machine.rc", "claude-hooks.rc"):
+    for rc_name in ("machine.rc", "linear.rc", "claude-hooks.rc"):
         rc_path = local_dir / rc_name
         for key, value in parse_rc_env_file(rc_path).items():
             if key not in merged or not str(merged.get(key, "")).strip():
@@ -661,6 +680,10 @@ def resolve_tracker_title(tracker_ref: TrackerRef) -> str:
         issue_data = fetch_issue_data(tracker_ref.github_issue)
         if issue_data and issue_data.title:
             return issue_data.title
+    if tracker_ref.kind == TRACKER_KIND_LINEAR and tracker_ref.linear_issue:
+        issue_data = fetch_linear_issue_data(tracker_ref.linear_issue)
+        if issue_data and issue_data.title:
+            return issue_data.title
     if tracker_ref.title_slug:
         return humanize_slug(tracker_ref.title_slug)
     page_title = fetch_page_title(tracker_ref.url)
@@ -700,6 +723,57 @@ def gh_authenticated() -> bool:
     return code == 0
 
 
+def resolve_linear_api_key(
+    env: dict[str, str] | None = None,
+    *,
+    caller_path: Path | None = None,
+) -> str:
+    merged = merged_env_with_botfiles_defaults(
+        env or dict(os.environ),
+        caller_path=caller_path or Path(__file__),
+    )
+    return merged.get("LINEAR_API_KEY", "").strip()
+
+
+def run_linear_graphql(
+    query: str,
+    *,
+    variables: dict[str, object] | None = None,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+    timeout_seconds: int = 20,
+) -> tuple[dict[str, object] | None, str]:
+    api_key = resolve_linear_api_key(env, caller_path=caller_path)
+    if not api_key:
+        return None, "LINEAR_API_KEY is not set"
+
+    req = Request(
+        LINEAR_GRAPHQL_URL,
+        data=json.dumps({"query": query, "variables": variables or {}}).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": api_key,
+            "User-Agent": "task-status-helper/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        return None, str(exc)
+
+    if not isinstance(payload, dict):
+        return None, "invalid Linear API response"
+    if payload.get("errors"):
+        return None, json.dumps(payload["errors"])
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return None, "Linear API response missing data"
+    return data, ""
+
+
 def fetch_issue_data(ref: IssueRef) -> IssueData | None:
     if not gh_available():
         return None
@@ -731,6 +805,69 @@ def fetch_issue_data(ref: IssueRef) -> IssueData | None:
     )
 
 
+def fetch_linear_issue_data(
+    ref: LinearIssueRef,
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> LinearIssueData | None:
+    data, _ = run_linear_graphql(
+        """
+        query IssueByIdentifier($identifier: String!) {
+          issue(id: $identifier) {
+            id
+            identifier
+            title
+            url
+            description
+            updatedAt
+            createdAt
+            state {
+              name
+            }
+            team {
+              id
+              name
+            }
+            project {
+              id
+              name
+            }
+          }
+        }
+        """,
+        variables={"identifier": ref.identifier},
+        env=env,
+        caller_path=caller_path,
+    )
+    if not data:
+        return None
+
+    issue = data.get("issue")
+    if not isinstance(issue, dict):
+        return None
+
+    state = issue.get("state") or {}
+    team = issue.get("team") or {}
+    project = issue.get("project") or {}
+
+    return LinearIssueData(
+        ref=ref,
+        id=str(issue.get("id") or "").strip(),
+        identifier=str(issue.get("identifier") or ref.identifier).strip(),
+        title=str(issue.get("title") or "").strip(),
+        url=str(issue.get("url") or ref.url).strip(),
+        description=issue.get("description") or "",
+        updated_at=str(issue.get("updatedAt") or "").strip(),
+        created_at=str(issue.get("createdAt") or "").strip(),
+        state_name=str(state.get("name") or "").strip(),
+        team_id=str(team.get("id") or "").strip(),
+        team_name=str(team.get("name") or "").strip(),
+        project_id=str(project.get("id") or "").strip(),
+        project_name=str(project.get("name") or "").strip(),
+    )
+
+
 def update_issue_body(ref: IssueRef, new_body: str) -> tuple[bool, str]:
     if not gh_available():
         return (False, "gh is not available")
@@ -750,6 +887,42 @@ def update_issue_body(ref: IssueRef, new_body: str) -> tuple[bool, str]:
     )
     if code != 0:
         return (False, stderr.strip() or "failed to update issue body")
+    return (True, "updated")
+
+
+def update_linear_issue_body(
+    issue_id: str,
+    new_body: str,
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> tuple[bool, str]:
+    if not issue_id.strip():
+        return (False, "Linear issue id is required")
+
+    data, error = run_linear_graphql(
+        """
+        mutation UpdateIssueDescription($id: String!, $input: IssueUpdateInput!) {
+          issueUpdate(id: $id, input: $input) {
+            success
+          }
+        }
+        """,
+        variables={
+            "id": issue_id,
+            "input": {
+                "description": new_body,
+            },
+        },
+        env=env,
+        caller_path=caller_path,
+    )
+    if not data:
+        return (False, error or "failed to update Linear issue body")
+
+    mutation = data.get("issueUpdate")
+    if not isinstance(mutation, dict) or not mutation.get("success"):
+        return (False, "Linear issue update did not report success")
     return (True, "updated")
 
 
@@ -864,11 +1037,12 @@ def build_live_session_block(
     attach_command: str,
     last_updated: str,
     project_root: str | None = None,
+    include_authorship_byline: bool = True,
 ) -> str:
     def plain_value(value: str) -> str:
         return (value or "none").replace("`", "").strip() or "none"
 
-    authorship_byline = build_github_authorship_byline(coding_agent)
+    authorship_byline = build_github_authorship_byline(coding_agent) if include_authorship_byline else None
     transcript_path = resolve_transcript_path(coding_agent, agent_session_id, project_root=project_root)
     lines = [
         LIVE_SESSION_START,
@@ -1706,12 +1880,90 @@ def save_json_map(path: Path, payload: dict[str, dict]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def parse_session_task_key(key: str) -> tuple[Path | None, str, str]:
+    parts = key.rsplit("::", 2)
+    if len(parts) != 3:
+        return None, "", ""
+
+    project_root_raw, coding_agent, agent_session_id = parts
+    project_root = None
+    if project_root_raw.strip():
+        try:
+            project_root = Path(project_root_raw).expanduser().resolve()
+        except Exception:
+            project_root = None
+
+    return project_root, coding_agent.strip(), agent_session_id.strip()
+
+
+def _resolve_optional_path(raw_value: object) -> Path | None:
+    value = str(raw_value or "").strip()
+    if not value or value.lower() == TRACKER_KIND_NONE:
+        return None
+    try:
+        return Path(value).expanduser().resolve()
+    except Exception:
+        return None
+
+
+def _parse_current_task_pointer(
+    raw: dict[str, object],
+    *,
+    fallback_project_root: Path | None = None,
+) -> CurrentTaskPointer | None:
+    task_dir = _resolve_optional_path(raw.get("task_dir"))
+    status_file = _resolve_optional_path(raw.get("status_file"))
+    task_label = str(raw.get("task_label", "")).strip()
+    updated_at = str(raw.get("updated_at", "")).strip()
+    project_root = _resolve_optional_path(raw.get("project_root")) or fallback_project_root
+    workspace_path = _resolve_optional_path(raw.get("workspace_path"))
+
+    if not task_dir or not status_file:
+        return None
+    if not task_dir.is_dir() or not status_file.is_file():
+        return None
+    if not project_root:
+        project_root = infer_project_root_from_path(status_file) or infer_project_root_from_path(task_dir)
+    if not project_root:
+        return None
+
+    return CurrentTaskPointer(
+        project_root=project_root.resolve(),
+        workspace_path=workspace_path,
+        task_dir=task_dir,
+        status_file=status_file,
+        task_label=task_label or extract_full_task_folder_slug(task_dir.name),
+        updated_at=updated_at,
+    )
+
+
+def _current_task_pointer_rank(
+    pointer: CurrentTaskPointer,
+    *,
+    requested_project_root: Path,
+) -> tuple[int, datetime, int, int]:
+    updated_at = parse_pst_label(pointer.updated_at) or datetime.fromtimestamp(
+        0,
+        tz=ZoneInfo("America/Los_Angeles"),
+    )
+    workspace_match = pointer.workspace_path == requested_project_root
+    project_match = pointer.project_root == requested_project_root
+    relevance = 1 if workspace_match or project_match else 0
+    return (
+        relevance,
+        updated_at,
+        1 if workspace_match else 0,
+        1 if project_match else 0,
+    )
+
+
 def upsert_current_task_pointer(
     status_file: Path,
     *,
     coding_agent: str,
     agent_session_id: str,
     task_label: str | None = None,
+    workspace_path: Path | str | None = None,
     caller_path: Path | None = None,
 ) -> bool:
     if not agent_session_id or agent_session_id == "none":
@@ -1726,8 +1978,12 @@ def upsert_current_task_pointer(
     task_dir = resolved_status.parent
     key = build_session_task_key(project_root, coding_agent, agent_session_id)
     payload = load_json_map(state_path)
+    resolved_workspace_path = _resolve_optional_path(workspace_path)
     entry = {
         "project_root": str(project_root),
+        "workspace_path": str(resolved_workspace_path) if resolved_workspace_path else TRACKER_KIND_NONE,
+        "coding_agent": coding_agent,
+        "agent_session_id": agent_session_id,
         "task_dir": str(task_dir),
         "status_file": str(resolved_status),
         "task_label": task_label or extract_full_task_folder_slug(task_dir.name),
@@ -1781,29 +2037,33 @@ def resolve_current_task_pointer(
     if not state_path:
         return None
     payload = load_json_map(state_path)
-    key = build_session_task_key(project_root, coding_agent, agent_session_id)
-    raw = payload.get(key)
-    if not isinstance(raw, dict):
+    requested_project_root = project_root.resolve()
+    candidates: list[CurrentTaskPointer] = []
+
+    for key, raw in payload.items():
+        if not isinstance(raw, dict):
+            continue
+        entry_project_root, entry_agent, entry_session_id = parse_session_task_key(key)
+        raw_agent = str(raw.get("coding_agent", "")).strip() or entry_agent
+        raw_session_id = str(raw.get("agent_session_id", "")).strip() or entry_session_id
+        if raw_agent != coding_agent or raw_session_id != agent_session_id:
+            continue
+        pointer = _parse_current_task_pointer(
+            raw,
+            fallback_project_root=entry_project_root,
+        )
+        if pointer:
+            candidates.append(pointer)
+
+    if not candidates:
         return None
 
-    task_dir_raw = str(raw.get("task_dir", "")).strip()
-    status_file_raw = str(raw.get("status_file", "")).strip()
-    task_label = str(raw.get("task_label", "")).strip()
-    updated_at = str(raw.get("updated_at", "")).strip()
-    if not task_dir_raw or not status_file_raw:
-        return None
-
-    task_dir = Path(task_dir_raw).expanduser().resolve()
-    status_file = Path(status_file_raw).expanduser().resolve()
-    if not task_dir.is_dir() or not status_file.is_file():
-        return None
-
-    return CurrentTaskPointer(
-        project_root=project_root.resolve(),
-        task_dir=task_dir,
-        status_file=status_file,
-        task_label=task_label or extract_full_task_folder_slug(task_dir.name),
-        updated_at=updated_at,
+    return max(
+        candidates,
+        key=lambda pointer: _current_task_pointer_rank(
+            pointer,
+            requested_project_root=requested_project_root,
+        ),
     )
 
 

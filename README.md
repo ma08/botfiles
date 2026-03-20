@@ -72,6 +72,7 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    cp secrets/templates/machine.rc.example secrets/local/machine.rc
    cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc
    # Optional:
+   cp secrets/templates/linear.rc.example secrets/local/linear.rc
    cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
    cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
    cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
@@ -178,10 +179,13 @@ cp ~/pro/botfiles/secrets/templates/codex-azure.rc.example ~/pro/botfiles/secret
 cp ~/pro/botfiles/secrets/templates/codex-openai.rc.example ~/pro/botfiles/secrets/local/codex-openai.rc
 cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
 cp ~/pro/botfiles/secrets/templates/machine.rc.example ~/pro/botfiles/secrets/local/machine.rc
+cp ~/pro/botfiles/secrets/templates/linear.rc.example ~/pro/botfiles/secrets/local/linear.rc
 cp ~/pro/botfiles/secrets/templates/claude-hooks.rc.example ~/pro/botfiles/secrets/local/claude-hooks.rc
 ```
 
 Then fill in values in each `secrets/local/*.rc` file.
+
+`secrets/local/linear.rc` is the default place for `LINEAR_API_KEY` so shells, hooks, and tracker tooling inherit it through `.botenv` without scraping another repo's `.env`.
 
 ### Zellij Configuration
 

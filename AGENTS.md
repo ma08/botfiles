@@ -16,6 +16,7 @@
 - `mkdir -p secrets/local` ensures the centralized local secret directory exists.
 - `cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc` sets up WhatsApp notification secrets.
 - `cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc` sets up Codex Azure credentials.
+- `cp secrets/templates/linear.rc.example secrets/local/linear.rc` sets up the default `LINEAR_API_KEY` export for shells, hooks, and tracker tooling.
 - `cd claude/hooks && uv run python test_whatsapp.py` sends a manual WhatsApp test message.
 - `cd claude/hooks && uv run python ~/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
 - `~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` tests the same notify wrapper used by `codex/config.toml`.
@@ -38,6 +39,7 @@
 
 ## Security & Configuration Tips
 - Keep secrets in `secrets/local/*.rc` only; all runtime secret files must remain untracked.
+- Keep the Linear API key in `secrets/local/linear.rc`; do not read it out of another repo's `.env` at runtime.
 - `.botrc` uses strict cutover and only loads provider/hook secrets from `secrets/local/`.
 - Symlinks target `~/.claude` and `~/.codex`, so validate paths before running `setup.sh`.
 

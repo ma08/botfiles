@@ -72,6 +72,7 @@ def print_entry(
     print(f"  Tracker URL: {metadata.get('tracker_url', 'none')}")
     print(f"  Tracker Human ID: {metadata.get('tracker_human_id', 'none')}")
     print(f"  Tracker Title: {metadata.get('tracker_title', 'none')}")
+    print(f"  Workspace Path: {metadata.get('workspace_path', 'none')}")
     if metadata.get("github_issue", "none") != "none":
         print(f"  GitHub Issue: {metadata.get('github_issue', 'none')}")
     if metadata.get("linear_issue_identifier", "none") != "none":
@@ -80,6 +81,8 @@ def print_entry(
         print(f"  Linear Team: {metadata.get('linear_team_name', 'none')}")
     if metadata.get("linear_project_name", "none") != "none":
         print(f"  Linear Project: {metadata.get('linear_project_name', 'none')}")
+    print(f"  Remote Session Anchor Kind: {metadata.get('remote_session_anchor_kind', 'none')}")
+    print(f"  Remote Session Anchor ID: {metadata.get('remote_session_anchor_id', 'none')}")
     print(f"  Machine: {metadata.get('machine', 'none')}")
     print(f"  Coding Agent: {metadata.get('coding_agent', 'none')}")
     print(f"  Agent Session ID: {metadata.get('agent_session_id', 'none')}")
@@ -160,6 +163,18 @@ def find_pointer_candidate(
     return None
 
 
+def build_pointer_candidate(pointer) -> TaskCandidate | None:
+    if not pointer:
+        return None
+    if not pointer.task_dir.is_dir() or not pointer.status_file.is_file():
+        return None
+    return TaskCandidate(
+        task_dir=pointer.task_dir,
+        status_file=pointer.status_file,
+        metadata=read_task_metadata(pointer.status_file),
+    )
+
+
 def resolve_direct_candidate(args: argparse.Namespace) -> TaskCandidate | None:
     if not args.status_file and not args.task_dir:
         return None
@@ -205,6 +220,18 @@ def handle_current_session_lookup(
             "Primary",
             candidate=pointer_candidate,
             age_days=task_age_days(pointer_candidate.task_dir, today),
+            include_recap=True,
+        )
+        return 0
+
+    direct_pointer_candidate = build_pointer_candidate(pointer)
+    if direct_pointer_candidate:
+        print("Note: current-task pointer resolves outside this repo's local task-status root.")
+        print("")
+        print_entry(
+            "Primary",
+            candidate=direct_pointer_candidate,
+            age_days=task_age_days(direct_pointer_candidate.task_dir, today),
             include_recap=True,
         )
         return 0
@@ -323,9 +350,6 @@ def main() -> int:
             max_entries=args.max_related,
             task_slug=args.task_slug,
         )
-
-    if not candidates:
-        return print_no_session_match(context)
 
     return handle_current_session_lookup(
         project_root=current_project_root,
