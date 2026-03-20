@@ -355,6 +355,7 @@ def main() -> int:
             start_marker=LIVE_SESSION_START,
             end_marker=LIVE_SESSION_END,
             prefer_top=True,
+            include_surrounding_rules=True,
         )
         if new_issue_body == issue_data.description:
             log(f"No issue-body changes needed for {linear_ref.url}")
@@ -397,6 +398,7 @@ def main() -> int:
         start_marker=LIVE_SESSION_START,
         end_marker=LIVE_SESSION_END,
         prefer_top=True,
+        include_surrounding_rules=True,
     )
 
     if new_issue_body == issue_data.body:

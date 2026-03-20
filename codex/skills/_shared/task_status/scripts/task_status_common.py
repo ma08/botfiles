@@ -54,6 +54,7 @@ TASK_METADATA_START = "<!-- TASK-METADATA:START -->"
 TASK_METADATA_END = "<!-- TASK-METADATA:END -->"
 LIVE_SESSION_START = "<!-- LIVE-SESSION:START -->"
 LIVE_SESSION_END = "<!-- LIVE-SESSION:END -->"
+LIVE_SESSION_RULE = "***"
 TASK_STATUS_STATE_FILENAME = "task-status-state.json"
 
 TRACKER_KIND_GITHUB = "github"
@@ -1045,7 +1046,10 @@ def build_live_session_block(
     authorship_byline = build_github_authorship_byline(coding_agent) if include_authorship_byline else None
     transcript_path = resolve_transcript_path(coding_agent, agent_session_id, project_root=project_root)
     lines = [
+        LIVE_SESSION_RULE,
+        "",
         LIVE_SESSION_START,
+        "",
         "## Live Session",
         "_Managed live session block. Updated automatically._",
         "",
@@ -1065,8 +1069,9 @@ def build_live_session_block(
             f"- Attach Command: `{plain_value(attach_command)}`",
             f"- Last Updated: `{plain_value(last_updated)}`",
             "",
-            "---",
             LIVE_SESSION_END,
+            "",
+            LIVE_SESSION_RULE,
         ]
     )
     return "\n".join(lines)
@@ -1079,14 +1084,27 @@ def upsert_marked_block(
     start_marker: str,
     end_marker: str,
     prefer_top: bool,
+    include_surrounding_rules: bool = False,
 ) -> str:
     text = original_text or ""
+    if include_surrounding_rules:
+        text = strip_fenced_marked_blocks(
+            text,
+            start_marker=start_marker,
+            end_marker=end_marker,
+        )
     block_text = block.strip("\n")
     marker_span = find_unfenced_marker_span(text, start_marker=start_marker, end_marker=end_marker)
 
     if marker_span:
         start_line, end_line = marker_span
         lines = text.splitlines()
+        if include_surrounding_rules:
+            start_line, end_line = expand_span_to_surrounding_rules(
+                lines,
+                start_line=start_line,
+                end_line=end_line,
+            )
         prefix = "\n".join(lines[:start_line]).rstrip("\n")
         suffix = "\n".join(lines[end_line + 1 :]).lstrip("\n")
         chunks = [part for part in [prefix, block_text, suffix] if part]
@@ -1110,6 +1128,76 @@ def extract_marked_block(text: str, *, start_marker: str, end_marker: str) -> st
     start_line, end_line = marker_span
     lines = text.splitlines()
     return "\n".join(lines[start_line : end_line + 1])
+
+
+def expand_span_to_surrounding_rules(
+    lines: list[str],
+    *,
+    start_line: int,
+    end_line: int,
+) -> tuple[int, int]:
+    expanded_start = start_line
+    before = start_line - 1
+    while before >= 0 and not lines[before].strip():
+        before -= 1
+    if before >= 0 and is_markdown_rule_line(lines[before]):
+        expanded_start = before
+
+    expanded_end = end_line
+    after = end_line + 1
+    while after < len(lines) and not lines[after].strip():
+        after += 1
+    if after < len(lines) and is_markdown_rule_line(lines[after]):
+        expanded_end = after
+
+    return expanded_start, expanded_end
+
+
+def is_markdown_rule_line(line: str) -> bool:
+    return bool(re.fullmatch(r"(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,}", line.strip()))
+
+
+def strip_fenced_marked_blocks(
+    text: str,
+    *,
+    start_marker: str,
+    end_marker: str,
+) -> str:
+    lines = text.splitlines()
+    kept: list[str] = []
+    index = 0
+
+    while index < len(lines):
+        if not lines[index].strip().startswith("```"):
+            kept.append(lines[index])
+            index += 1
+            continue
+
+        fence_start = index
+        fence_end = index + 1
+        while fence_end < len(lines) and not lines[fence_end].strip().startswith("```"):
+            fence_end += 1
+
+        if fence_end >= len(lines):
+            kept.extend(lines[fence_start:])
+            break
+
+        fenced_lines = lines[fence_start : fence_end + 1]
+        fenced_text = "\n".join(fenced_lines)
+        if start_marker in fenced_text and end_marker in fenced_text:
+            while kept and not kept[-1].strip():
+                kept.pop()
+            index = fence_end + 1
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            if kept and index < len(lines):
+                kept.append("")
+            continue
+
+        kept.extend(fenced_lines)
+        index = fence_end + 1
+
+    return "\n".join(kept)
 
 
 def find_unfenced_marker_span(
