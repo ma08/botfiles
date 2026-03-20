@@ -16,6 +16,8 @@ notify = [
 ]
 file_opener = "cursor"
 profile = "openai_api"
+history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
+# Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
 [profiles.azure]
 # Rollback options:

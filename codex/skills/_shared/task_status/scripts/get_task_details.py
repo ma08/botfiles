@@ -19,6 +19,7 @@ from task_status_common import (  # noqa: E402
     build_task_recap,
     infer_project_root_from_path,
     load_task_candidates,
+    normalize_task_metadata,
     read_task_metadata,
     resolve_current_task_pointer,
     resolve_transcript_path,
@@ -57,23 +58,34 @@ def print_entry(
     *,
     include_recap: bool = False,
 ) -> None:
-    metadata = candidate.metadata
-    transcript_path = resolve_transcript_path(
-        metadata.get("Coding Agent", "none"),
-        metadata.get("Agent Session ID", "none"),
+    metadata = normalize_task_metadata(
+        candidate.metadata,
+        status_file=candidate.status_file,
+        hydrate_transcript_path=True,
     )
     print(f"{label}:")
     print(f"  Task Folder: {candidate.task_dir}")
     print(f"  Status File: {candidate.status_file if candidate.status_file else 'none'}")
     if age_days is not None:
         print(f"  Age (days): {age_days}")
-    print(f"  GitHub Issue: {metadata.get('GitHub Issue', 'none')}")
-    print(f"  Machine: {metadata.get('Machine', 'none')}")
-    print(f"  Coding Agent: {metadata.get('Coding Agent', 'none')}")
-    print(f"  Agent Session ID: {metadata.get('Agent Session ID', 'none')}")
-    print(f"  Transcript Path: {transcript_path}")
-    print(f"  Zellij Session: {metadata.get('Zellij Session', 'none')}")
-    print(f"  Zellij Link: {metadata.get('Zellij Link', 'none')}")
+    print(f"  Tracker Kind: {metadata.get('tracker_kind', 'none')}")
+    print(f"  Tracker URL: {metadata.get('tracker_url', 'none')}")
+    print(f"  Tracker Human ID: {metadata.get('tracker_human_id', 'none')}")
+    print(f"  Tracker Title: {metadata.get('tracker_title', 'none')}")
+    if metadata.get("github_issue", "none") != "none":
+        print(f"  GitHub Issue: {metadata.get('github_issue', 'none')}")
+    if metadata.get("linear_issue_identifier", "none") != "none":
+        print(f"  Linear Issue Identifier: {metadata.get('linear_issue_identifier', 'none')}")
+    if metadata.get("linear_team_name", "none") != "none":
+        print(f"  Linear Team: {metadata.get('linear_team_name', 'none')}")
+    if metadata.get("linear_project_name", "none") != "none":
+        print(f"  Linear Project: {metadata.get('linear_project_name', 'none')}")
+    print(f"  Machine: {metadata.get('machine', 'none')}")
+    print(f"  Coding Agent: {metadata.get('coding_agent', 'none')}")
+    print(f"  Agent Session ID: {metadata.get('agent_session_id', 'none')}")
+    print(f"  Transcript Path: {metadata.get('transcript_path', 'none')}")
+    print(f"  Zellij Session: {metadata.get('zellij_session', 'none')}")
+    print(f"  Zellij Link: {metadata.get('zellij_link', 'none')}")
     if include_recap:
         print("  Recap:")
         for line in build_task_recap(candidate.status_file):

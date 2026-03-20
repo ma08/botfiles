@@ -30,6 +30,11 @@ GITHUB_ISSUE_RE = re.compile(
     r"^https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)(?:[/?#].*)?$",
     re.IGNORECASE,
 )
+LINEAR_ISSUE_RE = re.compile(
+    r"^https?://linear\.app/(?P<workspace>[^/\s]+)/issue/(?P<identifier>[A-Za-z][A-Za-z0-9_]*-\d+)"
+    r"(?:/(?P<title_slug>[^?#\s]+))?(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
 GITHUB_REMOTE_RE = re.compile(
     r"^(?:https?://github\.com/|ssh://git@github\.com/|git@github\.com:)"
     r"(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)(?:\.git)?/?$",
@@ -50,6 +55,78 @@ TASK_METADATA_END = "<!-- TASK-METADATA:END -->"
 LIVE_SESSION_START = "<!-- LIVE-SESSION:START -->"
 LIVE_SESSION_END = "<!-- LIVE-SESSION:END -->"
 TASK_STATUS_STATE_FILENAME = "task-status-state.json"
+
+TRACKER_KIND_GITHUB = "github"
+TRACKER_KIND_LINEAR = "linear"
+TRACKER_KIND_NONE = "none"
+TRACKER_REMOTE_SESSION_MARKER = "LIVE-SESSION"
+
+TASK_METADATA_REQUIRED_FIELDS = (
+    "tracker_kind",
+    "tracker_url",
+    "tracker_human_id",
+    "tracker_title",
+    "machine",
+    "coding_agent",
+    "agent_session_id",
+    "task_folder",
+    "task_status_path",
+    "transcript_path",
+    "last_synced_at",
+)
+TASK_METADATA_OPTIONAL_FIELDS = (
+    "workspace_path",
+    "zellij_session",
+    "zellij_link",
+    "remote_session_anchor_kind",
+    "remote_session_anchor_id",
+)
+TASK_METADATA_GITHUB_COMPAT_FIELDS = (
+    "github_issue",
+    "github_repo",
+    "github_issue_number",
+)
+TASK_METADATA_LINEAR_COMPAT_FIELDS = (
+    "linear_issue_id",
+    "linear_issue_identifier",
+    "linear_team_id",
+    "linear_team_name",
+    "linear_project_id",
+    "linear_project_name",
+)
+TASK_METADATA_RENDER_ORDER = (
+    TASK_METADATA_REQUIRED_FIELDS
+    + TASK_METADATA_OPTIONAL_FIELDS
+    + TASK_METADATA_GITHUB_COMPAT_FIELDS
+    + TASK_METADATA_LINEAR_COMPAT_FIELDS
+)
+TASK_METADATA_FIELD_LABELS = {
+    "tracker_kind": "Tracker Kind",
+    "tracker_url": "Tracker URL",
+    "tracker_human_id": "Tracker Human ID",
+    "tracker_title": "Tracker Title",
+    "machine": "Machine",
+    "coding_agent": "Coding Agent",
+    "agent_session_id": "Agent Session ID",
+    "task_folder": "Task Folder",
+    "task_status_path": "Task Status Path",
+    "transcript_path": "Transcript Path",
+    "last_synced_at": "Last Synced",
+    "workspace_path": "Workspace Path",
+    "zellij_session": "Zellij Session",
+    "zellij_link": "Zellij Link",
+    "remote_session_anchor_kind": "Remote Session Anchor Kind",
+    "remote_session_anchor_id": "Remote Session Anchor ID",
+    "github_issue": "GitHub Issue",
+    "github_repo": "GitHub Repo",
+    "github_issue_number": "GitHub Issue Number",
+    "linear_issue_id": "Linear Issue ID",
+    "linear_issue_identifier": "Linear Issue Identifier",
+    "linear_team_id": "Linear Team ID",
+    "linear_team_name": "Linear Team Name",
+    "linear_project_id": "Linear Project ID",
+    "linear_project_name": "Linear Project Name",
+}
 
 
 @dataclass(frozen=True)
@@ -76,6 +153,24 @@ class IssueData:
 
 
 @dataclass(frozen=True)
+class LinearIssueRef:
+    workspace: str
+    identifier: str
+    url: str
+    title_slug: str
+
+
+@dataclass(frozen=True)
+class TrackerRef:
+    kind: str
+    url: str
+    human_id: str
+    title_slug: str = ""
+    github_issue: IssueRef | None = None
+    linear_issue: LinearIssueRef | None = None
+
+
+@dataclass(frozen=True)
 class RuntimeTaskContext:
     machine: str
     coding_agent: str
@@ -89,6 +184,13 @@ class TaskCandidate:
     task_dir: Path
     status_file: Path | None
     metadata: dict[str, str]
+
+
+@dataclass(frozen=True)
+class TrackerTaskHome:
+    project_root: Path
+    task_status_root: Path
+    candidate: TaskCandidate
 
 
 @dataclass(frozen=True)
@@ -402,6 +504,12 @@ def slugify(value: str) -> str:
     return slug or "task"
 
 
+def humanize_slug(value: str) -> str:
+    text = re.sub(r"[-_]+", " ", (value or "").strip()).strip()
+    text = re.sub(r"\s{2,}", " ", text)
+    return text or TRACKER_KIND_NONE
+
+
 def enforce_slug_length(slug: str, max_length: int) -> str:
     if max_length < 16:
         max_length = 16
@@ -419,6 +527,14 @@ def build_issue_slug(repo: str, number: int, title: str, max_length: int = 60) -
     repo_slug = slugify(repo)
     title_slug = slugify(title)
     raw = f"{repo_slug}-issue-{number}"
+    if title_slug:
+        raw = f"{raw}-{title_slug}"
+    return enforce_slug_length(raw, max_length=max_length)
+
+
+def build_linear_issue_slug(identifier: str, title: str, max_length: int = 60) -> str:
+    raw = slugify(identifier)
+    title_slug = slugify(title)
     if title_slug:
         raw = f"{raw}-{title_slug}"
     return enforce_slug_length(raw, max_length=max_length)
@@ -447,12 +563,108 @@ def parse_github_issue_url(url: str) -> IssueRef | None:
     return IssueRef(owner=owner, repo=repo, number=number, url=canonical)
 
 
+def parse_linear_issue_url(url: str) -> LinearIssueRef | None:
+    match = LINEAR_ISSUE_RE.match(url.strip())
+    if not match:
+        return None
+    workspace = match.group("workspace").strip()
+    identifier = match.group("identifier").upper()
+    title_slug = (match.group("title_slug") or "").strip().strip("/")
+    canonical = f"https://linear.app/{workspace}/issue/{identifier}"
+    return LinearIssueRef(
+        workspace=workspace,
+        identifier=identifier,
+        url=canonical,
+        title_slug=title_slug,
+    )
+
+
+def parse_tracker_url(url: str) -> TrackerRef | None:
+    linear_ref = parse_linear_issue_url(url)
+    if linear_ref:
+        return TrackerRef(
+            kind=TRACKER_KIND_LINEAR,
+            url=linear_ref.url,
+            human_id=linear_ref.identifier,
+            title_slug=linear_ref.title_slug,
+            linear_issue=linear_ref,
+        )
+
+    github_ref = parse_github_issue_url(url)
+    if github_ref:
+        return TrackerRef(
+            kind=TRACKER_KIND_GITHUB,
+            url=github_ref.url,
+            human_id=f"{github_ref.repo_key}#{github_ref.number}",
+            github_issue=github_ref,
+        )
+
+    return None
+
+
 def extract_primary_issue_ref(text: str) -> IssueRef | None:
     for url in extract_urls(text):
         ref = parse_github_issue_url(url)
         if ref:
             return ref
     return None
+
+
+def extract_primary_linear_issue_ref(text: str) -> LinearIssueRef | None:
+    for url in extract_urls(text):
+        ref = parse_linear_issue_url(url)
+        if ref:
+            return ref
+    return None
+
+
+def extract_primary_tracker_ref(text: str) -> TrackerRef | None:
+    linear_ref = extract_primary_linear_issue_ref(text)
+    if linear_ref:
+        return TrackerRef(
+            kind=TRACKER_KIND_LINEAR,
+            url=linear_ref.url,
+            human_id=linear_ref.identifier,
+            title_slug=linear_ref.title_slug,
+            linear_issue=linear_ref,
+        )
+
+    github_ref = extract_primary_issue_ref(text)
+    if github_ref:
+        return TrackerRef(
+            kind=TRACKER_KIND_GITHUB,
+            url=github_ref.url,
+            human_id=f"{github_ref.repo_key}#{github_ref.number}",
+            github_issue=github_ref,
+        )
+
+    return None
+
+
+def build_tracker_slug(tracker_ref: TrackerRef, title: str, max_length: int = 60) -> str:
+    if tracker_ref.kind == TRACKER_KIND_GITHUB and tracker_ref.github_issue:
+        return build_issue_slug(
+            tracker_ref.github_issue.repo,
+            tracker_ref.github_issue.number,
+            title,
+            max_length=max_length,
+        )
+    if tracker_ref.kind == TRACKER_KIND_LINEAR:
+        return build_linear_issue_slug(tracker_ref.human_id, title, max_length=max_length)
+
+    raw = slugify(f"{tracker_ref.kind}-{tracker_ref.human_id}-{title}")
+    return enforce_slug_length(raw, max_length=max_length)
+
+
+def resolve_tracker_title(tracker_ref: TrackerRef) -> str:
+    if tracker_ref.kind == TRACKER_KIND_GITHUB and tracker_ref.github_issue:
+        issue_data = fetch_issue_data(tracker_ref.github_issue)
+        if issue_data and issue_data.title:
+            return issue_data.title
+    if tracker_ref.title_slug:
+        return humanize_slug(tracker_ref.title_slug)
+    page_title = fetch_page_title(tracker_ref.url)
+    return page_title or TRACKER_KIND_NONE
 
 
 def run_command(
@@ -565,30 +777,69 @@ def fetch_page_title(url: str, timeout_seconds: int = 4) -> str | None:
 
 def build_task_metadata_block(
     *,
+    tracker_kind: str,
+    tracker_url: str,
+    tracker_human_id: str,
+    tracker_title: str,
     machine: str,
     coding_agent: str,
     agent_session_id: str,
-    issue_url: str,
-    issue_repo: str,
-    issue_number: str,
+    task_folder: str,
+    task_status_path: str,
+    transcript_path: str,
+    last_synced_at: str,
+    workspace_path: str = TRACKER_KIND_NONE,
     zellij_session: str,
     zellij_link: str,
-    last_synced: str,
+    remote_session_anchor_kind: str = TRACKER_KIND_NONE,
+    remote_session_anchor_id: str = TRACKER_KIND_NONE,
+    github_issue: str = TRACKER_KIND_NONE,
+    github_repo: str = TRACKER_KIND_NONE,
+    github_issue_number: str = TRACKER_KIND_NONE,
+    linear_issue_id: str = TRACKER_KIND_NONE,
+    linear_issue_identifier: str = TRACKER_KIND_NONE,
+    linear_team_id: str = TRACKER_KIND_NONE,
+    linear_team_name: str = TRACKER_KIND_NONE,
+    linear_project_id: str = TRACKER_KIND_NONE,
+    linear_project_name: str = TRACKER_KIND_NONE,
 ) -> str:
+    values = normalize_task_metadata(
+        {
+            TASK_METADATA_FIELD_LABELS["tracker_kind"]: tracker_kind,
+            TASK_METADATA_FIELD_LABELS["tracker_url"]: tracker_url,
+            TASK_METADATA_FIELD_LABELS["tracker_human_id"]: tracker_human_id,
+            TASK_METADATA_FIELD_LABELS["tracker_title"]: tracker_title,
+            TASK_METADATA_FIELD_LABELS["machine"]: machine,
+            TASK_METADATA_FIELD_LABELS["coding_agent"]: coding_agent,
+            TASK_METADATA_FIELD_LABELS["agent_session_id"]: agent_session_id,
+            TASK_METADATA_FIELD_LABELS["task_folder"]: task_folder,
+            TASK_METADATA_FIELD_LABELS["task_status_path"]: task_status_path,
+            TASK_METADATA_FIELD_LABELS["transcript_path"]: transcript_path,
+            TASK_METADATA_FIELD_LABELS["last_synced_at"]: last_synced_at,
+            TASK_METADATA_FIELD_LABELS["workspace_path"]: workspace_path,
+            TASK_METADATA_FIELD_LABELS["zellij_session"]: zellij_session,
+            TASK_METADATA_FIELD_LABELS["zellij_link"]: zellij_link,
+            TASK_METADATA_FIELD_LABELS["remote_session_anchor_kind"]: remote_session_anchor_kind,
+            TASK_METADATA_FIELD_LABELS["remote_session_anchor_id"]: remote_session_anchor_id,
+            TASK_METADATA_FIELD_LABELS["github_issue"]: github_issue,
+            TASK_METADATA_FIELD_LABELS["github_repo"]: github_repo,
+            TASK_METADATA_FIELD_LABELS["github_issue_number"]: github_issue_number,
+            TASK_METADATA_FIELD_LABELS["linear_issue_id"]: linear_issue_id,
+            TASK_METADATA_FIELD_LABELS["linear_issue_identifier"]: linear_issue_identifier,
+            TASK_METADATA_FIELD_LABELS["linear_team_id"]: linear_team_id,
+            TASK_METADATA_FIELD_LABELS["linear_team_name"]: linear_team_name,
+            TASK_METADATA_FIELD_LABELS["linear_project_id"]: linear_project_id,
+            TASK_METADATA_FIELD_LABELS["linear_project_name"]: linear_project_name,
+        }
+    )
     lines = [
         TASK_METADATA_START,
         "## Task Metadata",
-        f"- Machine: {machine}",
-        f"- Coding Agent: {coding_agent}",
-        f"- Agent Session ID: {agent_session_id}",
-        f"- GitHub Issue: {issue_url}",
-        f"- GitHub Repo: {issue_repo}",
-        f"- GitHub Issue Number: {issue_number}",
-        f"- Zellij Session: {zellij_session}",
-        f"- Zellij Link: {zellij_link}",
-        f"- Last Synced: {last_synced}",
-        TASK_METADATA_END,
     ]
+    for field_name in TASK_METADATA_RENDER_ORDER:
+        label = TASK_METADATA_FIELD_LABELS[field_name]
+        lines.append(f"- {label}: {values[field_name]}")
+    lines.append(TASK_METADATA_END)
     return "\n".join(lines)
 
 
@@ -720,6 +971,147 @@ def parse_bullet_metadata(block: str | None) -> dict[str, str]:
         value = match.group(2).strip()
         values[key] = value
     return values
+
+
+def _normalize_metadata_value(value: str | None, *, default: str = TRACKER_KIND_NONE) -> str:
+    resolved = str(value or "").strip()
+    if not resolved or resolved.lower() == TRACKER_KIND_NONE:
+        return default
+    return resolved
+
+
+def _first_metadata_value(metadata: dict[str, str], *labels: str, default: str = TRACKER_KIND_NONE) -> str:
+    for label in labels:
+        resolved = _normalize_metadata_value(metadata.get(label), default="")
+        if resolved:
+            return resolved
+    return default
+
+
+def _normalize_tracker_kind(value: str | None) -> str:
+    normalized = _normalize_metadata_value(value).lower()
+    if normalized in {TRACKER_KIND_GITHUB, TRACKER_KIND_LINEAR}:
+        return normalized
+    return TRACKER_KIND_NONE
+
+
+def _github_human_id_from_metadata(metadata: dict[str, str]) -> str:
+    issue_url = _first_metadata_value(metadata, "GitHub Issue")
+    issue_ref = parse_github_issue_url(issue_url) if issue_url != TRACKER_KIND_NONE else None
+    if issue_ref:
+        return f"{issue_ref.repo_key}#{issue_ref.number}"
+
+    repo = _first_metadata_value(metadata, "GitHub Repo")
+    number = _first_metadata_value(metadata, "GitHub Issue Number")
+    if repo != TRACKER_KIND_NONE and number != TRACKER_KIND_NONE:
+        return f"{repo}#{number}"
+    return TRACKER_KIND_NONE
+
+
+def normalize_task_metadata(
+    metadata: dict[str, str] | None,
+    *,
+    status_file: Path | None = None,
+    hydrate_transcript_path: bool = False,
+) -> dict[str, str]:
+    raw = metadata or {}
+    tracker_url = _first_metadata_value(raw, "Tracker URL", "GitHub Issue")
+    tracker_ref = parse_tracker_url(tracker_url) if tracker_url != TRACKER_KIND_NONE else None
+
+    tracker_kind = _normalize_tracker_kind(_first_metadata_value(raw, "Tracker Kind"))
+    if tracker_kind == TRACKER_KIND_NONE and tracker_ref:
+        tracker_kind = tracker_ref.kind
+    if tracker_kind == TRACKER_KIND_NONE and _first_metadata_value(raw, "Linear Issue Identifier", "Linear Issue ID") != TRACKER_KIND_NONE:
+        tracker_kind = TRACKER_KIND_LINEAR
+    if tracker_kind == TRACKER_KIND_NONE and _first_metadata_value(raw, "GitHub Issue", "GitHub Repo", "GitHub Issue Number") != TRACKER_KIND_NONE:
+        tracker_kind = TRACKER_KIND_GITHUB
+
+    tracker_human_id = _first_metadata_value(raw, "Tracker Human ID", "Linear Issue Identifier")
+    if tracker_human_id == TRACKER_KIND_NONE and tracker_ref:
+        tracker_human_id = tracker_ref.human_id
+    if tracker_human_id == TRACKER_KIND_NONE and tracker_kind == TRACKER_KIND_GITHUB:
+        tracker_human_id = _github_human_id_from_metadata(raw)
+
+    tracker_title = _first_metadata_value(raw, "Tracker Title")
+    if tracker_title == TRACKER_KIND_NONE and tracker_ref and tracker_ref.title_slug:
+        tracker_title = humanize_slug(tracker_ref.title_slug)
+
+    resolved_task_folder = _first_metadata_value(raw, "Task Folder")
+    resolved_status_path = _first_metadata_value(raw, "Task Status Path")
+    if status_file:
+        resolved_task_folder = (
+            resolved_task_folder
+            if resolved_task_folder != TRACKER_KIND_NONE
+            else str(status_file.parent.resolve())
+        )
+        resolved_status_path = (
+            resolved_status_path
+            if resolved_status_path != TRACKER_KIND_NONE
+            else str(status_file.resolve())
+        )
+
+    workspace_path = _first_metadata_value(raw, "Workspace Path")
+    if workspace_path == TRACKER_KIND_NONE and status_file:
+        project_root = infer_project_root_from_path(status_file)
+        if project_root:
+            workspace_path = str(project_root)
+
+    transcript_path = _first_metadata_value(raw, "Transcript Path")
+    if transcript_path == TRACKER_KIND_NONE and hydrate_transcript_path:
+        transcript_path = resolve_transcript_path(
+            _first_metadata_value(raw, "Coding Agent"),
+            _first_metadata_value(raw, "Agent Session ID"),
+            project_root=workspace_path if workspace_path != TRACKER_KIND_NONE else None,
+        )
+
+    github_issue = _first_metadata_value(raw, "GitHub Issue")
+    github_repo = _first_metadata_value(raw, "GitHub Repo")
+    github_issue_number = _first_metadata_value(raw, "GitHub Issue Number")
+    if github_issue == TRACKER_KIND_NONE and tracker_kind == TRACKER_KIND_GITHUB and tracker_ref:
+        github_issue = tracker_ref.url
+    if github_repo == TRACKER_KIND_NONE and tracker_kind == TRACKER_KIND_GITHUB and tracker_ref and tracker_ref.github_issue:
+        github_repo = tracker_ref.github_issue.repo_key
+    if (
+        github_issue_number == TRACKER_KIND_NONE
+        and tracker_kind == TRACKER_KIND_GITHUB
+        and tracker_ref
+        and tracker_ref.github_issue
+    ):
+        github_issue_number = str(tracker_ref.github_issue.number)
+
+    linear_issue_id = _first_metadata_value(raw, "Linear Issue ID")
+    linear_issue_identifier = _first_metadata_value(raw, "Linear Issue Identifier")
+    if linear_issue_identifier == TRACKER_KIND_NONE and tracker_kind == TRACKER_KIND_LINEAR and tracker_ref:
+        linear_issue_identifier = tracker_ref.human_id
+
+    normalized = {
+        "tracker_kind": tracker_kind,
+        "tracker_url": tracker_url,
+        "tracker_human_id": tracker_human_id,
+        "tracker_title": tracker_title,
+        "machine": _first_metadata_value(raw, "Machine"),
+        "coding_agent": _first_metadata_value(raw, "Coding Agent"),
+        "agent_session_id": _first_metadata_value(raw, "Agent Session ID"),
+        "task_folder": resolved_task_folder,
+        "task_status_path": resolved_status_path,
+        "transcript_path": transcript_path,
+        "last_synced_at": _first_metadata_value(raw, "Last Synced", "Last Synced At"),
+        "workspace_path": workspace_path,
+        "zellij_session": _first_metadata_value(raw, "Zellij Session"),
+        "zellij_link": _first_metadata_value(raw, "Zellij Link"),
+        "remote_session_anchor_kind": _first_metadata_value(raw, "Remote Session Anchor Kind"),
+        "remote_session_anchor_id": _first_metadata_value(raw, "Remote Session Anchor ID"),
+        "github_issue": github_issue,
+        "github_repo": github_repo,
+        "github_issue_number": github_issue_number,
+        "linear_issue_id": linear_issue_id,
+        "linear_issue_identifier": linear_issue_identifier,
+        "linear_team_id": _first_metadata_value(raw, "Linear Team ID"),
+        "linear_team_name": _first_metadata_value(raw, "Linear Team Name"),
+        "linear_project_id": _first_metadata_value(raw, "Linear Project ID"),
+        "linear_project_name": _first_metadata_value(raw, "Linear Project Name"),
+    }
+    return normalized
 
 
 def resolve_status_file(task_dir: Path) -> Path | None:
@@ -1052,6 +1444,96 @@ def find_local_repo_roots_for_github_repo(
     return matches
 
 
+def local_project_roots(current_project_root: Path | None = None) -> list[Path]:
+    matches: list[Path] = []
+    seen: set[Path] = set()
+
+    def maybe_add(candidate: Path) -> None:
+        resolved = candidate.expanduser().resolve()
+        project_root = infer_project_root_from_path(resolved) or resolved
+        project_root = project_root.expanduser().resolve()
+        if project_root in seen or not project_root.is_dir():
+            return
+        if not (
+            (project_root / "AGENTS.md").is_file()
+            or (project_root / "CLAUDE.md").is_file()
+            or (project_root / ".botrc").is_file()
+            or (project_root / ".git").exists()
+        ):
+            return
+        seen.add(project_root)
+        matches.append(project_root)
+
+    if current_project_root:
+        maybe_add(current_project_root)
+
+    for search_root in local_repo_search_roots(current_project_root):
+        for child in sorted(search_root.iterdir()):
+            if not child.is_dir():
+                continue
+            maybe_add(child)
+
+    return matches
+
+
+def task_candidate_matches_tracker(candidate: TaskCandidate, tracker_ref: TrackerRef) -> bool:
+    metadata = normalize_task_metadata(candidate.metadata, status_file=candidate.status_file)
+    tracker_url = metadata.get("tracker_url", TRACKER_KIND_NONE).strip().lower()
+    if tracker_url and tracker_url != TRACKER_KIND_NONE and tracker_url == tracker_ref.url.lower():
+        return True
+
+    if metadata.get("tracker_kind", TRACKER_KIND_NONE).strip().lower() != tracker_ref.kind.lower():
+        return False
+
+    tracker_human_id = metadata.get("tracker_human_id", TRACKER_KIND_NONE).strip().lower()
+    if tracker_human_id and tracker_human_id != TRACKER_KIND_NONE and tracker_human_id == tracker_ref.human_id.lower():
+        return True
+
+    if tracker_ref.kind == TRACKER_KIND_GITHUB and tracker_ref.github_issue:
+        github_issue = metadata.get("github_issue", TRACKER_KIND_NONE).strip().lower()
+        if github_issue and github_issue != TRACKER_KIND_NONE and github_issue == tracker_ref.github_issue.url.lower():
+            return True
+        github_repo = metadata.get("github_repo", TRACKER_KIND_NONE).strip().lower()
+        github_issue_number = metadata.get("github_issue_number", TRACKER_KIND_NONE).strip()
+        return github_repo == tracker_ref.github_issue.repo_key.lower() and github_issue_number == str(
+            tracker_ref.github_issue.number
+        )
+
+    if tracker_ref.kind == TRACKER_KIND_LINEAR and tracker_ref.linear_issue:
+        linear_issue_identifier = metadata.get("linear_issue_identifier", TRACKER_KIND_NONE).strip().lower()
+        return (
+            linear_issue_identifier
+            and linear_issue_identifier != TRACKER_KIND_NONE
+            and linear_issue_identifier == tracker_ref.linear_issue.identifier.lower()
+        )
+
+    return False
+
+
+def find_local_task_homes_for_tracker(
+    tracker_ref: TrackerRef,
+    *,
+    current_project_root: Path | None = None,
+    caller_path: Path | None = None,
+) -> list[TrackerTaskHome]:
+    matches: list[TrackerTaskHome] = []
+    for project_root in local_project_roots(current_project_root):
+        task_status_root = resolve_task_status_root(project_root, caller_path=caller_path)
+        candidates = sort_task_candidates_by_recency(load_task_candidates(task_status_root))
+        for candidate in candidates:
+            if not task_candidate_matches_tracker(candidate, tracker_ref):
+                continue
+            matches.append(
+                TrackerTaskHome(
+                    project_root=project_root,
+                    task_status_root=task_status_root,
+                    candidate=candidate,
+                )
+            )
+            break
+    return matches
+
+
 def parse_pst_label(value: str) -> datetime | None:
     match = PST_LABEL_RE.match((value or "").strip())
     if not match:
@@ -1156,7 +1638,8 @@ def load_task_candidates(root: Path, slug: str | None = None) -> list[TaskCandid
 
 
 def task_candidate_sort_key(candidate: TaskCandidate) -> tuple[float, float, str]:
-    last_synced = parse_pst_label(candidate.metadata.get("Last Synced", ""))
+    normalized_metadata = normalize_task_metadata(candidate.metadata, status_file=candidate.status_file)
+    last_synced = parse_pst_label(normalized_metadata.get("last_synced_at", ""))
     last_synced_ts = last_synced.timestamp() if last_synced else 0.0
     status_mtime = 0.0
     if candidate.status_file and candidate.status_file.is_file():
@@ -1324,8 +1807,27 @@ def resolve_current_task_pointer(
     )
 
 
+def non_tracker_urls(urls: Iterable[str], tracker_ref: TrackerRef | None) -> list[str]:
+    if not tracker_ref:
+        return list(urls)
+    filtered: list[str] = []
+    for url in urls:
+        candidate = parse_tracker_url(url)
+        if candidate and candidate.kind == tracker_ref.kind and candidate.human_id == tracker_ref.human_id:
+            continue
+        if url == tracker_ref.url:
+            continue
+        filtered.append(url)
+    return filtered
+
+
 def non_issue_urls(urls: Iterable[str], issue_ref: IssueRef | None) -> list[str]:
     if not issue_ref:
         return list(urls)
-    issue_url = issue_ref.url
-    return [url for url in urls if url != issue_url]
+    tracker_ref = TrackerRef(
+        kind=TRACKER_KIND_GITHUB,
+        url=issue_ref.url,
+        human_id=f"{issue_ref.repo_key}#{issue_ref.number}",
+        github_issue=issue_ref,
+    )
+    return non_tracker_urls(urls, tracker_ref)
