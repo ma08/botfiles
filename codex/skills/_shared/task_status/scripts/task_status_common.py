@@ -1047,9 +1047,11 @@ def build_live_session_block(
     lines = [
         LIVE_SESSION_START,
         "## Live Session",
+        "_Managed live session block. Updated automatically._",
+        "",
     ]
     if authorship_byline:
-        lines.extend(["", authorship_byline, ""])
+        lines.extend([authorship_byline, ""])
     lines.extend(
         [
             f"- Machine: `{plain_value(machine)}`",
@@ -1062,6 +1064,8 @@ def build_live_session_block(
             f"- Status File: `{plain_value(status_file)}`",
             f"- Attach Command: `{plain_value(attach_command)}`",
             f"- Last Updated: `{plain_value(last_updated)}`",
+            "",
+            "---",
             LIVE_SESSION_END,
         ]
     )
