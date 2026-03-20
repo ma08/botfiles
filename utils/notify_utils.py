@@ -520,9 +520,14 @@ def get_task_github_issue_url(
     coding_agent_override: str | None = None,
 ) -> str:
     context_path = _resolve_context_path(working_directory_override)
+    task_dir = _task_dir_from_context_path(context_path)
     cwd_github_issue_url = _task_metadata_value_from_context_path(context_path, "github_issue")
     if cwd_github_issue_url:
         return cwd_github_issue_url
+    if task_dir:
+        # An explicit task-directory lookup should not inherit an unrelated
+        # session-scoped GitHub issue when that task's local metadata has none.
+        return ""
 
     project_root = infer_project_root_from_path(context_path)
     resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
