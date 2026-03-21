@@ -17,7 +17,7 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
 - **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
 - **.botrc** - Interactive shell layer (aliases, functions) that sources `.botenv`
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
-- **zellij/** - Canonical Zellij config (including lock key remap away from `Ctrl+g`)
+- **zellij/** - Canonical Zellij config (including remaps away from `Ctrl+g` and `Ctrl+t`)
 
 ## Prerequisites
 
@@ -193,6 +193,7 @@ Then fill in values in each `secrets/local/*.rc` file.
 
 Keybinding decision:
 - Zellij lock mode is mapped to `Alt+g` (not `Ctrl+g`) to avoid conflicts with terminal apps such as Codex/Vim input workflows.
+- Zellij tab mode is mapped to `Alt+t` (not `Ctrl+t`) so Codex keeps `Ctrl+t` available for its transcript overlay inside Zellij panes.
 
 Clipboard copy behavior:
 - `zellij/config.kdl` uses `copy_command "sh -c ~/pro/botfiles/shell/clipboard-copy"`.
