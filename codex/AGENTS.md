@@ -37,8 +37,8 @@ These are user-level instructions for the Codex agent shared across all projects
 
 Botfiles uses a two-layer shell model:
 
-- **`.botenv`** — Non-interactive-safe core: secrets, PATH (`~/.local/bin`, `/usr/local/bin`), `BOTFILES_ROOT`, `EDITOR`, `TERM`, `UV_BIN`. Sourced for ALL shell contexts (interactive, SSH commands, agent exec, cron). This is what non-interactive scripts and hooks should source.
-- **`.botrc`** — Interactive layer: sources `.botenv`, then adds aliases (`cc`, `bedcc`, `zj`), shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`), and functions (`oracle`, `work-ml`).
+- **`.botenv`** — Non-interactive-safe core: secrets, PATH (`$BOTFILES_ROOT/bin`, `~/.local/bin`, `/usr/local/bin`), `BOTFILES_ROOT`, `EDITOR`, `TERM`, `UV_BIN`. Sourced for ALL shell contexts (interactive, SSH commands, agent exec, cron). This is what non-interactive scripts and hooks should source.
+- **`.botrc`** — Interactive layer: sources `.botenv`, then adds aliases (`cc`, `bedcc`, `zj`), shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`), and functions (`oracle`, `work-ml`) on top of the shared executable wrappers.
 
 When writing scripts, hooks, or runner wrappers that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load. The Codex notify hook (`codex/hooks/run-codex-notify.sh`) is an example — it sources `.botrc` for historical reasons but only needs `.botenv`.
 
@@ -63,7 +63,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 - `~/pro/botfiles/codex/skills/oracle` and `~/pro/botfiles/claude/skills/oracle` are kept as verbatim upstream copies of `steipete/oracle/skills/oracle`.
 - Do not hand-edit the Oracle skill directory for local preferences; refresh it by replacing it from upstream, and keep local Oracle behavior in `AGENTS.md` / `CLAUDE.md` or botfiles shell modules instead.
-- On machines where the default Node runtime is below 22, use the shell wrappers `oracle` and `oracle-mcp` loaded from `~/pro/botfiles/.botrc` instead of raw `npx -y @steipete/oracle`.
+- On machines where the default Node runtime is below 22, use the local `oracle` and `oracle-mcp` wrappers from `~/pro/botfiles/bin/` (symlinked into `~/.local/bin` by `setup.sh` and also loaded as shell functions from `~/pro/botfiles/.botrc`) instead of raw `npx -y @steipete/oracle`.
 - In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, use `--engine api` instead of relying on upstream defaults.
 - In this environment, Oracle should target `gpt-5.4-pro` by default. Unless the user explicitly asks for another model or a multi-model run, use `--model gpt-5.4-pro`.
 - When invoking Oracle from an agent workflow, be explicit about the engine choice rather than assuming Oracle's default mode matches local expectations.
