@@ -33,6 +33,16 @@ model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "api"
 plan_mode_reasoning_effort = "xhigh"
+approvals_reviewer = "guardian_subagent"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[profiles.openai_api.features]
+js_repl = false
+apps = false
+guardian_approval = true
+tui_app_server = false
+prevent_idle_sleep = false
 
 [profiles.chatgpt]
 model = "gpt-5.3-codex"
@@ -106,6 +116,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."/home/azureuser"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/symphony"]
 trust_level = "trusted"
 
 [notice]
