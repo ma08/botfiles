@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Compare and sync skill folders between claude/skills and codex/skills.
+Compare and sync skill folders between Claude and Codex skill roots.
 
-Supports both standard project layouts (`claude/skills`, `codex/skills`) and
-hidden project layouts (`.claude/skills`, `.codex/skills`).
+Supports both the botfiles/global visible layout (`claude/skills`,
+`codex/skills`) and the hidden project-local layout
+(`.claude/skills`, `.codex/skills`).
 
 Examples:
   python scripts/sync_skills.py status
@@ -131,7 +132,7 @@ def _build_sync_plan(
     missing_in_source = [skill for skill in selected if skill not in source_skills]
     if missing_in_source:
         raise FileNotFoundError(
-            f"Skill(s) not found in source ({from_side}/skills): {', '.join(missing_in_source)}"
+            f"Skill(s) not found in source {from_side} skill root: {', '.join(missing_in_source)}"
         )
 
     plan: list[SkillPlan] = []
@@ -196,14 +197,18 @@ def _apply_plan(
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare and sync codex/skills and claude/skills (including hidden .codex/.claude layouts)"
+        description=(
+            "Compare and sync botfiles-style visible skill roots or hidden "
+            "project-local skill roots for Codex and Claude."
+        )
     )
     parser.add_argument(
         "--repo-root",
         default=None,
         help=(
-            "Repo root containing claude/codex skills directories; supports standard "
-            "(claude/skills, codex/skills) and hidden (.claude/skills, .codex/skills) layouts"
+            "Repo root containing either botfiles-style visible skill roots "
+            "(claude/skills, codex/skills) or hidden project-local skill roots "
+            "(.claude/skills, .codex/skills)"
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

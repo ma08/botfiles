@@ -1,6 +1,6 @@
 ---
 name: sync-codex-claude-skills
-description: Compare, audit drift, and sync skills between `claude/skills` and `codex/skills`, and sync local Codex skills against the OpenAI curated skills repo with protected local forks. Use when the user asks to keep skills aligned across Claude and Codex, compare local skills to `openai/skills`, sync all or selected skills, or identify where drift exists.
+description: Compare, audit drift, and sync skills between botfiles-style visible skill trees (`claude/skills`, `codex/skills`) or hidden project-local skill trees (`.claude/skills`, `.codex/skills`), and sync local Codex skills against the OpenAI curated skills repo with protected local forks. Use when the user asks to keep skills aligned across Claude and Codex, compare local skills to `openai/skills`, sync all or selected skills, or identify where drift exists.
 ---
 
 # Sync Codex Claude Skills
@@ -21,13 +21,19 @@ For upstream curated sync:
 python ~/pro/botfiles/codex/skills/sync-codex-claude-skills/scripts/sync_upstream_skills.py ...
 ```
 
-The script auto-discovers repo root from the current directory. It supports both standard skill directories (`claude/skills`, `codex/skills`) and hidden project skill directories (`.claude/skills`, `.codex/skills`). If needed, pass an explicit root:
+The script auto-discovers repo root from the current directory. It supports both the botfiles/global visible layout (`claude/skills`, `codex/skills`) and the normal hidden project-local layout (`.claude/skills`, `.codex/skills`). If needed, pass an explicit root:
 
 ```bash
 python scripts/sync_skills.py --repo-root ~/pro/botfiles ...
 ```
 
 The upstream sync script uses `upstream_sync_policy.json` in this skill directory by default.
+
+## Layout Convention
+
+- For ordinary project-local skills, prefer `.claude/skills` and `.codex/skills`.
+- Treat visible `claude/skills` and `codex/skills` as the botfiles/global exception unless a repo clearly documents a different convention.
+- Botfiles uses visible skill directories because user-level global skill paths are symlinked there for source control and easier inspection.
 
 ## Workflow A: Claude <-> Codex
 
@@ -39,8 +45,8 @@ python scripts/sync_skills.py status
 
 This reports:
 
-- skills only in `claude/skills` or `.claude/skills`
-- skills only in `codex/skills` or `.codex/skills`
+- skills only in the active Claude skill root (`claude/skills` or `.claude/skills`)
+- skills only in the active Codex skill root (`codex/skills` or `.codex/skills`)
 - skills in both but different
 - skills in both and identical
 

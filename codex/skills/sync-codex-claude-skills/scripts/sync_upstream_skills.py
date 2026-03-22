@@ -321,7 +321,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--repo-root",
         default=None,
-        help="Repo root containing codex/skills and claude/skills (visible or hidden layout).",
+        help=(
+            "Repo root containing either botfiles-style visible skill roots "
+            "(codex/skills, claude/skills) or hidden project-local skill roots "
+            "(.codex/skills, .claude/skills)."
+        ),
     )
     parser.add_argument(
         "--policy",

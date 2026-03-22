@@ -1,4 +1,4 @@
 interface:
   display_name: "Sync Codex Claude Skills"
   short_description: "Compare local skill drift and sync local or upstream skills"
-  default_prompt: "Compare codex/skills and claude/skills or compare local codex skills against the OpenAI curated catalog, report drift, then run the appropriate dry-run sync before applying changes."
+  default_prompt: "Compare botfiles-style visible skill roots or hidden project-local skill roots, report drift, then run the appropriate dry-run sync before applying changes."
