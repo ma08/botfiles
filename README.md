@@ -211,8 +211,12 @@ work-ml-ssh        # SSH-only fallback path for ML VM
 work-arya          # SSH-first connect to Aryabhatta, pick/create zellij session
 work-arya-mosh     # mosh-first path for Aryabhatta (use when UDP is available)
 work-arya-ssh      # explicit SSH path for Aryabhatta
+work-agent         # SSH-first connect to agent-prod; prefer Tailscale alias, then public alias
+work-agent-mosh    # mosh-first path for agent-prod with the same alias fallback
+work-agent-ssh     # explicit SSH path for agent-prod with the same alias fallback
 mml                # raw shell shortcut (mosh-first, no zellij attach)
 marya              # raw shell shortcut (mosh-first, no zellij attach)
+magent             # raw shell shortcut for agent-prod (mosh-first, no zellij attach; Tailscale then public alias)
 cursor-ml          # open/reuse Cursor window at ML VM home over Remote-SSH
 ```
 
@@ -220,10 +224,11 @@ Dependency behavior:
 - `fzf` is required for interactive picker mode.
 - If `fzf` is missing, pass a session name explicitly (example: `work-ml my-session` or `work-here my-session`).
 - Local `zellij` is required for `work-here`; remote hosts still need `zellij` for all `work-*` attach/create flows.
-- `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`).
-- If `mosh` is missing or transport fails, workflows fall back to SSH.
+- `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`, `work-agent-mosh`) and raw shell shortcuts (`mml`, `marya`, `magent`).
+- If `mosh` is missing or transport fails, mosh-based workflows fall back to SSH on the selected host alias.
+- Host selection can include both primary and fallback aliases when configured. ML always probes both. Agent-prod defaults to `ladduu-agent-prod` first and `ladduu-agent-prod-public` second only when you keep the built-in primary alias; if you override just `BOT_AGENT_HOST` or `BOT_AGENT_HOST_PRIMARY`, the fallback stays empty unless you set `BOT_AGENT_HOST_FALLBACK` explicitly.
 - Cursor Remote-SSH uses SSH transport and cannot run directly over mosh transport.
-- Use `cursor-ml` for editor workflow and `mml` for resilient terminal-only workflow.
+- Use `cursor-ml` for editor workflow, `mml` for the ML raw terminal workflow, and `magent` for the agent-prod raw terminal workflow.
 
 Interactive picker behavior:
 - Current and active sessions are listed first with inline zellij metadata; `EXITED` sessions are grouped below them.
@@ -242,6 +247,9 @@ Optional environment variables (set before sourcing `.botrc`) let you override h
 export BOT_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
 export BOT_ML_HOST_FALLBACK=ladduu-dev-ml-vm
 export BOT_ARYA_HOST=ladduu-dev-aryabhatta
+export BOT_AGENT_HOST=ladduu-agent-prod
+export BOT_AGENT_HOST_PRIMARY=ladduu-agent-prod
+export BOT_AGENT_HOST_FALLBACK=ladduu-agent-prod-public
 export BOT_CURSOR_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
 export BOT_CURSOR_ML_HOST_FALLBACK=ladduu-dev-ml-vm
 export BOT_CURSOR_ML_PATH=/home/azureuser
