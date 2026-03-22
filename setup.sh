@@ -166,6 +166,16 @@ backup_existing() {
         mv "$HOME/.config/zellij/config.kdl" "$HOME/.config/zellij/config.kdl.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -e "$HOME/.local/bin/oracle" ] && [ ! -L "$HOME/.local/bin/oracle" ]; then
+        echo "  Backing up ~/.local/bin/oracle"
+        mv "$HOME/.local/bin/oracle" "$HOME/.local/bin/oracle.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
+    if [ -e "$HOME/.local/bin/oracle-mcp" ] && [ ! -L "$HOME/.local/bin/oracle-mcp" ]; then
+        echo "  Backing up ~/.local/bin/oracle-mcp"
+        mv "$HOME/.local/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -179,6 +189,7 @@ create_symlinks() {
     mkdir -p "$SCRIPT_DIR/codex/skills"
     mkdir -p "$SCRIPT_DIR/secrets/local"
     mkdir -p "$HOME/.config/zellij"
+    mkdir -p "$HOME/.local/bin"
 
     # Remove existing symlinks if they exist
     [ -L "$CLAUDE_DIR/settings.json" ] && rm "$CLAUDE_DIR/settings.json"
@@ -189,6 +200,8 @@ create_symlinks() {
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
     [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
+    [ -L "$HOME/.local/bin/oracle" ] && rm "$HOME/.local/bin/oracle"
+    [ -L "$HOME/.local/bin/oracle-mcp" ] && rm "$HOME/.local/bin/oracle-mcp"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -219,6 +232,12 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/zellij/config.kdl" "$HOME/.config/zellij/config.kdl"
     echo "  zellij config.kdl -> $SCRIPT_DIR/zellij/config.kdl"
+
+    ln -sf "$SCRIPT_DIR/bin/oracle" "$HOME/.local/bin/oracle"
+    echo "  ~/.local/bin/oracle -> $SCRIPT_DIR/bin/oracle"
+
+    ln -sf "$SCRIPT_DIR/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp"
+    echo "  ~/.local/bin/oracle-mcp -> $SCRIPT_DIR/bin/oracle-mcp"
 
     echo ""
 }
@@ -457,6 +476,7 @@ main() {
     echo "Claude Code configuration is now symlinked to botfiles."
     echo "Codex CLI configuration, skills, and AGENTS.md are now symlinked to botfiles."
     echo "Zellij config is now symlinked to botfiles."
+    echo "Oracle wrappers are now symlinked into ~/.local/bin."
     echo ""
     echo "Shell bootstrap (two-layer model):"
     echo "  .botenv  -> core env (secrets, PATH, UV_BIN) loaded for ALL shell contexts"

@@ -2,6 +2,7 @@
 
 ## Project Structure & Module Organization
 - `claude/` holds the Claude Code configuration that gets symlinked into `~/.claude/`.
+- `bin/` contains repo-managed executable wrappers that must work in non-interactive shells.
 - `claude/hooks/` contains Python notification hooks plus `pyproject.toml` and `uv.lock` for dependencies.
 - `claude/skills/` is the target for installed skills; `claude/backup_skills/` stores archived skill examples.
 - `codex/` stores Codex CLI config, synced Codex skills, and global Codex instructions (`config.toml`, `skills/`, `AGENTS.md`).

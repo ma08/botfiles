@@ -124,15 +124,16 @@ Botfiles uses a two-layer shell environment model:
 
 **`.botenv` (core, non-interactive safe)**
 - Secrets from `secrets/local/*.rc`
-- PATH additions (`~/.local/bin`, `/usr/local/bin`)
+- PATH additions (`$BOTFILES_ROOT/bin`, `~/.local/bin`, `/usr/local/bin`)
 - Core env: `BOTFILES_ROOT`, `EDITOR`, `VISUAL`, `TERM`, `UV_BIN`
 - Safe to source from any context: SSH commands, cron, systemd, agent exec
+- Exposes repo-managed executables like `oracle` and `oracle-mcp` to non-interactive shells
 
 **`.botrc` (interactive layer)**
 - Sources `.botenv` first (idempotent via double-source guard)
 - Adds aliases (`cc`, `bedcc`, `zj`, etc.)
 - Loads interactive shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`)
-- Defines workflow functions (`work-ml`, `oracle`, etc.)
+- Defines workflow functions (`work-ml`, `oracle`, etc.) on top of the shared executable wrappers
 
 **Shell entrypoint wiring:**
 
@@ -156,7 +157,7 @@ export BASH_ENV="$HOME/pro/botfiles/.botenv"
 source ~/pro/botfiles/.botrc
 ```
 
-`setup.sh` configures these entrypoints automatically.
+`setup.sh` configures these entrypoints automatically and symlinks `oracle` / `oracle-mcp` into `~/.local/bin` so command runners like `watch` can resolve them without sourcing `.botrc`.
 
 `setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
 

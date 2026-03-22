@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_source="${BASH_SOURCE[0]}"
+while [ -L "${script_source}" ]; do
+  script_dir="$(cd "$(dirname "${script_source}")" && pwd)"
+  script_source="$(readlink "${script_source}")"
+  case "${script_source}" in
+    /*) ;;
+    *) script_source="${script_dir}/${script_source}" ;;
+  esac
+done
+
+script_dir="$(cd "$(dirname "${script_source}")" && pwd)"
+botfiles_root="$(cd "${script_dir}/.." && pwd)"
+
+# shellcheck disable=SC1091
+. "${botfiles_root}/.botenv"
+# shellcheck disable=SC1091
+. "${botfiles_root}/shell/30-oracle.sh"
+
+oracle "$@"
