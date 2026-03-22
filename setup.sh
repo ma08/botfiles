@@ -179,6 +179,27 @@ backup_existing() {
     echo ""
 }
 
+backup_foreign_symlink() {
+    local source_path="$1"
+    local dest_path="$2"
+    local label="$3"
+
+    if [ -L "$dest_path" ] && [ "$(readlink "$dest_path")" != "$source_path" ]; then
+        echo "  Backing up $label symlink"
+        mv "$dest_path" "$dest_path.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+}
+
+safe_symlink() {
+    local source_path="$1"
+    local dest_path="$2"
+    local label="$3"
+
+    backup_foreign_symlink "$source_path" "$dest_path" "$label"
+    ln -sf "$source_path" "$dest_path"
+    echo "  $label -> $source_path"
+}
+
 # Create symlinks
 create_symlinks() {
     echo "Creating symlinks..."
@@ -200,8 +221,6 @@ create_symlinks() {
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
     [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
-    [ -L "$HOME/.local/bin/oracle" ] && rm "$HOME/.local/bin/oracle"
-    [ -L "$HOME/.local/bin/oracle-mcp" ] && rm "$HOME/.local/bin/oracle-mcp"
 
     # Create new symlinks
     ln -sf "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/settings.json"
@@ -233,11 +252,9 @@ create_symlinks() {
     ln -sf "$SCRIPT_DIR/zellij/config.kdl" "$HOME/.config/zellij/config.kdl"
     echo "  zellij config.kdl -> $SCRIPT_DIR/zellij/config.kdl"
 
-    ln -sf "$SCRIPT_DIR/bin/oracle" "$HOME/.local/bin/oracle"
-    echo "  ~/.local/bin/oracle -> $SCRIPT_DIR/bin/oracle"
+    safe_symlink "$SCRIPT_DIR/bin/oracle" "$HOME/.local/bin/oracle" "~/.local/bin/oracle"
 
-    ln -sf "$SCRIPT_DIR/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp"
-    echo "  ~/.local/bin/oracle-mcp -> $SCRIPT_DIR/bin/oracle-mcp"
+    safe_symlink "$SCRIPT_DIR/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp" "~/.local/bin/oracle-mcp"
 
     echo ""
 }

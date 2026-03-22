@@ -55,21 +55,37 @@ if [ -z "$TERM" ] || [ "$TERM" = "dumb" ]; then
   export TERM=xterm-256color
 fi
 
-# --- PATH: idempotently add common bin directories ---------------------
-case ":${PATH}:" in
-  *":$BOTFILES_ROOT/bin:"*) ;;
-  *) export PATH="$BOTFILES_ROOT/bin:$PATH" ;;
-esac
+# --- PATH: normalize shared bin directories in the intended order ------
+_botenv_path_rest=""
+_botenv_old_ifs=$IFS
+IFS=:
 
-case ":${PATH}:" in
-  *":$HOME/.local/bin:"*) ;;
-  *) export PATH="$HOME/.local/bin:$PATH" ;;
-esac
+for _botenv_path_entry in ${PATH:-}; do
+  case "$_botenv_path_entry" in
+    "$BOTFILES_ROOT/bin"|"$HOME/.local/bin"|"/usr/local/bin") ;;
+    "")
+      ;;
+    *)
+      if [ -n "$_botenv_path_rest" ]; then
+        _botenv_path_rest="${_botenv_path_rest}:$_botenv_path_entry"
+      else
+        _botenv_path_rest="$_botenv_path_entry"
+      fi
+      ;;
+  esac
+done
 
-case ":${PATH}:" in
-  *":/usr/local/bin:"*) ;;
-  *) export PATH="/usr/local/bin:$PATH" ;;
-esac
+IFS=$_botenv_old_ifs
+unset _botenv_old_ifs _botenv_path_entry
+
+_botenv_path_prefix="$BOTFILES_ROOT/bin:$HOME/.local/bin:/usr/local/bin"
+if [ -n "$_botenv_path_rest" ]; then
+  PATH="$_botenv_path_prefix:$_botenv_path_rest"
+else
+  PATH="$_botenv_path_prefix"
+fi
+export PATH
+unset _botenv_path_prefix _botenv_path_rest
 
 # --- UV_BIN resolution -------------------------------------------------
 if [ -f "$BOTFILES_ROOT/shell/10-uv-bin.sh" ]; then
