@@ -156,6 +156,11 @@ backup_existing() {
         mv "$CODEX_DIR/skills" "$CODEX_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -e "$CODEX_DIR/agents" ] && [ ! -L "$CODEX_DIR/agents" ]; then
+        echo "  Backing up codex agents"
+        mv "$CODEX_DIR/agents" "$CODEX_DIR/agents.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     if [ -f "$CODEX_DIR/AGENTS.md" ] && [ ! -L "$CODEX_DIR/AGENTS.md" ]; then
         echo "  Backing up codex AGENTS.md"
         mv "$CODEX_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md.bak.$(date +%Y%m%d%H%M%S)"
@@ -207,6 +212,7 @@ create_symlinks() {
     # Ensure .claude directory exists
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
+    mkdir -p "$SCRIPT_DIR/codex/agents"
     mkdir -p "$SCRIPT_DIR/codex/skills"
     mkdir -p "$SCRIPT_DIR/secrets/local"
     mkdir -p "$HOME/.config/zellij"
@@ -218,6 +224,7 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
+    [ -L "$CODEX_DIR/agents" ] && rm "$CODEX_DIR/agents"
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
     [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
@@ -242,6 +249,9 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
+
+    ln -sf "$SCRIPT_DIR/codex/agents" "$CODEX_DIR/agents"
+    echo "  codex agents/ -> $SCRIPT_DIR/codex/agents"
 
     ln -sf "$SCRIPT_DIR/codex/skills" "$CODEX_DIR/skills"
     echo "  codex skills/ -> $SCRIPT_DIR/codex/skills"

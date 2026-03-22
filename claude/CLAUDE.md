@@ -49,8 +49,9 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, pass `--engine api` instead of relying on upstream defaults.
 - Default to `gpt-5.4-pro` unless the user explicitly asks for another model, a multi-model run, or a faster/cheaper pass.
 - Be explicit about engine/model choice. Prefer the local `oracle` wrapper so the intended defaults are applied unless you are intentionally overriding them.
-- If the Oracle result is needed for the next step, prefer one foreground subagent to own the Oracle run and wait for a terminal status before handing the result back.
-- If Oracle stays in the main thread, wait or reattach until the session reaches `completed` or `error`. Skip that only when the user explicitly says not to wait.
+- If the Oracle result is needed for the next step, prefer one foreground subagent to own the Oracle run and wait for a terminal status before handing the result back. Do not rerun, shorten the prompt, or downgrade the model for latency alone.
+- For `gpt-5.4-pro`, treat 10-15 minutes as common, 15-40 minutes as a normal slow run, and up to 60 minutes as within tolerance. `in_progress` is not failure.
+- If Oracle stays in the main thread, wait or reattach until the session reaches `completed` or `error`. If a polling shell dies or `stdin` closes, restart polling against the same slug; that is not Oracle failure. Skip waiting only when the user explicitly says not to wait.
 - When giving timing context, quote local Oracle evidence (`oracle status`, `meta.json`, `output.log`) instead of guessing.
 - Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
