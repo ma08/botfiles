@@ -210,8 +210,12 @@ work-ml-ssh        # SSH-only fallback path for ML VM
 work-arya          # SSH-first connect to Aryabhatta, pick/create zellij session
 work-arya-mosh     # mosh-first path for Aryabhatta (use when UDP is available)
 work-arya-ssh      # explicit SSH path for Aryabhatta
+work-agent         # SSH-first connect to agent-prod, pick/create zellij session
+work-agent-mosh    # mosh-first path for agent-prod (use when UDP is available)
+work-agent-ssh     # explicit SSH path for agent-prod
 mml                # raw shell shortcut (mosh-first, no zellij attach)
 marya              # raw shell shortcut (mosh-first, no zellij attach)
+magent             # raw shell shortcut for agent-prod (mosh-first, no zellij attach)
 cursor-ml          # open/reuse Cursor window at ML VM home over Remote-SSH
 ```
 
@@ -219,7 +223,7 @@ Dependency behavior:
 - `fzf` is required for interactive picker mode.
 - If `fzf` is missing, pass a session name explicitly (example: `work-ml my-session` or `work-here my-session`).
 - Local `zellij` is required for `work-here`; remote hosts still need `zellij` for all `work-*` attach/create flows.
-- `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`).
+- `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`, `work-agent-mosh`).
 - If `mosh` is missing or transport fails, workflows fall back to SSH.
 - Cursor Remote-SSH uses SSH transport and cannot run directly over mosh transport.
 - Use `cursor-ml` for editor workflow and `mml` for resilient terminal-only workflow.
@@ -241,6 +245,7 @@ Optional environment variables (set before sourcing `.botrc`) let you override h
 export BOT_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
 export BOT_ML_HOST_FALLBACK=ladduu-dev-ml-vm
 export BOT_ARYA_HOST=ladduu-dev-aryabhatta
+export BOT_AGENT_HOST=ladduu-agent-prod
 export BOT_CURSOR_ML_HOST_PRIMARY=ladduu-dev-ml-vm-ts
 export BOT_CURSOR_ML_HOST_FALLBACK=ladduu-dev-ml-vm
 export BOT_CURSOR_ML_PATH=/home/azureuser

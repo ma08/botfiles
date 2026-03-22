@@ -4,6 +4,7 @@
 #   BOT_ML_HOST_PRIMARY   (default: ladduu-dev-ml-vm-ts)
 #   BOT_ML_HOST_FALLBACK  (default: ladduu-dev-ml-vm)
 #   BOT_ARYA_HOST         (default: ladduu-dev-aryabhatta)
+#   BOT_AGENT_HOST        (default: ladduu-agent-prod)
 #   BOT_CURSOR_ML_HOST_PRIMARY  (default: BOT_ML_HOST_PRIMARY)
 #   BOT_CURSOR_ML_HOST_FALLBACK (default: BOT_ML_HOST_FALLBACK)
 #   BOT_CURSOR_ML_PATH          (default: /home/azureuser)
@@ -11,6 +12,7 @@
 : "${BOT_ML_HOST_PRIMARY:=ladduu-dev-ml-vm-ts}"
 : "${BOT_ML_HOST_FALLBACK:=ladduu-dev-ml-vm}"
 : "${BOT_ARYA_HOST:=ladduu-dev-aryabhatta}"
+: "${BOT_AGENT_HOST:=ladduu-agent-prod}"
 : "${BOT_CURSOR_ML_HOST_PRIMARY:=$BOT_ML_HOST_PRIMARY}"
 : "${BOT_CURSOR_ML_HOST_FALLBACK:=$BOT_ML_HOST_FALLBACK}"
 : "${BOT_CURSOR_ML_PATH:=/home/azureuser}"
@@ -116,6 +118,18 @@ work-arya-ssh() {
   _bot_ssh_workflow_connect "ssh" "${1:-}" "$BOT_ARYA_HOST"
 }
 
+work-agent() {
+  _bot_ssh_workflow_connect "ssh" "${1:-}" "$BOT_AGENT_HOST"
+}
+
+work-agent-mosh() {
+  _bot_ssh_workflow_connect "mosh" "${1:-}" "$BOT_AGENT_HOST"
+}
+
+work-agent-ssh() {
+  _bot_ssh_workflow_connect "ssh" "${1:-}" "$BOT_AGENT_HOST"
+}
+
 work-here() {
   if [ -n "${1:-}" ]; then
     _bot_run_zellij_workflow connect --mode local --transport local --session "$1"
@@ -147,6 +161,21 @@ mml() {
 
 marya() {
   local host="$BOT_ARYA_HOST"
+
+  if command -v mosh >/dev/null 2>&1; then
+    if _bot_mosh_connect "$host"; then
+      return 0
+    fi
+    echo "mosh failed for ${host}; falling back to ssh."
+  else
+    echo "mosh is not installed; falling back to ssh."
+  fi
+
+  ssh "$host"
+}
+
+magent() {
+  local host="$BOT_AGENT_HOST"
 
   if command -v mosh >/dev/null 2>&1; then
     if _bot_mosh_connect "$host"; then
