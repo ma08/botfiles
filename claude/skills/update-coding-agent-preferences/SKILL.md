@@ -42,9 +42,10 @@ The visible botfiles trees exist because `setup.sh` symlinks the user-level glob
 4. If a skill changes:
    - Determine whether the target is a global botfiles skill or a project-local skill.
    - Edit the Codex copy first in the matching skill root.
-   - For ordinary project-local skills, use `.codex/skills` and `.claude/skills`.
-   - If you encounter visible `codex/skills` and `claude/skills` in a non-botfiles repo, inspect whether that repo is intentionally mirroring user-level global skills before treating that as the correct target.
-   - Mirror it to Claude with the sync workflow unless there is an intentional Claude-only difference
+   - Preserve the repo's documented or already-established local skill layout. Do not create a second skill root just because another layout is more common.
+   - For ordinary project-local skills, default to `.codex/skills` and `.claude/skills`.
+   - If a repo intentionally documents or already uses visible `codex/skills` and `claude/skills`, preserve that layout instead of creating hidden roots beside it.
+   - Mirror to Claude with the sync workflow when a counterpart already exists, or when the user explicitly wants a new mirror. One-sided skills are valid; do not create a brand-new counterpart by default.
    - Re-read the Claude copy after sync
 5. Keep the change localized. Do not touch unrelated instructions, generated assets, or curated upstream skills unless the preference explicitly requires it.
 
@@ -69,6 +70,7 @@ python ~/pro/botfiles/codex/skills/sync-codex-claude-skills/scripts/sync_skills.
 ```
 
 The sync script can also operate on botfiles-style visible roots when a repo intentionally uses that exception, but do not create or describe `codex/skills` and `claude/skills` as the default project-local layout.
+Preserve the repo's documented layout before applying this default.
 
 If the skill is an intentional local fork or the Claude copy must differ, skip sync and edit both copies manually. State that exception in the final handoff.
 
@@ -84,14 +86,14 @@ If the skill is an intentional local fork or the Claude copy must differ, skip s
 
 - "Make this a standing rule everywhere": update the global instruction pair.
 - "Only in this repo": update the project instruction pair.
-- "Change how a global skill behaves": update the global skill pair, plus any instruction file that defines the policy.
-- "Change how a project-local skill behaves": update the repo-local skill pair under `.codex/skills` and `.claude/skills`, plus any local instruction file that defines the policy.
+- "Change how a global skill behaves": update the existing global skill surface, plus any instruction file that defines the policy. Create a new mirror only if the counterpart already exists or the user explicitly wants one.
+- "Change how a project-local skill behaves": update the repo-local skill surface in the repo's documented layout, plus any local instruction file that defines the policy. Create a new mirror only if the counterpart already exists or the user explicitly wants one.
 - "Temporary for this task": use task notes or status files instead of long-lived instruction docs.
 
 ## Edge Cases
 
 - If the repo has only `AGENTS.md` or only `CLAUDE.md`, update the existing file and note that the counterpart is missing.
-- If the repo has project-local skills on only one side, update the existing side and note the missing counterpart unless the user explicitly wants you to create a new local mirrored skill.
+- If a global or project-local skill exists on only one side, update the existing side and note the missing counterpart unless the user explicitly wants you to create a new mirrored skill.
 - If you see visible `codex/skills` or `claude/skills` in a non-botfiles repo, verify whether that repo is intentionally using a symlink-backed or otherwise exceptional layout before editing it as if it were project-local.
 - If the request conflicts with a curated or upstream-managed skill, keep the preference in instruction files unless the user explicitly asks for a protected fork.
 - If a preference originated in one ecosystem but changes cross-agent behavior, update both Codex and Claude counterparts so the rule does not drift.
