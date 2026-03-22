@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Agent Preferences"
+  short_description: "Apply coding agent preference changes"
+  default_prompt: "Use $update-coding-agent-preferences to apply this preference change across the right Codex and Claude files."
