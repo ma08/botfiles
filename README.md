@@ -225,7 +225,7 @@ Dependency behavior:
 - Local `zellij` is required for `work-here`; remote hosts still need `zellij` for all `work-*` attach/create flows.
 - `mosh` is only required for mosh-first commands (`work-ml`, `work-arya-mosh`, `work-agent-mosh`) and raw shell shortcuts (`mml`, `marya`, `magent`).
 - If `mosh` is missing or transport fails, mosh-based workflows fall back to SSH on the selected host alias.
-- Host selection can include both primary and fallback aliases when configured. ML always probes both, and agent-prod defaults to `ladduu-agent-prod` first and `ladduu-agent-prod-public` second.
+- Host selection can include both primary and fallback aliases when configured. ML always probes both. Agent-prod defaults to `ladduu-agent-prod` first and `ladduu-agent-prod-public` second only when you keep the built-in primary alias; if you override just `BOT_AGENT_HOST` or `BOT_AGENT_HOST_PRIMARY`, the fallback stays empty unless you set `BOT_AGENT_HOST_FALLBACK` explicitly.
 - Cursor Remote-SSH uses SSH transport and cannot run directly over mosh transport.
 - Use `cursor-ml` for editor workflow, `mml` for the ML raw terminal workflow, and `magent` for the agent-prod raw terminal workflow.
 

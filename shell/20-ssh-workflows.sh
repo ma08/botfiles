@@ -6,7 +6,8 @@
 #   BOT_ARYA_HOST         (default: ladduu-dev-aryabhatta)
 #   BOT_AGENT_HOST        (default: ladduu-agent-prod; compatibility alias)
 #   BOT_AGENT_HOST_PRIMARY   (default: BOT_AGENT_HOST)
-#   BOT_AGENT_HOST_FALLBACK  (default: ladduu-agent-prod-public)
+#   BOT_AGENT_HOST_FALLBACK  (default: ladduu-agent-prod-public only when
+#                             BOT_AGENT_HOST_PRIMARY uses the built-in default)
 #   BOT_CURSOR_ML_HOST_PRIMARY  (default: BOT_ML_HOST_PRIMARY)
 #   BOT_CURSOR_ML_HOST_FALLBACK (default: BOT_ML_HOST_FALLBACK)
 #   BOT_CURSOR_ML_PATH          (default: /home/azureuser)
@@ -16,7 +17,13 @@
 : "${BOT_ARYA_HOST:=ladduu-dev-aryabhatta}"
 : "${BOT_AGENT_HOST:=ladduu-agent-prod}"
 : "${BOT_AGENT_HOST_PRIMARY:=$BOT_AGENT_HOST}"
-: "${BOT_AGENT_HOST_FALLBACK:=ladduu-agent-prod-public}"
+if [ -z "${BOT_AGENT_HOST_FALLBACK+x}" ]; then
+  if [ "$BOT_AGENT_HOST_PRIMARY" = "ladduu-agent-prod" ]; then
+    BOT_AGENT_HOST_FALLBACK="ladduu-agent-prod-public"
+  else
+    BOT_AGENT_HOST_FALLBACK=""
+  fi
+fi
 : "${BOT_CURSOR_ML_HOST_PRIMARY:=$BOT_ML_HOST_PRIMARY}"
 : "${BOT_CURSOR_ML_HOST_FALLBACK:=$BOT_ML_HOST_FALLBACK}"
 : "${BOT_CURSOR_ML_PATH:=/home/azureuser}"
