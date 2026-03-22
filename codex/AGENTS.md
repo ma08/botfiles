@@ -65,20 +65,16 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Do not hand-edit the Oracle skill directory for local preferences; refresh it by replacing it from upstream, and keep local Oracle behavior in `AGENTS.md` / `CLAUDE.md` or botfiles shell modules instead.
 - On machines where the default Node runtime is below 22, use the local `oracle` and `oracle-mcp` wrappers from `~/pro/botfiles/bin/` (symlinked into `~/.local/bin` by `setup.sh` and also loaded as shell functions from `~/pro/botfiles/.botrc`) instead of raw `npx -y @steipete/oracle`.
 - In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, use `--engine api` instead of relying on upstream defaults.
-- In this environment, Oracle should target `gpt-5.4-pro` by default. Treat that as the strongest single-model default here; unless the user explicitly asks for another model, a multi-model run, or a faster/cheaper pass, use `--model gpt-5.4-pro` and do not downgrade just because the run is slow.
-- When invoking Oracle from an agent workflow, be explicit about the engine choice rather than assuming Oracle's default mode matches local expectations.
-- When invoking Oracle from an agent workflow, be explicit about the model choice too. Prefer the local `oracle` wrapper so the intended `--engine api` and `--model gpt-5.4-pro` defaults are applied unless you are intentionally overriding them.
-- Prefer a dedicated awaiter-style subagent for Oracle work when the Oracle result is needed for the next step. That subagent should own the Oracle session, monitor it, and wait for a terminal status before handing the result back to the main thread.
-- Treat long Oracle latency as normal for Pro runs. The installed CLI currently documents `--timeout auto` as 60 minutes for `gpt-5.4-pro`, so several minutes without a final answer is not evidence of failure.
-- If an Oracle result is needed for the next step, wait until the session reaches a terminal status. Do not abandon the run for impatience alone; keep monitoring or reattaching with `oracle status` / `oracle session` until the status is `completed` or `error`.
-- Do not leave Oracle waiting as ambient main-thread work when an awaiter-style subagent can own it. Use the main thread to coordinate only after that subagent returns or reports a terminal error.
-- Skip waiting only when the user explicitly asks not to wait, explicitly allows parallel work without the Oracle result, or the Oracle session has already reached a terminal error state.
-- When giving the user timing context, prefer quoting recent local Oracle evidence instead of guessing. `oracle status` shows recent sessions, session `meta.json` records `startedAt`, `completedAt`, and `elapsedMs`, and `output.log` shows live elapsed progress updates while a run is still in flight.
+- Default to `gpt-5.4-pro` unless the user explicitly asks for another model, a multi-model run, or a faster/cheaper pass.
+- Be explicit about engine/model choice. Prefer the local `oracle` wrapper so the intended defaults are applied unless you are intentionally overriding them.
+- Before using Oracle, ask the user whether they want the awaiter-style subagent to own the Oracle run. Use that subagent only after an explicit yes. If the answer is no, keep Oracle in the main thread.
+- If the Oracle result is needed for the next step, wait or reattach until the session reaches `completed` or `error`. Skip that only when the user explicitly says not to wait.
+- When giving timing context, quote local Oracle evidence (`oracle status`, `meta.json`, `output.log`) instead of guessing.
 - Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
 - Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
 - For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
-- Oracle API runs on non-Pro models may still inherit shorter auto timeouts from the CLI. If you intentionally use a non-Pro model for a long run, pass an explicit `--timeout` or use background mode rather than relying on `auto`.
+- On non-Pro models, pass an explicit `--timeout` or use background mode for long Oracle runs instead of relying on `auto`.
 
 ## Task Status Files
 
