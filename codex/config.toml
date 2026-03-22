@@ -121,6 +121,9 @@ trust_level = "trusted"
 [projects."/home/azureuser/pro/symphony"]
 trust_level = "trusted"
 
+[projects."/Volumes/RS"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
