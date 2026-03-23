@@ -206,7 +206,7 @@ safe_symlink() {
     local label="$3"
 
     backup_foreign_symlink "$source_path" "$dest_path" "$label"
-    ln -sf "$source_path" "$dest_path"
+    ln -sfn "$source_path" "$dest_path"
     echo "  $label -> $source_path"
 }
 
