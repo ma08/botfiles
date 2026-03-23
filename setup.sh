@@ -141,6 +141,11 @@ backup_existing() {
         mv "$CLAUDE_DIR/skills" "$CLAUDE_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -d "$CLAUDE_DIR/agents" ] && [ ! -L "$CLAUDE_DIR/agents" ]; then
+        echo "  Backing up agents directory"
+        mv "$CLAUDE_DIR/agents" "$CLAUDE_DIR/agents.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     if [ -f "$CLAUDE_DIR/CLAUDE.md" ] && [ ! -L "$CLAUDE_DIR/CLAUDE.md" ]; then
         echo "  Backing up CLAUDE.md"
         mv "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak.$(date +%Y%m%d%H%M%S)"
@@ -212,6 +217,7 @@ create_symlinks() {
     # Ensure .claude directory exists
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
+    mkdir -p "$SCRIPT_DIR/claude/agents"
     mkdir -p "$SCRIPT_DIR/codex/agents"
     mkdir -p "$SCRIPT_DIR/codex/skills"
     mkdir -p "$SCRIPT_DIR/secrets/local"
@@ -223,6 +229,7 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/statusline-simple.sh" ] && rm "$CLAUDE_DIR/statusline-simple.sh"
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
+    [ -L "$CLAUDE_DIR/agents" ] && rm "$CLAUDE_DIR/agents"
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
     [ -L "$CODEX_DIR/agents" ] && rm "$CODEX_DIR/agents"
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
@@ -241,6 +248,9 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
     echo "  skills/ -> $SCRIPT_DIR/claude/skills"
+
+    ln -sf "$SCRIPT_DIR/claude/agents" "$CLAUDE_DIR/agents"
+    echo "  agents/ -> $SCRIPT_DIR/claude/agents"
 
     [ -L "$CLAUDE_DIR/CLAUDE.md" ] && rm "$CLAUDE_DIR/CLAUDE.md"
 
