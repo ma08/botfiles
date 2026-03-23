@@ -1,6 +1,7 @@
 name = "oracle_awaiter"
 description = "Own a single Oracle run and wait it through to a terminal status without impatience-driven retries or model downgrades."
 nickname_candidates = ["Oracle Awaiter", "Oracle Waiter"]
+model = "gpt-5.4-pro"
 model_reasoning_effort = "medium"
 
 developer_instructions = """

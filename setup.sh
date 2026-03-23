@@ -229,9 +229,7 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/statusline-simple.sh" ] && rm "$CLAUDE_DIR/statusline-simple.sh"
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
-    [ -L "$CLAUDE_DIR/agents" ] && rm "$CLAUDE_DIR/agents"
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
-    [ -L "$CODEX_DIR/agents" ] && rm "$CODEX_DIR/agents"
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
     [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
@@ -249,8 +247,7 @@ create_symlinks() {
     ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
     echo "  skills/ -> $SCRIPT_DIR/claude/skills"
 
-    ln -sf "$SCRIPT_DIR/claude/agents" "$CLAUDE_DIR/agents"
-    echo "  agents/ -> $SCRIPT_DIR/claude/agents"
+    safe_symlink "$SCRIPT_DIR/claude/agents" "$CLAUDE_DIR/agents" "agents/"
 
     [ -L "$CLAUDE_DIR/CLAUDE.md" ] && rm "$CLAUDE_DIR/CLAUDE.md"
 
@@ -260,8 +257,7 @@ create_symlinks() {
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
 
-    ln -sf "$SCRIPT_DIR/codex/agents" "$CODEX_DIR/agents"
-    echo "  codex agents/ -> $SCRIPT_DIR/codex/agents"
+    safe_symlink "$SCRIPT_DIR/codex/agents" "$CODEX_DIR/agents" "codex agents/"
 
     ln -sf "$SCRIPT_DIR/codex/skills" "$CODEX_DIR/skills"
     echo "  codex skills/ -> $SCRIPT_DIR/codex/skills"
