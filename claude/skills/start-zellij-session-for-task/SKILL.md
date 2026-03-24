@@ -2,8 +2,8 @@
 name: start-zellij-session-for-task
 description: >-
   Start a detached zellij session for a tracker-linked or natural-language
-  task, launch Codex as the default shell, and print the post-attach
-  `$start-new-task ...` handoff command.
+  task, and launch Codex as the default shell with an initial
+  `$start-new-task ...` handoff prompt.
 ---
 
 # Start Zellij Session For Task
@@ -50,12 +50,12 @@ default to `here`.
   the live Codex UI.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex
   process.
-- Prints the exact post-attach command to run after you attach:
+- Seeds the child interactive Codex session with the exact initial prompt:
   - `$start-new-task <original input>`
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, which is the current
   CLI equivalent of the historical `--yolo` shorthand.
-- Prints the launched session name, target, attach hint, and any available
-  zellij web link.
+- Prints the launched session name, target, attach hint, initial prompt, and
+  any available zellij web link.
 
 ## Notes
 

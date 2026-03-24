@@ -20,7 +20,7 @@ Usage:
   start-zellij-session-for-task [--target here|ml|arya|agent] [--project-root <path>] [--session-name <name>] [--tab-name <name>] [--dry-run] <linear-url|linear-id|github-issue-url|task description>
 
 Starts a detached zellij session, launches Codex as the session's default
-shell, and prints the exact post-attach command to run:
+shell, and seeds the child Codex session with the initial prompt:
   $start-new-task <original input>
 
 Notes:
@@ -69,6 +69,10 @@ build_cd_command() {
 }
 
 build_codex_command() {
+  local initial_prompt="$1"
+  local quoted_prompt
+
+  printf -v quoted_prompt '%q' "$initial_prompt"
   printf '%s ' \
 'while IFS="=" read -r _name _rest; do
   case "$_name" in
@@ -79,11 +83,12 @@ build_codex_command() {
       ;;
   esac
 done < <(env)
-exec codex --profile openai_api --dangerously-bypass-approvals-and-sandbox --no-alt-screen'
+exec codex --profile openai_api --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quoted_prompt"
 }
 
 build_bootstrap_script() {
   local project_root="$1"
+  local initial_prompt="$2"
   cat <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -94,7 +99,7 @@ if [ -f "\$BOTFILES_ROOT/.botenv" ]; then
 fi
 rm -f -- "\$0" >/dev/null 2>&1 || true
 $(build_cd_command "$project_root")
-$(build_codex_command)
+$(build_codex_command "$initial_prompt")
 EOF
 }
 
@@ -300,8 +305,8 @@ else
   tab_name="$session_name"
 fi
 
-post_attach_command="\$start-new-task $description"
-bootstrap_script="$(build_bootstrap_script "$canonical_project_root")"
+initial_prompt="\$start-new-task $description"
+bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$initial_prompt")"
 launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 
@@ -333,7 +338,7 @@ if [ "$dry_run" -eq 1 ]; then
   printf 'Tracker Kind: %s\n' "$tracker_kind"
   printf 'Tracker URL: %s\n' "$tracker_url"
   printf 'Canonical Project Root: %s\n' "$canonical_project_root"
-  printf 'Post-Attach Command: %s\n' "$post_attach_command"
+  printf 'Initial Prompt: %s\n' "$initial_prompt"
   printf 'Attach Hint: %s\n' "$attach_hint"
   printf 'Launch Script:\n%s' "$launch_script"
   exit 0
@@ -349,7 +354,7 @@ if [ "$target" = "here" ] || [ "$resolved_host" = "local" ]; then
   printf 'Tracker: %s\n' "$tracker_url"
   printf 'Project Root: %s\n' "$canonical_project_root"
   printf 'Attach: %s\n' "$attach_hint"
-  printf 'Post-Attach Command: %s\n' "$post_attach_command"
+  printf 'Initial Prompt: %s\n' "$initial_prompt"
   printf 'Zellij Link: %s\n' "$zellij_link"
   exit 0
 fi
@@ -363,5 +368,5 @@ printf 'Tab: %s\n' "$tab_name"
 printf 'Tracker: %s\n' "$tracker_url"
 printf 'Project Root: %s\n' "$canonical_project_root"
 printf 'Attach: %s\n' "$attach_hint"
-printf 'Post-Attach Command: %s\n' "$post_attach_command"
+printf 'Initial Prompt: %s\n' "$initial_prompt"
 printf 'Zellij Link: remote-machine-local\n'

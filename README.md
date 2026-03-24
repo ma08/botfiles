@@ -261,9 +261,9 @@ Behavior:
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
 - Launches Codex as the session's default shell so attaching lands on the live Codex UI.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
-- Prints the exact post-attach `$start-new-task <original input>` command instead of pretending detached prompt submission succeeded.
+- Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
-- Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) after launch.
+- Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.
 
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
