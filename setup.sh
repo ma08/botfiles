@@ -141,6 +141,11 @@ backup_existing() {
         mv "$CLAUDE_DIR/skills" "$CLAUDE_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -d "$CLAUDE_DIR/agents" ] && [ ! -L "$CLAUDE_DIR/agents" ]; then
+        echo "  Backing up agents directory"
+        mv "$CLAUDE_DIR/agents" "$CLAUDE_DIR/agents.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     if [ -f "$CLAUDE_DIR/CLAUDE.md" ] && [ ! -L "$CLAUDE_DIR/CLAUDE.md" ]; then
         echo "  Backing up CLAUDE.md"
         mv "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak.$(date +%Y%m%d%H%M%S)"
@@ -154,6 +159,11 @@ backup_existing() {
     if [ -e "$CODEX_DIR/skills" ] && [ ! -L "$CODEX_DIR/skills" ]; then
         echo "  Backing up codex skills"
         mv "$CODEX_DIR/skills" "$CODEX_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
+    if [ -e "$CODEX_DIR/agents" ] && [ ! -L "$CODEX_DIR/agents" ]; then
+        echo "  Backing up codex agents"
+        mv "$CODEX_DIR/agents" "$CODEX_DIR/agents.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
     if [ -f "$CODEX_DIR/AGENTS.md" ] && [ ! -L "$CODEX_DIR/AGENTS.md" ]; then
@@ -196,7 +206,7 @@ safe_symlink() {
     local label="$3"
 
     backup_foreign_symlink "$source_path" "$dest_path" "$label"
-    ln -sf "$source_path" "$dest_path"
+    ln -sfn "$source_path" "$dest_path"
     echo "  $label -> $source_path"
 }
 
@@ -207,6 +217,8 @@ create_symlinks() {
     # Ensure .claude directory exists
     mkdir -p "$CLAUDE_DIR"
     mkdir -p "$CODEX_DIR"
+    mkdir -p "$SCRIPT_DIR/claude/agents"
+    mkdir -p "$SCRIPT_DIR/codex/agents"
     mkdir -p "$SCRIPT_DIR/codex/skills"
     mkdir -p "$SCRIPT_DIR/secrets/local"
     mkdir -p "$HOME/.config/zellij"
@@ -235,6 +247,8 @@ create_symlinks() {
     ln -sf "$SCRIPT_DIR/claude/skills" "$CLAUDE_DIR/skills"
     echo "  skills/ -> $SCRIPT_DIR/claude/skills"
 
+    safe_symlink "$SCRIPT_DIR/claude/agents" "$CLAUDE_DIR/agents" "agents/"
+
     [ -L "$CLAUDE_DIR/CLAUDE.md" ] && rm "$CLAUDE_DIR/CLAUDE.md"
 
     ln -sf "$SCRIPT_DIR/claude/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
@@ -242,6 +256,8 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
+
+    safe_symlink "$SCRIPT_DIR/codex/agents" "$CODEX_DIR/agents" "codex agents/"
 
     ln -sf "$SCRIPT_DIR/codex/skills" "$CODEX_DIR/skills"
     echo "  codex skills/ -> $SCRIPT_DIR/codex/skills"

@@ -48,6 +48,8 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 - Codex skills are stored in `~/pro/botfiles/codex/skills`
 - `setup.sh` symlinks `~/.codex/skills` to that folder
+- Codex custom agents are stored in `~/pro/botfiles/codex/agents`
+- `setup.sh` symlinks `~/.codex/agents` to that folder
 - Keep Codex/Claude skill counterparts aligned to avoid drift
 - Codex system skills in `~/.codex/skills/.system/` are machine-managed and should not be source-controlled in `botfiles`
 
@@ -65,13 +67,18 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Do not hand-edit the Oracle skill directory for local preferences; refresh it by replacing it from upstream, and keep local Oracle behavior in `AGENTS.md` / `CLAUDE.md` or botfiles shell modules instead.
 - On machines where the default Node runtime is below 22, use the local `oracle` and `oracle-mcp` wrappers from `~/pro/botfiles/bin/` (symlinked into `~/.local/bin` by `setup.sh` and also loaded as shell functions from `~/pro/botfiles/.botrc`) instead of raw `npx -y @steipete/oracle`.
 - In this environment, Oracle should be run in API mode by default. Unless the user explicitly asks for browser mode or the task specifically requires ChatGPT web behavior, use `--engine api` instead of relying on upstream defaults.
-- In this environment, Oracle should target `gpt-5.4-pro` by default. Unless the user explicitly asks for another model or a multi-model run, use `--model gpt-5.4-pro`.
-- When invoking Oracle from an agent workflow, be explicit about the engine choice rather than assuming Oracle's default mode matches local expectations.
+- Default to `gpt-5.4-pro` unless the user explicitly asks for another model, a multi-model run, or a faster/cheaper pass.
+- Be explicit about engine/model choice. Prefer the local `oracle` wrapper so the intended defaults are applied unless you are intentionally overriding them.
+- Before using Oracle, ask the user whether they want the `oracle_awaiter` custom subagent to own the Oracle run. Use it only after an explicit yes. If the answer is no, keep Oracle in the main thread.
+- When `oracle_awaiter` owns the run, let it own exactly one Oracle session. Do not interrupt it for latency alone, and do not redirect it to a new model, prompt, or second Oracle run unless the user explicitly asks or the Oracle session reaches `error`.
+- For `gpt-5.4-pro`, treat 10-15 minutes as common, 15-40 minutes as a normal slow run, and up to 60 minutes as within tolerance. `in_progress` is not failure.
+- If the Oracle result is needed for the next step, wait or reattach until the session reaches `completed` or `error`. If a polling shell dies or `stdin` closes, restart polling against the same slug; that is not Oracle failure. Skip waiting only when the user explicitly says not to wait.
+- When giving timing context, quote local Oracle evidence (`oracle status`, `meta.json`, `output.log`) instead of guessing.
 - Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
 - Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
 - For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
-- Oracle API runs on non-Pro models may still inherit shorter auto timeouts from the CLI. If you intentionally use a non-Pro model for a long run, pass an explicit `--timeout` or use background mode rather than relying on `auto`.
+- On non-Pro models, pass an explicit `--timeout` or use background mode for long Oracle runs instead of relying on `auto`.
 
 ## Task Status Files
 

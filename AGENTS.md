@@ -2,17 +2,18 @@
 
 ## Project Structure & Module Organization
 - `claude/` holds the Claude Code configuration that gets symlinked into `~/.claude/`.
+- `claude/agents/` contains source-controlled custom Claude Code subagents that sync into `~/.claude/agents/`.
 - `bin/` contains repo-managed executable wrappers that must work in non-interactive shells.
 - `claude/hooks/` contains Python notification hooks plus `pyproject.toml` and `uv.lock` for dependencies.
 - `claude/skills/` is the target for installed skills; `claude/backup_skills/` stores archived skill examples.
-- `codex/` stores Codex CLI config, synced Codex skills, and global Codex instructions (`config.toml`, `skills/`, `AGENTS.md`).
+- `codex/` stores Codex CLI config, custom agents, synced Codex skills, and global Codex instructions (`config.toml`, `agents/`, `skills/`, `AGENTS.md`).
 - `secrets/` contains centralized secret templates (`templates/`) and local runtime secret files (`local/`, git-ignored).
 - `codex/skills/.system/` is machine-managed and git-ignored (may vary by OS/Codex version).
 - `.botrc` sources centralized secrets from `secrets/local/*.rc` for your shell.
 - `setup.sh` bootstraps the symlinks and installs hook dependencies.
 
 ## Build, Test, and Development Commands
-- `./setup.sh` creates symlinks in `~/.claude` and `~/.codex`, then runs `uv sync` for hook deps.
+- `./setup.sh` creates symlinks in `~/.claude` and `~/.codex`, including custom agent directories, then runs `uv sync` for hook deps.
 - `cd claude/hooks && uv sync` refreshes Python dependencies after updates.
 - `mkdir -p secrets/local` ensures the centralized local secret directory exists.
 - `cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc` sets up WhatsApp notification secrets.

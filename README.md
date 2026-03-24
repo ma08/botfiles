@@ -12,6 +12,7 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
+- **claude/agents/** - Source-controlled custom Claude Code subagents, synced into `~/.claude/agents`
 - **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
 - **secrets/** - Centralized secret templates and local runtime secret files
 - **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
@@ -103,7 +104,9 @@ ln -sf ~/pro/botfiles/claude/settings.json ~/.claude/settings.json
 ln -sf ~/pro/botfiles/claude/statusline-simple.sh ~/.claude/statusline-simple.sh
 ln -sf ~/pro/botfiles/claude/hooks ~/.claude/hooks
 ln -sf ~/pro/botfiles/claude/skills ~/.claude/skills
+ln -sf ~/pro/botfiles/claude/agents ~/.claude/agents
 ln -sf ~/pro/botfiles/codex/config.toml ~/.codex/config.toml
+ln -sf ~/pro/botfiles/codex/agents ~/.codex/agents
 ln -sf ~/pro/botfiles/codex/skills ~/.codex/skills
 ln -sf ~/pro/botfiles/codex/AGENTS.md ~/.codex/AGENTS.md
 mkdir -p ~/.config/zellij
@@ -159,7 +162,7 @@ source ~/pro/botfiles/.botrc
 
 `setup.sh` configures these entrypoints automatically and symlinks `oracle` / `oracle-mcp` into `~/.local/bin` so command runners like `watch` can resolve them without sourcing `.botrc`.
 
-`setup.sh` also symlinks `~/.codex/AGENTS.md` to `codex/AGENTS.md`.
+`setup.sh` also symlinks `~/.claude/agents` to `claude/agents`, `~/.codex/AGENTS.md` to `codex/AGENTS.md`, and `~/.codex/agents` to `codex/agents`.
 
 Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
@@ -415,6 +418,8 @@ botfiles/
 ├── codex/
 │   ├── AGENTS.md
 │   ├── config.toml
+│   ├── agents/
+│   │   └── oracle_awaiter.toml
 │   └── skills/
 │       └── README.md
 └── claude/
