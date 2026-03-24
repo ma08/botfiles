@@ -1,6 +1,6 @@
 # Botfiles
 
-Configuration files for Claude Code CLI, designed to be synced across multiple machines.
+Configuration files for Claude Code and Codex CLI, designed to be synced across multiple machines.
 
 ## What's Included
 
@@ -12,7 +12,8 @@ Configuration files for Claude Code CLI, designed to be synced across multiple m
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
   - **notion/** - Notion workspace integration
-- **claude/agents/** - Source-controlled custom Claude Code subagents, synced into `~/.claude/agents`
+- **claude/agents/** - Source-controlled custom Claude Code subagents, synced into `~/.claude/agents` (`oracle-awaiter`, `reviewer`)
+- **codex/agents/** - Source-controlled custom Codex agents, synced into `~/.codex/agents` (`oracle_awaiter`, `reviewer`)
 - **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
 - **secrets/** - Centralized secret templates and local runtime secret files
 - **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
@@ -419,10 +420,14 @@ botfiles/
 │   ├── AGENTS.md
 │   ├── config.toml
 │   ├── agents/
-│   │   └── oracle_awaiter.toml
+│   │   ├── oracle_awaiter.toml
+│   │   └── reviewer.toml
 │   └── skills/
 │       └── README.md
 └── claude/
+    ├── agents/
+    │   ├── oracle-awaiter.md
+    │   └── reviewer.md
     ├── settings.json
     ├── statusline-simple.sh
     ├── hooks/
