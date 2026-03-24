@@ -35,6 +35,10 @@ LINEAR_ISSUE_RE = re.compile(
     r"(?:/(?P<title_slug>[^?#\s]+))?(?:[/?#].*)?$",
     re.IGNORECASE,
 )
+LINEAR_ISSUE_IDENTIFIER_RE = re.compile(
+    r"^(?P<identifier>[A-Za-z][A-Za-z0-9_]*-\d+)$",
+    re.IGNORECASE,
+)
 GITHUB_REMOTE_RE = re.compile(
     r"^(?:https?://github\.com/|ssh://git@github\.com/|git@github\.com:)"
     r"(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)(?:\.git)?/?$",
@@ -599,6 +603,47 @@ def parse_linear_issue_url(url: str) -> LinearIssueRef | None:
     )
 
 
+def parse_linear_issue_identifier(text: str) -> str | None:
+    normalized = (text or "").strip().strip("`").strip()
+    match = LINEAR_ISSUE_IDENTIFIER_RE.match(normalized)
+    if not match:
+        return None
+    return match.group("identifier").upper()
+
+
+def resolve_linear_issue_identifier_ref(
+    identifier: str,
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> LinearIssueRef:
+    identifier = identifier.upper()
+    fallback = LinearIssueRef(
+        workspace="",
+        identifier=identifier,
+        url=f"https://linear.app/issue/{identifier}",
+        title_slug="",
+    )
+
+    issue_data = fetch_linear_issue_data(
+        fallback,
+        env=env,
+        caller_path=caller_path,
+    )
+    if issue_data and issue_data.url:
+        parsed = parse_linear_issue_url(issue_data.url)
+        if parsed:
+            return parsed
+        return LinearIssueRef(
+            workspace="",
+            identifier=issue_data.identifier or identifier,
+            url=issue_data.url,
+            title_slug="",
+        )
+
+    return fallback
+
+
 def parse_tracker_url(url: str) -> TrackerRef | None:
     linear_ref = parse_linear_issue_url(url)
     if linear_ref:
@@ -630,16 +675,38 @@ def extract_primary_issue_ref(text: str) -> IssueRef | None:
     return None
 
 
-def extract_primary_linear_issue_ref(text: str) -> LinearIssueRef | None:
+def extract_primary_linear_issue_ref(
+    text: str,
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> LinearIssueRef | None:
     for url in extract_urls(text):
         ref = parse_linear_issue_url(url)
         if ref:
             return ref
+
+    bare_identifier = parse_linear_issue_identifier(text)
+    if bare_identifier:
+        return resolve_linear_issue_identifier_ref(
+            bare_identifier,
+            env=env,
+            caller_path=caller_path,
+        )
     return None
 
 
-def extract_primary_tracker_ref(text: str) -> TrackerRef | None:
-    linear_ref = extract_primary_linear_issue_ref(text)
+def extract_primary_tracker_ref(
+    text: str,
+    *,
+    env: dict[str, str] | None = None,
+    caller_path: Path | None = None,
+) -> TrackerRef | None:
+    linear_ref = extract_primary_linear_issue_ref(
+        text,
+        env=env,
+        caller_path=caller_path,
+    )
     if linear_ref:
         return TrackerRef(
             kind=TRACKER_KIND_LINEAR,

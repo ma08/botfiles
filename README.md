@@ -244,6 +244,30 @@ Interactive picker behavior:
 - The picker owns a zellij-inspired color theme: green session names, magenta age text, red `EXITED` state text, and muted `fzf` chrome for the prompt, border, and header.
 - The current interaction model and themed output here are the functional baseline to preserve before any later visual refinements.
 
+### Detached Task Session Launcher
+
+Use `start-zellij-session-for-task` when you want to kick off a second Codex run
+inside a detached zellij session without stealing the current terminal:
+
+```bash
+start-zellij-session-for-task "https://linear.app/trymyzone/issue/ZON-39/define-append-only-pr-review-comment-contract-keyed-by-head-sha"
+start-zellij-session-for-task ZON-39
+start-zellij-session-for-task --target ml "Investigate flaky Linear live-session sync"
+```
+
+Behavior:
+- Resolves tracker-aware slugs with the same shared task-status tooling used by `start-new-task`.
+- Creates a detached zellij session whose name matches the resolved task slug.
+- Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
+- Launches Codex as the session's default shell so attaching lands on the live Codex UI.
+- Uses the current machine's default Codex profile instead of forcing a profile override.
+- Clears inherited `CODEX_*` session metadata before starting the child Codex process.
+- Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
+- Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
+- Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
+- Supports `--dry-run` for inspection without starting the session.
+- For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.
+
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 
 ```bash
