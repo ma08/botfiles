@@ -19,7 +19,8 @@ usage() {
 Usage:
   start-zellij-session-for-task [--target here|ml|arya|agent] [--project-root <path>] [--session-name <name>] [--tab-name <name>] [--dry-run] <linear-url|linear-id|github-issue-url|task description>
 
-Starts a detached zellij session and bootstraps Codex with:
+Starts a detached zellij session, launches Codex as the session's default
+shell, and prints the exact post-attach command to run:
   $start-new-task <original input>
 
 Notes:
@@ -68,29 +69,74 @@ build_cd_command() {
 }
 
 build_codex_command() {
-  local prompt="$1"
-  printf 'exec codex --profile openai_api --dangerously-bypass-approvals-and-sandbox --no-alt-screen %q' "$prompt"
+  printf '%s ' \
+'while IFS="=" read -r _name _rest; do
+  case "$_name" in
+    CODEX_HOME)
+      ;;
+    CODEX_*)
+      unset "$_name"
+      ;;
+  esac
+done < <(env)
+exec codex --profile openai_api --dangerously-bypass-approvals-and-sandbox --no-alt-screen'
 }
 
 build_bootstrap_script() {
   local project_root="$1"
-  local prompt="$2"
-  printf '%s && %s' "$(build_cd_command "$project_root")" "$(build_codex_command "$prompt")"
+  cat <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+BOTFILES_ROOT="\${BOTFILES_ROOT:-\$HOME/pro/botfiles}"
+if [ -f "\$BOTFILES_ROOT/.botenv" ]; then
+  # shellcheck disable=SC1090
+  source "\$BOTFILES_ROOT/.botenv"
+fi
+rm -f -- "\$0" >/dev/null 2>&1 || true
+$(build_cd_command "$project_root")
+$(build_codex_command)
+EOF
 }
 
 build_launch_script() {
   local session_name="$1"
   local tab_name="$2"
   local bootstrap_script="$3"
+  local bootstrap_b64
   local attach_cmd
   local rename_cmd
-  local run_cmd
+  local create_bootstrap_cmd
 
-  printf -v attach_cmd 'zellij attach --create-background %q >/dev/null' "$session_name"
+  bootstrap_b64="$(
+    BOOTSTRAP_SCRIPT="$bootstrap_script" python - <<'PY'
+import base64
+import os
+
+print(base64.b64encode(os.environ["BOOTSTRAP_SCRIPT"].encode()).decode(), end="")
+PY
+  )"
+
+  printf -v create_bootstrap_cmd '%s\n' \
+'bootstrap_dir="${XDG_CACHE_HOME:-$HOME/.cache}/botfiles/start-zellij-session-for-task"
+bootstrap_path="${bootstrap_dir}/'"$session_name"'.bootstrap.sh"
+mkdir -p "$bootstrap_dir"
+python - "$bootstrap_path" "'"$bootstrap_b64"'" <<'\''PY'\''
+import base64
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = base64.b64decode(sys.argv[2])
+path.write_bytes(payload)
+path.chmod(0o755)
+PY'
+  printf -v attach_cmd 'zellij attach --create-background %q options --default-shell "$bootstrap_path" >/dev/null' "$session_name"
   printf -v rename_cmd 'zellij -s %q action rename-tab %q >/dev/null 2>&1 || true' "$session_name" "$tab_name"
-  printf -v run_cmd 'zellij -s %q run --in-place -- bash -lc %q' "$session_name" "$bootstrap_script"
 
-  printf 'set -euo pipefail\n%s\nsleep 1\n%s\n%s\n' "$attach_cmd" "$rename_cmd" "$run_cmd"
+  printf 'set -euo pipefail\n%s\n%s\nsleep 1\n%s\n' \
+    "$create_bootstrap_cmd" \
+    "$attach_cmd" \
+    "$rename_cmd"
 }
 
 session_exists_local() {
@@ -254,8 +300,8 @@ else
   tab_name="$session_name"
 fi
 
-prompt="\$start-new-task $description"
-bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$prompt")"
+post_attach_command="\$start-new-task $description"
+bootstrap_script="$(build_bootstrap_script "$canonical_project_root")"
 launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 
@@ -287,7 +333,7 @@ if [ "$dry_run" -eq 1 ]; then
   printf 'Tracker Kind: %s\n' "$tracker_kind"
   printf 'Tracker URL: %s\n' "$tracker_url"
   printf 'Canonical Project Root: %s\n' "$canonical_project_root"
-  printf 'Prompt: %s\n' "$prompt"
+  printf 'Post-Attach Command: %s\n' "$post_attach_command"
   printf 'Attach Hint: %s\n' "$attach_hint"
   printf 'Launch Script:\n%s' "$launch_script"
   exit 0
@@ -303,6 +349,7 @@ if [ "$target" = "here" ] || [ "$resolved_host" = "local" ]; then
   printf 'Tracker: %s\n' "$tracker_url"
   printf 'Project Root: %s\n' "$canonical_project_root"
   printf 'Attach: %s\n' "$attach_hint"
+  printf 'Post-Attach Command: %s\n' "$post_attach_command"
   printf 'Zellij Link: %s\n' "$zellij_link"
   exit 0
 fi
@@ -316,4 +363,5 @@ printf 'Tab: %s\n' "$tab_name"
 printf 'Tracker: %s\n' "$tracker_url"
 printf 'Project Root: %s\n' "$canonical_project_root"
 printf 'Attach: %s\n' "$attach_hint"
+printf 'Post-Attach Command: %s\n' "$post_attach_command"
 printf 'Zellij Link: remote-machine-local\n'

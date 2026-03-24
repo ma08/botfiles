@@ -259,7 +259,9 @@ Behavior:
 - Resolves tracker-aware slugs with the same shared task-status tooling used by `start-new-task`.
 - Creates a detached zellij session whose name matches the resolved task slug.
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
-- Boots Codex in-place with `$start-new-task <original input>`.
+- Launches Codex as the session's default shell so attaching lands on the live Codex UI.
+- Clears inherited `CODEX_*` session metadata before starting the child Codex process.
+- Prints the exact post-attach `$start-new-task <original input>` command instead of pretending detached prompt submission succeeded.
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) after launch.
 - Supports `--dry-run` for inspection without starting the session.

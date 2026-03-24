@@ -2,7 +2,8 @@
 name: start-zellij-session-for-task
 description: >-
   Start a detached zellij session for a tracker-linked or natural-language
-  task and bootstrap a Codex run with `$start-new-task ...`.
+  task, launch Codex as the default shell, and print the post-attach
+  `$start-new-task ...` handoff command.
 ---
 
 # Start Zellij Session For Task
@@ -44,7 +45,11 @@ default to `here`.
 - Resolves tracker and slug context with the shared task-status resolver.
 - Uses the resolved task slug as the zellij session name unless overridden.
 - Uses `[TRACKER-ID]` as the tab name when a tracker is present.
-- Boots Codex in-place inside the new detached session with:
+- Launches Codex as the detached session's default shell so attaching lands on
+  the live Codex UI.
+- Clears inherited `CODEX_*` session metadata before starting the child Codex
+  process.
+- Prints the exact post-attach command to run after you attach:
   - `$start-new-task <original input>`
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, which is the current
   CLI equivalent of the historical `--yolo` shorthand.
