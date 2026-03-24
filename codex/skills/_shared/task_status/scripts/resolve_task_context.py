@@ -77,7 +77,11 @@ def main() -> int:
     zellij_session = resolve_zellij_session(env)
     zellij_link = build_zellij_link(zellij_session, env)
 
-    tracker_ref = extract_primary_tracker_ref(args.description)
+    tracker_ref = extract_primary_tracker_ref(
+        args.description,
+        env=env,
+        caller_path=Path(__file__),
+    )
     github_issue_ref = extract_primary_issue_ref(args.description)
     tracker_title = TRACKER_KIND_NONE
     github_issue_title = TRACKER_KIND_NONE
