@@ -62,10 +62,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 ## Reviewer Agent
 
-- Use the `reviewer` custom subagent when you want a read-focused review of a PR, working tree, or targeted diff before handoff.
-- The subagent definition lives at `~/pro/botfiles/claude/agents/reviewer.md` and syncs into `~/.claude/agents/reviewer.md`.
-- It inherits the active Claude model and limits tool access to `Read`, `Grep`, `Glob`, and `Bash` for inspection work without edit tools.
-- Its prompt prioritizes correctness, security, behavior regressions, and missing tests over style-only commentary.
+- Use the read-only `reviewer` custom subagent at `~/pro/botfiles/claude/agents/reviewer.md` (synced to `~/.claude/agents/reviewer.md`) for PR or working-tree review focused on correctness, security, regressions, and missing tests.
 
 ## Task Status Tracking
 

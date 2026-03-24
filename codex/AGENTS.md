@@ -82,10 +82,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 ## Reviewer Agent
 
-- Use the `reviewer` custom agent when you want a read-only second pass over a PR, working tree, or targeted diff before handoff.
-- The agent definition lives at `~/pro/botfiles/codex/agents/reviewer.toml` and syncs into `~/.codex/agents/reviewer.toml`.
-- The reviewer agent uses `gpt-5.4`, `high` reasoning, and `sandbox_mode = "read-only"`.
-- Its prompt prioritizes correctness, security, behavior regressions, and missing tests over style-only commentary.
+- Use the read-only `reviewer` custom agent at `~/pro/botfiles/codex/agents/reviewer.toml` (synced to `~/.codex/agents/reviewer.toml`) for PR or working-tree review focused on correctness, security, regressions, and missing tests.
 
 ## Task Status Files
 
