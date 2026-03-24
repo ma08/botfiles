@@ -83,7 +83,7 @@ build_codex_command() {
       ;;
   esac
 done < <(env)
-exec codex --profile openai_api --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quoted_prompt"
+exec codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quoted_prompt"
 }
 
 build_bootstrap_script() {

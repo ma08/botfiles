@@ -47,6 +47,8 @@ default to `here`.
 - Uses `[TRACKER-ID]` as the tab name when a tracker is present.
 - Launches Codex as the detached session's default shell so attaching lands on
   the live Codex UI.
+- Uses the current machine's default Codex profile instead of forcing a
+  profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex
   process.
 - Seeds the child interactive Codex session with the exact initial prompt:

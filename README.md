@@ -260,6 +260,7 @@ Behavior:
 - Creates a detached zellij session whose name matches the resolved task slug.
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
 - Launches Codex as the session's default shell so attaching lands on the live Codex UI.
+- Uses the current machine's default Codex profile instead of forcing a profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
 - Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
