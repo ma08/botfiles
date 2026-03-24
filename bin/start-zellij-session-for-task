@@ -189,13 +189,20 @@ remote_path_exists() {
 
 build_zellij_link() {
   local session_name="$1"
+  local python_cmd
 
   if [ "${ZELLIJ_WEB_ENABLE_LINKS:-false}" != "true" ] || [ -z "${ZELLIJ_WEB_BASE_URL:-}" ]; then
     printf 'none\n'
     return 0
   fi
 
-  python - "$session_name" "${ZELLIJ_WEB_BASE_URL%/}" <<'PY'
+  python_cmd="$(pick_python_cmd 2>/dev/null || true)"
+  if [ -z "$python_cmd" ]; then
+    printf 'none\n'
+    return 0
+  fi
+
+  "$python_cmd" - "$session_name" "${ZELLIJ_WEB_BASE_URL%/}" <<'PY'
 import sys
 from urllib.parse import quote
 
@@ -304,8 +311,9 @@ done
 description="$*"
 
 project_root_abs="$(cd "$project_root" && pwd -P)"
+python_cmd="$(pick_python_cmd)" || die "python or python3 is required on the launching machine"
 resolve_output="$(
-  python "$BOTFILES_ROOT/codex/skills/_shared/task_status/scripts/resolve_task_context.py" \
+  "$python_cmd" "$BOTFILES_ROOT/codex/skills/_shared/task_status/scripts/resolve_task_context.py" \
     --project-root "$project_root_abs" \
     --description "$description" \
     --max-slug-length 60
@@ -332,7 +340,6 @@ fi
 
 initial_prompt="\$start-new-task $description"
 bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$initial_prompt")"
-python_cmd="$(pick_python_cmd)" || die "python or python3 is required on the launching machine"
 launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script" "$python_cmd")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 
