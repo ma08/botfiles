@@ -60,6 +60,10 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
 - On non-Pro models, pass an explicit `--timeout` or use background mode for long Oracle runs instead of relying on `auto`.
 
+## Reviewer Agent
+
+- Use the read-only `reviewer` custom subagent at `~/pro/botfiles/claude/agents/reviewer.md` (synced to `~/.claude/agents/reviewer.md`) for PR or working-tree review focused on correctness, security, regressions, and missing tests.
+
 ## Task Status Tracking
 
 When working on any task, **proactively** maintain task status documentation.
