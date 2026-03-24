@@ -58,6 +58,8 @@ default to `here`.
   CLI equivalent of the historical `--yolo` shorthand.
 - Prints the launched session name, target, attach hint, initial prompt, and
   any available zellij web link.
+- For remote targets, fails early if the resolved project root does not exist on
+  the target host.
 
 ## Notes
 

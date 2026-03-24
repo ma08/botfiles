@@ -266,6 +266,7 @@ Behavior:
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.
+- For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.
 
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 

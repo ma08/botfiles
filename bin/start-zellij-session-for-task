@@ -35,6 +35,20 @@ die() {
   exit 1
 }
 
+pick_python_cmd() {
+  if command -v python >/dev/null 2>&1; then
+    printf 'python\n'
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3\n'
+    return 0
+  fi
+
+  return 1
+}
+
 field_from_resolve_output() {
   local key="$1"
   local output="$2"
@@ -107,13 +121,14 @@ build_launch_script() {
   local session_name="$1"
   local tab_name="$2"
   local bootstrap_script="$3"
+  local python_cmd="$4"
   local bootstrap_b64
   local attach_cmd
   local rename_cmd
   local create_bootstrap_cmd
 
   bootstrap_b64="$(
-    BOOTSTRAP_SCRIPT="$bootstrap_script" python - <<'PY'
+    BOOTSTRAP_SCRIPT="$bootstrap_script" "$python_cmd" - <<'PY'
 import base64
 import os
 
@@ -125,7 +140,9 @@ PY
 'bootstrap_dir="${XDG_CACHE_HOME:-$HOME/.cache}/botfiles/start-zellij-session-for-task"
 bootstrap_path="${bootstrap_dir}/'"$session_name"'.bootstrap.sh"
 mkdir -p "$bootstrap_dir"
-python - "$bootstrap_path" "'"$bootstrap_b64"'" <<'\''PY'\''
+python_cmd="$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)"
+[ -n "$python_cmd" ] || { echo "start-zellij-session-for-task: python or python3 is required on target host" >&2; exit 1; }
+"$python_cmd" - "$bootstrap_path" "'"$bootstrap_b64"'" <<'\''PY'\''
 import base64
 import pathlib
 import sys
@@ -160,6 +177,14 @@ session_exists_remote() {
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
     "zellij list-sessions --reverse --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\\.?$/d' | sed 's/ \\[Created.*$//'" \
     | grep -Fxq "$session_name"
+}
+
+remote_path_exists() {
+  local host="$1"
+  local path="$2"
+
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
+    "test -d $(printf %q "$path")"
 }
 
 build_zellij_link() {
@@ -307,7 +332,8 @@ fi
 
 initial_prompt="\$start-new-task $description"
 bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$initial_prompt")"
-launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script")"
+python_cmd="$(pick_python_cmd)" || die "python or python3 is required on the launching machine"
+launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script" "$python_cmd")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 
 resolved_host="$(resolve_target_host "$target")" || die "unsupported or unreachable target: $target"
@@ -325,6 +351,9 @@ else
       die "remote targets require the resolved project root to live under \$HOME so the path stays portable across machines"
       ;;
   esac
+  if ! remote_path_exists "$resolved_host" "$canonical_project_root"; then
+    die "resolved project root does not exist on $resolved_host: $canonical_project_root"
+  fi
   if session_exists_remote "$resolved_host" "$session_name"; then
     die "session already exists on $resolved_host: $session_name (attach with: $attach_hint)"
   fi
