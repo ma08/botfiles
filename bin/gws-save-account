@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: gws-save-account <alias>" >&2
+  exit 64
+fi
+
+alias_name="$1"
+accounts_dir="${GWS_ACCOUNTS_DIR:-$HOME/.config/gws/accounts}"
+credentials_file="$accounts_dir/$alias_name.json"
+
+mkdir -p "$accounts_dir"
+
+auth_method="$(
+  gws auth status | python3 -c 'import json,sys; print(json.load(sys.stdin).get("auth_method", "none"))'
+)"
+
+if [[ "$auth_method" == "none" ]]; then
+  echo "No active gws auth session. Run 'gws auth login --readonly --services drive,gmail' first." >&2
+  exit 1
+fi
+
+gws auth export --unmasked > "$credentials_file"
+
+python3 - "$credentials_file" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text())
+
+# gws file-based auth expects a token endpoint. The export flow can omit it.
+data.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+
+path.write_text(json.dumps(data))
+PY
+
+chmod 600 "$credentials_file"
+
+echo "Saved current gws credentials to $credentials_file"
