@@ -13,17 +13,32 @@ metadata:
 
 ## Installation
 
-The `gws` binary must be on `$PATH`. See the project README for install options.
+The `gws` binary must be on `$PATH`. On this machine, `~/pro/botfiles/bin/gws` is the preferred wrapper because it can locate the installed CLI even when the NVM bin path is missing.
 
 ## Authentication
 
 ```bash
-# Browser-based OAuth (interactive)
-gws auth login
+# Browser-based OAuth (interactive) for the current session
+gws auth login --readonly --services drive,gmail
 
-# Service Account
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+# Save the refreshed login into a named account alias
+gws-save-account work
 ```
+
+## Multi-Account Pattern (This Machine)
+
+Prefer named aliases over bare `gws` whenever mailbox or Drive ownership matters:
+
+```bash
+gws-account work gmail +triage --max 5 --format json
+gws-account personal drive files list --params '{"pageSize": 5, "q": "trashed=false"}' --format json
+```
+
+Saved aliases live under `~/.config/gws/accounts/` and currently map to:
+
+- `work` -> `sourya4@trymyzone.com`
+- `personal` -> `sourya4@gmail.com`
+- `columbia` -> `sk5057@columbia.edu`
 
 ## Global Flags
 
@@ -71,6 +86,10 @@ gws <service> <resource> [sub-resource] <method> [flags]
 - **JSON with double quotes:** Wrap `--params` and `--json` values in single quotes so the shell does not interpret the inner double quotes:
   ```bash
   gws drive files list --params '{"pageSize": 5}'
+  ```
+- **Drive search queries:** Drive `q` expressions often need single quotes inside the query itself. In that case, wrap the whole JSON blob in double quotes and escape the inner JSON quotes:
+  ```bash
+  gws-account personal drive files list --params "{\"pageSize\": 5, \"q\": \"name contains 'tax' and trashed=false\"}"
   ```
 
 ## Community & Feedback Etiquette
