@@ -17,7 +17,7 @@ auth_method="$(
 )"
 
 if [[ "$auth_method" == "none" ]]; then
-  echo "No active gws auth session. Run 'gws auth login' first." >&2
+  echo "No active gws auth session. Run 'gws auth login --readonly --services drive,gmail' first." >&2
   exit 1
 fi
 
