@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+find_real_gws() {
+  local candidate=""
+
+  if [[ -n "${GWS_REAL_BIN:-}" && -x "${GWS_REAL_BIN}" ]]; then
+    printf '%s\n' "${GWS_REAL_BIN}"
+    return 0
+  fi
+
+  shopt -s nullglob
+  for candidate in "${HOME}"/.nvm/versions/node/*/bin/gws; do
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  shopt -u nullglob
+
+  return 1
+}
+
+real_gws="$(find_real_gws || true)"
+if [[ -z "${real_gws}" ]]; then
+  cat >&2 <<'EOF'
+gws wrapper: could not find the installed googleworkspace/cli binary.
+
+Expected a real binary under:
+  $HOME/.nvm/versions/node/*/bin/gws
+
+Install it with:
+  npm install -g @googleworkspace/cli
+EOF
+  exit 127
+fi
+
+exec "${real_gws}" "$@"
