@@ -97,6 +97,16 @@ Every tracked task gets a folder at `<task-status-root>/YYYY-MM-DD/<HH>h<MM>m<SS
 - **Machine identity**: Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so metadata and notifications remain consistent across workflows.
 - **Legacy folders**: Existing folders without time prefix or `user_inputs/` continue to work unchanged.
 
+## Cross-Session Orchestration
+
+- For regular non-Symphony multi-session work, prefer the shared skills `cross-session-context`, `cross-session-message`, and `pr-autoreview-loop`.
+- Target other sessions by tracker ref or task slug first. Use `--task-dir`, `--status-file`, or `--zellij-session` only for lower-level or debug workflows.
+- Treat task/status metadata as the primary source of truth, transcript tail as a targeted fallback, and live zellij inspection as diagnostic context.
+- Keep cross-session sends preview-first. `send-zellij-message` should stay in dry-run mode until the resolved session/tab target is clearly correct; use `--execute` and `--submit enter` explicitly.
+- Do not use cross-session message send as remote control. It is for bounded prompt delivery into a known live target only.
+- For PR-bearing non-Symphony review loops, use `pr-autoreview-loop` to match current-head reviewer output, address findings, push, and wait again until the sweep is clean or genuinely blocked.
+- When the PR loop reports `blocked`, or reviewer/check infrastructure fails without an in-session retry path, stop and ask for human input instead of silently spinning.
+
 ### Per-Project Overrides
 Projects can customize the task-status root by adding to their CLAUDE.md:
 ```
