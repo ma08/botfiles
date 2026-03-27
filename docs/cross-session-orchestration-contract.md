@@ -65,7 +65,8 @@ Derived states:
 - `clean`: the latest current-head reviewer artifact is clean and the reviewer
   check is not still pending/failing
 - `blocked`: the current-head sweep published a blocked result or failed before
-  a usable current-head artifact landed
+  a usable current-head artifact landed; this also includes repos where no
+  reviewer infrastructure is detectable, so a current-head sweep cannot publish
 - `closed`: the PR is not open
 
 ## Loop Policy
@@ -81,5 +82,7 @@ Stop and ask for human input when:
 
 - the reviewer reports `blocked`
 - the reviewer/check infrastructure fails and there is no in-session retry path
+- the repo has no detectable reviewer infrastructure and no valid current-head
+  reviewer artifact has been published manually
 - the fix would require a product or policy decision rather than an
   implementation change

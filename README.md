@@ -288,6 +288,7 @@ Behavior:
 - `send-zellij-message` refuses ambiguous multi-tab targets and cross-machine targets unless you intentionally use an explicit local `--zellij-session` override for debug work.
 - `pr-autoreview-loop` matches only current-head reviewer artifacts, preferring `review-run-meta` top-level comments and falling back to exact-head GitHub review objects.
 - `pr-autoreview-loop` is designed to support a semi-autonomous fix loop: wait for review, address findings, push, wait again, and stop only when clean or genuinely blocked.
+- `pr-autoreview-loop` reports `blocked` instead of waiting forever when a repo has no detectable reviewer infrastructure and no valid current-head reviewer artifact exists yet.
 
 See `docs/cross-session-orchestration-contract.md` for the shared v1 contract.
 

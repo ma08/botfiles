@@ -303,6 +303,25 @@ def fetch_reviews(owner: str, repo: str, number: int, *, repo_root: Path) -> lis
     return payload if isinstance(payload, list) else []
 
 
+def fetch_workflow_count(owner: str, repo: str, *, repo_root: Path) -> int | None:
+    try:
+        payload = gh_json(
+            ["api", f"repos/{owner}/{repo}/actions/workflows?per_page=100"],
+            cwd=repo_root,
+        )
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    total_count = payload.get("total_count")
+    if isinstance(total_count, int):
+        return total_count
+    workflows = payload.get("workflows")
+    if isinstance(workflows, list):
+        return len(workflows)
+    return None
+
+
 def inspect_pr(repo_root: Path, pr_arg: str | None, review_check_substring: str) -> dict[str, Any]:
     pr_view_args = [
         "pr",
@@ -384,6 +403,15 @@ def inspect_pr(repo_root: Path, pr_arg: str | None, review_check_substring: str)
             next_action = (
                 "Autoreview check failed before publishing a usable current-head reviewer artifact."
             )
+    elif not checks:
+        workflow_count = fetch_workflow_count(owner, repo, repo_root=repo_root)
+        if workflow_count == 0:
+            overall_state = "blocked"
+            next_action = (
+                "No GitHub Actions workflows are configured for this repo, so no autoreview/check "
+                "can publish. Add reviewer infrastructure or publish a valid current-head "
+                "reviewer artifact manually."
+            )
 
     other_failing_checks = [
         {
@@ -424,6 +452,7 @@ def inspect_pr(repo_root: Path, pr_arg: str | None, review_check_substring: str)
         "other_failing_checks": other_failing_checks,
         "matching_comment_runs": len(comment_artifacts),
         "matching_review_runs": len(review_artifacts),
+        "workflow_count": workflow_count if "workflow_count" in locals() else None,
     }
 
 
