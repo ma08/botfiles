@@ -75,7 +75,7 @@ Use output fields:
 Search for an existing task folder with the same slug:
 - If found, ask resume vs create-new.
 - For tracker-linked work, search the canonical task root first when one is emitted by `resolve_task_context.py`.
-- If resume, hand off to `/save-task-status`.
+- If resume, hand off to `/continue-task` unless the current session already owns the task and only needs a checkpoint-style refresh.
 
 ### Step 5: Create Folder Structure
 

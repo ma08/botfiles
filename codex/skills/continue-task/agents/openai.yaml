@@ -1,0 +1,4 @@
+interface:
+  display_name: "Continue Task"
+  short_description: "Resume interrupted tracked work in this session"
+  default_prompt: "Use $continue-task to take over an interrupted tracked task, sync its existing status file to this session, and brief me on the current state."
