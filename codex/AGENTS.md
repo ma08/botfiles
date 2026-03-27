@@ -88,6 +88,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
 - Use `get-task-details` to retrieve current status path plus linked issue, machine, coding-agent session id, and zellij context
+- Use the `finish-task` skill when the user wants the standard wrap-up flow for a tracked task: gate on actual closeout readiness, sync status/tracker notes, handle any required downstream heads-up, and clean branches/worktrees only after confirmation
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
 - New folders use time-prefixed names: `<HH>h<MM>m<SS>sPST-<task-slug>` (e.g., `21h45m59sPST-fix-auth-timeout`)
 - Full path example: `context/daily/2026-02-24/21h45m59sPST-fix-auth-timeout/`

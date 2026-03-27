@@ -358,6 +358,7 @@ export SYSTEM_NAME="MyMachineName"
 `SYSTEM_NAME` is reused across:
 - WhatsApp notifications (origin context)
 - Task-status metadata sync (`start-new-task`, `save-task-status`, `get-task-details`)
+- Task closeout orchestration (`finish-task`)
 
 If not set, tooling falls back to hostname.
 
@@ -379,6 +380,15 @@ After running `setup.sh`:
 - Claude skills are available at `~/.claude/skills/` (backed by `claude/skills/`)
 - Codex skills are available at `~/.codex/skills/` (backed by `codex/skills/`)
 - Codex **system** skills under `~/.codex/skills/.system/` are machine-managed and intentionally git-ignored in this repo (to allow version/platform differences across machines)
+
+### Tracked Task Lifecycle Skills
+
+Shared workflow skills now cover the full tracked-task lifecycle:
+
+- `start-new-task` scaffolds a tracker-aware task folder and initial metadata.
+- `get-task-details` resolves the active task folder, status path, tracker URL, transcript path, and session metadata.
+- `save-task-status` updates the durable task record throughout execution.
+- `finish-task` standardizes closeout when the user asks to wrap up a task: it checks closeout readiness first, syncs status/tracker notes, handles any required downstream heads-up, and performs local cleanup only after confirmation.
 
 ### Notion Skill
 

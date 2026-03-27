@@ -8,6 +8,9 @@ Store custom Codex skills in this directory so they are versioned in
 Keep skill instructions machine-agnostic: prefer `~/pro/...` paths over
 machine-specific absolute paths.
 
+Key shared workflow skills for tracked work are `start-new-task`,
+`get-task-details`, `save-task-status`, and `finish-task`.
+
 Note: `~/.codex/skills/.system/` is machine-managed and intentionally
 git-ignored, since Codex/system skill versions can differ across OS and
 installation versions.
