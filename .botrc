@@ -25,6 +25,12 @@ alias codex-azure="codex --profile azure"
 alias codex-openai="codex --profile openai_api"
 alias codex-chatgpt="codex --profile chatgpt"
 
+# --- Codex yolo aliases (parallel to ccy for Claude) ----------------------
+alias codexy="codex --yolo"
+alias codexy-azure="codex --yolo --profile azure"
+alias codexy-openai="codex --yolo --profile openai_api"
+alias codexy-chatgpt="codex --yolo --profile chatgpt"
+
 # --- Claude Code aliases ---------------------------------------------------
 alias cc="claude"                                        # normal start
 alias ccc="claude --continue"                            # continue last session
