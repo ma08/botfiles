@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from session_orchestration_common import (
@@ -18,6 +19,8 @@ from session_orchestration_common import (
 )
 
 SUBMIT_CHOICES = ("none", "enter")
+CODEX_SECONDARY_ENTER_THRESHOLD_CHARS = 1024
+CODEX_SECONDARY_ENTER_DELAY_SECONDS = 1.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +48,15 @@ def parse_args() -> argparse.Namespace:
 def fail(message: str) -> int:
     print(message, file=sys.stderr)
     return 2
+
+
+def should_send_codex_confirm_enter(message_text: str, client_commands: list[str]) -> bool:
+    if "\n" not in message_text or len(message_text) < CODEX_SECONDARY_ENTER_THRESHOLD_CHARS:
+        return False
+    for running_command in client_commands:
+        if "codex" in (running_command or "").lower():
+            return True
+    return False
 
 
 def main() -> int:
@@ -119,6 +131,10 @@ def main() -> int:
         "execute": args.execute,
         "message_length": len(args.text),
         "message_preview": truncate_preview(args.text),
+        "secondary_submit_enter": should_send_codex_confirm_enter(
+            args.text,
+            [client.running_command for client in session.clients],
+        ),
         "warnings": session.warnings,
     }
 
@@ -134,6 +150,7 @@ def main() -> int:
             print(f"Zellij State: {payload['zellij_state']}")
             print(f"Selected Tab: {payload['selected_tab_name']}")
             print(f"Submit Mode: {payload['submit']}")
+            print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
             print(f"Message Length: {payload['message_length']}")
             print(f"Message Preview: {payload['message_preview']}")
             if session.tab_names:
@@ -176,6 +193,21 @@ def main() -> int:
                 f"{(stderr or '').strip() or 'unknown error'}"
             )
 
+        # Large multiline prompts can remain staged in Codex after the first
+        # Enter. A delayed confirm Enter submits that specific case without
+        # affecting short or single-line messages.
+        if payload["secondary_submit_enter"]:
+            time.sleep(CODEX_SECONDARY_ENTER_DELAY_SECONDS)
+            code, _, stderr = run_local_command(
+                ["zellij", "-s", session_name, "action", "write", "13"],
+                timeout_seconds=10,
+            )
+            if code != 0:
+                return fail(
+                    "send-zellij-message: failed to send Codex confirm Enter byte: "
+                    f"{(stderr or '').strip() or 'unknown error'}"
+                )
+
     payload["executed"] = True
     if args.json:
         print(json_dump(payload))
@@ -184,6 +216,7 @@ def main() -> int:
         print(f"Zellij Session: {payload['zellij_session']}")
         print(f"Selected Tab: {payload['selected_tab_name']}")
         print(f"Submit Mode: {payload['submit']}")
+        print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
         print(f"Message Preview: {payload['message_preview']}")
     return 0
 

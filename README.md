@@ -285,6 +285,7 @@ Behavior:
 - `get-cross-session-context` resolves another tracked task/session by tracker ref, task slug, or explicit task/session override.
 - Task/status metadata is the primary contract; transcript tail is the targeted fallback; live zellij inspection is diagnostic only.
 - `send-zellij-message` is dry-run by default and requires `--execute` for actual writes.
+- `send-zellij-message` automatically adds a delayed confirm Enter for large multiline Codex payloads because one immediate Enter can leave the text staged instead of submitted.
 - `send-zellij-message` refuses ambiguous multi-tab targets and cross-machine targets unless you intentionally use an explicit local `--zellij-session` override for debug work.
 - `pr-autoreview-loop` matches only current-head reviewer artifacts, preferring `review-run-meta` top-level comments and falling back to exact-head GitHub review objects.
 - `pr-autoreview-loop` is designed to support a semi-autonomous fix loop: wait for review, address findings, push, wait again, and stop only when clean or genuinely blocked.
