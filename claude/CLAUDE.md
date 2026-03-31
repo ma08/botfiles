@@ -69,7 +69,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 When working on any task, **proactively** maintain task status documentation.
 
 ### Proactive Behavior
-- **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For resuming existing tasks, use `/save-task-status` instead.
+- **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For interrupted tracked resumes from another session, use `/continue-task` instead. Keep `/save-task-status` for checkpoint updates once the current session already owns the task.
 - **At any checkpoint**: Use `/get-task-details` to retrieve the active status path plus issue/machine/coding-agent session metadata.
 - **At milestones**: Update the status file when completing sub-tasks, making key decisions, or discovering important information
 - **Save artifacts continuously**:
@@ -81,7 +81,7 @@ When working on any task, **proactively** maintain task status documentation.
 - Save generated screenshots to `task-progress-artifacts/scratchpad/` by default, then move or copy the important long-term evidence to top-level `task-progress-artifacts/` when it should be easy to review later.
 - When given a short-lived s3 url, download input-context files into `user_inputs/input_artifacts/`; download generated output captures into `task-progress-artifacts/scratchpad/`, then promote them only if they become durable reference material.
 - **Before session end**: Ensure the status file reflects the current state so work can be resumed
-- Use `/start-new-task` to create new task folders and `/save-task-status` for structured status updates throughout the task lifecycle
+- Use `/start-new-task` to create new task folders, `/continue-task` to adopt interrupted tracked work, and `/save-task-status` for structured status updates throughout the task lifecycle
 
 ### Task Folder Convention
 Every tracked task gets a folder at `<task-status-root>/YYYY-MM-DD/<HH>h<MM>m<SS>sPST-<task-slug>/`:

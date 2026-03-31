@@ -381,7 +381,7 @@ export SYSTEM_NAME="MyMachineName"
 
 `SYSTEM_NAME` is reused across:
 - WhatsApp notifications (origin context)
-- Task-status metadata sync (`start-new-task`, `save-task-status`, `get-task-details`)
+- Task-status metadata sync (`start-new-task`, `continue-task`, `save-task-status`, `get-task-details`)
 
 If not set, tooling falls back to hostname.
 
@@ -403,6 +403,10 @@ After running `setup.sh`:
 - Claude skills are available at `~/.claude/skills/` (backed by `claude/skills/`)
 - Codex skills are available at `~/.codex/skills/` (backed by `codex/skills/`)
 - Codex **system** skills under `~/.codex/skills/.system/` are machine-managed and intentionally git-ignored in this repo (to allow version/platform differences across machines)
+
+### Continue Task Skill
+
+Use `$continue-task <tracker-ref-or-slug>` in Codex or `/continue-task <tracker-ref-or-slug>` in Claude when the current session should adopt an existing tracked task after an interruption. The skill resolves the current task home, syncs that `status.md` to the new session, and uses transcript tail only as fallback context.
 
 ### Notion Skill
 
