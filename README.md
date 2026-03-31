@@ -264,6 +264,7 @@ Behavior:
 - Uses the current machine's default Codex profile instead of forcing a profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
 - Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
+- That seeded `start-new-task` flow is expected to continue through initial tracker/local context review and first-pass plan approval in the child session when enough information is already available.
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.

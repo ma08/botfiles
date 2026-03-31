@@ -69,7 +69,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 When working on any task, **proactively** maintain task status documentation.
 
 ### Proactive Behavior
-- **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For interrupted tracked resumes from another session, use `/continue-task` instead. Keep `/save-task-status` for checkpoint updates once the current session already owns the task.
+- **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For interrupted tracked resumes from another session, use `/continue-task` instead. Keep `/save-task-status` for checkpoint updates once the current session already owns the task. When enough context is already available, keep going in the same turn: gather tracker/local context, ask `AskUserQuestion` only for critical planning gaps, and present a first-pass written plan for approval instead of stopping at boilerplate setup.
 - **At any checkpoint**: Use `/get-task-details` to retrieve the active status path plus issue/machine/coding-agent session metadata.
 - **At milestones**: Update the status file when completing sub-tasks, making key decisions, or discovering important information
 - **Save artifacts continuously**:
