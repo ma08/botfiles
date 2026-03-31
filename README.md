@@ -269,6 +269,30 @@ Behavior:
 - Supports `--dry-run` for inspection without starting the session.
 - For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.
 
+### Cross-Session Orchestration
+
+Use these repo-managed helpers for regular non-Symphony multi-session work:
+
+```bash
+get-cross-session-context --project-root "$PWD" ZON-71 --include-transcript-tail 3
+send-zellij-message --project-root "$PWD" --text "Please post a short status update." ZON-71
+send-zellij-message --project-root "$PWD" --text "Please post a short status update." --execute --submit enter ZON-71
+pr-autoreview-loop status --repo ~/pro/botfiles --pr 123
+pr-autoreview-loop wait --repo ~/pro/botfiles --pr 123
+```
+
+Behavior:
+- `get-cross-session-context` resolves another tracked task/session by tracker ref, task slug, or explicit task/session override.
+- Task/status metadata is the primary contract; transcript tail is the targeted fallback; live zellij inspection is diagnostic only.
+- `send-zellij-message` is dry-run by default and requires `--execute` for actual writes.
+- `send-zellij-message` automatically adds a delayed confirm Enter for large multiline Codex payloads because one immediate Enter can leave the text staged instead of submitted.
+- `send-zellij-message` refuses ambiguous multi-tab targets and cross-machine targets unless you intentionally use an explicit local `--zellij-session` override for debug work.
+- `pr-autoreview-loop` matches only current-head reviewer artifacts, preferring `review-run-meta` top-level comments and falling back to exact-head GitHub review objects.
+- `pr-autoreview-loop` is designed to support a semi-autonomous fix loop: wait for review, address findings, push, wait again, and stop only when clean or genuinely blocked.
+- `pr-autoreview-loop` reports `blocked` instead of waiting forever when a repo has no detectable reviewer infrastructure and no valid current-head reviewer artifact exists yet.
+
+See `docs/cross-session-orchestration-contract.md` for the shared v1 contract.
+
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 
 ```bash

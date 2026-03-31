@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""Preview or send a bounded message into a known local zellij session/tab."""
+from __future__ import annotations
+
+import argparse
+import sys
+import time
+from pathlib import Path
+
+from session_orchestration_common import (
+    TRACKER_KIND_NONE,
+    add_target_resolution_arguments,
+    inspect_session_target,
+    json_dump,
+    resolve_target,
+    run_local_command,
+    truncate_preview,
+    validate_message_text,
+)
+
+SUBMIT_CHOICES = ("none", "enter")
+CODEX_SECONDARY_ENTER_THRESHOLD_CHARS = 1024
+CODEX_SECONDARY_ENTER_DELAY_SECONDS = 1.0
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_target_resolution_arguments(parser)
+    parser.add_argument("--text", required=True, help="Bounded message text to write.")
+    parser.add_argument(
+        "--submit",
+        choices=SUBMIT_CHOICES,
+        default="none",
+        help=(
+            "Whether to send an Enter byte after writing the text. "
+            "`enter` is best-effort and should be used explicitly."
+        ),
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually perform the zellij write. Without this flag the command is a dry run.",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable text.")
+    return parser.parse_args()
+
+
+def fail(message: str) -> int:
+    print(message, file=sys.stderr)
+    return 2
+
+
+def should_send_codex_confirm_enter(message_text: str, client_commands: list[str]) -> bool:
+    if "\n" not in message_text or len(message_text) < CODEX_SECONDARY_ENTER_THRESHOLD_CHARS:
+        return False
+    for running_command in client_commands:
+        if "codex" in (running_command or "").lower():
+            return True
+    return False
+
+
+def main() -> int:
+    args = parse_args()
+    validation_error = validate_message_text(args.text)
+    if validation_error:
+        return fail(f"send-zellij-message: {validation_error}")
+
+    result = resolve_target(
+        project_root=Path(args.project_root),
+        target=args.target,
+        task_dir=args.task_dir,
+        status_file=args.status_file,
+        zellij_session=args.zellij_session,
+    )
+    if result.get("status") != "resolved":
+        if args.json:
+            print(json_dump(result))
+        else:
+            print(
+                result.get(
+                    "warning",
+                    "send-zellij-message: unable to resolve a unique target.",
+                ),
+                file=sys.stderr,
+            )
+        return 2
+
+    primary = result["primary"]
+    metadata = primary["metadata"]
+    session = inspect_session_target(
+        metadata.get("zellij_session", TRACKER_KIND_NONE),
+        tracker_human_id=metadata.get("tracker_human_id", TRACKER_KIND_NONE),
+        explicit_tab_name=args.tab_name,
+    )
+
+    session_name = session.session_name
+    if session_name == TRACKER_KIND_NONE:
+        return fail("send-zellij-message: target does not expose a zellij session name.")
+
+    if session.state == "exited":
+        return fail(f"send-zellij-message: zellij session `{session_name}` is exited.")
+
+    target_machine = metadata.get("machine", TRACKER_KIND_NONE)
+    current_machine = result.get("current_machine", TRACKER_KIND_NONE)
+    if target_machine not in {TRACKER_KIND_NONE, current_machine} and not args.zellij_session:
+        return fail(
+            "send-zellij-message: target task resolves to a different machine "
+            f"(`{target_machine}`); run this helper on that machine or use an explicit local "
+            "--zellij-session override for debug work."
+        )
+
+    selected_tab_name = session.selected_tab_name
+    if not selected_tab_name and len(session.tab_names) > 1:
+        return fail(
+            "send-zellij-message: multiple tab names exist for this session; pass --tab-name "
+            "to avoid guessing."
+        )
+
+    payload = {
+        "resolution_source": result.get("resolution_source", TRACKER_KIND_NONE),
+        "query": result.get("query", TRACKER_KIND_NONE),
+        "current_machine": current_machine,
+        "target_machine": target_machine,
+        "task_dir": primary.get("task_dir", TRACKER_KIND_NONE),
+        "status_file": primary.get("status_file", TRACKER_KIND_NONE),
+        "zellij_session": session_name,
+        "zellij_state": session.state,
+        "tab_names": session.tab_names,
+        "selected_tab_name": selected_tab_name or TRACKER_KIND_NONE,
+        "submit": args.submit,
+        "execute": args.execute,
+        "message_length": len(args.text),
+        "message_preview": truncate_preview(args.text),
+        "secondary_submit_enter": should_send_codex_confirm_enter(
+            args.text,
+            [client.running_command for client in session.clients],
+        ),
+        "warnings": session.warnings,
+    }
+
+    if not args.execute:
+        if args.json:
+            print(json_dump(payload))
+        else:
+            print("Dry Run: no zellij actions were executed.")
+            print(f"Resolution Source: {payload['resolution_source']}")
+            print(f"Query: {payload['query']}")
+            print(f"Target Machine: {payload['target_machine']}")
+            print(f"Zellij Session: {payload['zellij_session']}")
+            print(f"Zellij State: {payload['zellij_state']}")
+            print(f"Selected Tab: {payload['selected_tab_name']}")
+            print(f"Submit Mode: {payload['submit']}")
+            print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
+            print(f"Message Length: {payload['message_length']}")
+            print(f"Message Preview: {payload['message_preview']}")
+            if session.tab_names:
+                print(f"Tab Names: {', '.join(session.tab_names)}")
+            if session.warnings:
+                print("Warnings:")
+                for warning in session.warnings:
+                    print(f"  - {warning}")
+        return 0
+
+    if selected_tab_name:
+        code, _, stderr = run_local_command(
+            ["zellij", "-s", session_name, "action", "go-to-tab-name", selected_tab_name],
+            timeout_seconds=10,
+        )
+        if code != 0:
+            return fail(
+                "send-zellij-message: failed to focus the target tab "
+                f"`{selected_tab_name}`: {(stderr or '').strip() or 'unknown error'}"
+            )
+
+    code, _, stderr = run_local_command(
+        ["zellij", "-s", session_name, "action", "write-chars", args.text],
+        timeout_seconds=10,
+    )
+    if code != 0:
+        return fail(
+            "send-zellij-message: failed to write message text: "
+            f"{(stderr or '').strip() or 'unknown error'}"
+        )
+
+    if args.submit == "enter":
+        code, _, stderr = run_local_command(
+            ["zellij", "-s", session_name, "action", "write", "13"],
+            timeout_seconds=10,
+        )
+        if code != 0:
+            return fail(
+                "send-zellij-message: failed to send Enter byte: "
+                f"{(stderr or '').strip() or 'unknown error'}"
+            )
+
+        # Large multiline prompts can remain staged in Codex after the first
+        # Enter. A delayed confirm Enter submits that specific case without
+        # affecting short or single-line messages.
+        if payload["secondary_submit_enter"]:
+            time.sleep(CODEX_SECONDARY_ENTER_DELAY_SECONDS)
+            code, _, stderr = run_local_command(
+                ["zellij", "-s", session_name, "action", "write", "13"],
+                timeout_seconds=10,
+            )
+            if code != 0:
+                return fail(
+                    "send-zellij-message: failed to send Codex confirm Enter byte: "
+                    f"{(stderr or '').strip() or 'unknown error'}"
+                )
+
+    payload["executed"] = True
+    if args.json:
+        print(json_dump(payload))
+    else:
+        print("Executed bounded zellij write.")
+        print(f"Zellij Session: {payload['zellij_session']}")
+        print(f"Selected Tab: {payload['selected_tab_name']}")
+        print(f"Submit Mode: {payload['submit']}")
+        print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
+        print(f"Message Preview: {payload['message_preview']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

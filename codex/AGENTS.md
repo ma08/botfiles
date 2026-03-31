@@ -126,6 +126,17 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - **Short-lived S3 URLs** (typically screenshots): download input-context files to `user_inputs/input_artifacts/`; download work-product captures to `task-progress-artifacts/scratchpad/`, then promote only the important long-term evidence to top-level `task-progress-artifacts/`.
 - **Self-contained folders**: copy content into the task folder rather than referencing external paths that may disappear. The task folder should be a complete, portable package.
 
+## Cross-Session Orchestration
+
+- For regular non-Symphony multi-session work, prefer the shared skills `cross-session-context`, `cross-session-message`, and `pr-autoreview-loop`.
+- Target other sessions by tracker ref or task slug first. Use `--task-dir`, `--status-file`, or `--zellij-session` only for lower-level or debug workflows.
+- Treat task/status metadata as the primary source of truth, transcript tail as a targeted fallback, and live zellij inspection as diagnostic context.
+- Keep cross-session sends preview-first. `send-zellij-message` should stay in dry-run mode until the resolved session/tab target is clearly correct; use `--execute` and `--submit enter` explicitly.
+- For large multiline Codex prompts, `send-zellij-message` now adds a delayed confirm Enter automatically after `--submit enter` because one immediate Enter can leave the prompt staged in the composer.
+- Do not use cross-session message send as remote control. It is for bounded prompt delivery into a known live target only.
+- For PR-bearing non-Symphony review loops, use `pr-autoreview-loop` to match current-head reviewer output, address findings, push, and wait again until the sweep is clean or genuinely blocked.
+- When the PR loop reports `blocked`, or reviewer/check infrastructure fails without an in-session retry path, stop and ask for human input instead of silently spinning.
+
 ## Ad-hoc Scripts (Required)
 
 - When running one-off Python/Bash, **write the script into the task's `task-progress-artifacts/scratchpad/` folder first**, with a short header comment explaining purpose + inputs/outputs, then execute it.
