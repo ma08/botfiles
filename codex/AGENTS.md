@@ -77,7 +77,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
 - Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
-- For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
+- For shell-wide API auth outside repos that provide their own `.env`, keep the default Azure Oracle route in `~/pro/botfiles/secrets/local/codex-azure.rc` and keep `~/pro/botfiles/secrets/local/codex-openai.rc` only for direct OpenAI fallback. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
 - On non-Pro models, pass an explicit `--timeout` or use background mode for long Oracle runs instead of relying on `auto`.
 
 ## Reviewer Agent
