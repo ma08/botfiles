@@ -48,6 +48,8 @@ Ralph allocates these files as persistent context every loop:
 ### 1. PROMPT.md - The Loop Engine
 The current task/instruction for Ralph. This is where you "tune Ralph" by adding guidance (signs).
 
+Important: if your loop uses a completion promise string, include that exact string only once in `PROMPT.md`. Repeating the same promise text in multiple sections can cause false-positive completion detection when a runner echoes the prompt.
+
 ### 2. AGENT.md - The Heart
 Instructions on HOW to build, run, and test the project:
 - Environment setup (conda, venv, PATH)
@@ -167,9 +169,14 @@ When Ralph goes wrong, add "signs" to PROMPT.md:
    - How to run tests
    - How to type-check
 
-5. **Generate run-ralph.sh** (see Running Ralph below) or use the ralph-loop plugin
+5. **Keep the completion promise single-sourced**:
+   - Put the exact completion string in one place in `PROMPT.md`
+   - Do not repeat the same literal promise string elsewhere in the prompt
+   - If you want extra wording, paraphrase around it instead of duplicating it verbatim
 
-6. **Copy staging to target and run** (see Orchestrator Workflow below)
+6. **Generate run-ralph.sh** (see Running Ralph below) or use the ralph-loop plugin
+
+7. **Copy staging to target and run** (see Orchestrator Workflow below)
 
 ---
 

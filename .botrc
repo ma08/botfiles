@@ -54,7 +54,7 @@ alias zja="zellij attach -c"         # attach to session (create if missing)
 alias zjk="zellij kill-session"      # kill a specific session
 
 # --- Shell: list current dir entries with full paths -----------------------
-alias lsf='ls -ld $(pwd)/*'
+alias lsf='ls -ld $(pwd)/.* $(pwd)/*'
 
 # --- Load modular shell extensions (skip 10-* loaded by .botenv) -----------
 if [ -d "$BOTFILES_ROOT/shell" ]; then
