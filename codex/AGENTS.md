@@ -32,6 +32,7 @@ These are user-level instructions for the Codex agent shared across all projects
 - Assume botfiles lives at `~/pro/botfiles`
 - Assume personal OS lives at `~/pro/personal_os`
 - Prefer reusable, machine-agnostic paths (`~/pro/...`) over machine-specific absolute paths
+- When a task needs cloud actions from the CLI, consult `~/pro/personal_os/context/cloud-access.md` first. Treat it as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes before assuming auth is already in place or changing login state.
 
 ## Shell Environment (two-layer bootstrap)
 
