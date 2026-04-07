@@ -25,6 +25,8 @@ Choose the most important incomplete item from fix_plan.md and implement it.
 
 ## Promise
 
+Keep the exact completion token below in this file only once. If you want additional wording elsewhere, paraphrase it instead of repeating the exact token.
+
 When all items in fix_plan.md are complete, respond with:
 
 ```

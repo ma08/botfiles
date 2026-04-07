@@ -46,14 +46,12 @@ fi
 case "$ENGINE" in
     codex)
         RUN_CMD="codex --dangerously-bypass-approvals-and-sandbox exec"
-        # Codex echoes the prompt in output, so the promise string appears twice:
-        # once in the echoed prompt text and once in the AI's response.
-        PROMISE_THRESHOLD=2
+        # Codex may echo the prompt in output, so discount promise matches that
+        # already appear in PROMPT.md and only look for assistant-side matches.
+        PROMISE_THRESHOLD=1
         ;;
     claude)
         RUN_CMD="claude --dangerously-skip-permissions -p"
-        # Claude -p does NOT echo the prompt — only the AI's response is output.
-        # The promise string appears exactly once (in the response).
         PROMISE_THRESHOLD=1
         ;;
     *)
@@ -99,14 +97,19 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     # Stream output in real-time to console, log file, AND temp file for promise detection
     cat PROMPT.md | $RUN_CMD 2>&1 | tee -a "$LOG_FILE" "$TEMP_OUTPUT" || true
 
-    # Check for promise in output.
-    # Codex echoes the prompt (threshold=2: prompt echo + response).
-    # Claude -p does not echo the prompt (threshold=1: response only).
-    PROMISE_COUNT=$(grep -c "$COMPLETION_PROMISE" "$TEMP_OUTPUT" 2>/dev/null || echo "0")
-    if [ "$PROMISE_COUNT" -ge "$PROMISE_THRESHOLD" ]; then
+    # Discount promise-string matches already present in PROMPT.md so prompt-echo
+    # output does not produce a false completion signal.
+    PROMPT_PROMISE_COUNT=$(grep -cF "$COMPLETION_PROMISE" PROMPT.md 2>/dev/null || echo "0")
+    TOTAL_PROMISE_COUNT=$(grep -cF "$COMPLETION_PROMISE" "$TEMP_OUTPUT" 2>/dev/null || echo "0")
+    ASSISTANT_PROMISE_COUNT=$((TOTAL_PROMISE_COUNT - PROMPT_PROMISE_COUNT))
+    if [ "$ASSISTANT_PROMISE_COUNT" -lt 0 ]; then
+        ASSISTANT_PROMISE_COUNT=0
+    fi
+
+    if [ "$ASSISTANT_PROMISE_COUNT" -ge "$PROMISE_THRESHOLD" ]; then
         echo "" | tee -a "$LOG_FILE"
         echo "=== COMPLETED ===" | tee -a "$LOG_FILE"
-        echo "Promise detected $PROMISE_COUNT times (threshold=$PROMISE_THRESHOLD for $ENGINE)" | tee -a "$LOG_FILE"
+        echo "Assistant promise detected $ASSISTANT_PROMISE_COUNT times (threshold=$PROMISE_THRESHOLD for $ENGINE; total matches=$TOTAL_PROMISE_COUNT, prompt matches=$PROMPT_PROMISE_COUNT)" | tee -a "$LOG_FILE"
         echo "Finished at iteration $i" | tee -a "$LOG_FILE"
         echo "Ended: $(date)" | tee -a "$LOG_FILE"
         exit 0

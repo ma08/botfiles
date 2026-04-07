@@ -33,6 +33,12 @@ When writing scripts or hooks that need botfiles env in a non-interactive contex
 
 On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_profile` > `~/.bash_login` > `~/.profile`, whichever bash reads first) to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
 
+## Shared Cloud CLI Context
+
+- When a task needs cloud actions from the CLI, read `~/pro/personal_os/context/cloud-access.md` first.
+- Treat that file as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes.
+- Use the `~/pro/...` path form when referring to it, and consult it before assuming cloud auth is already available or changing login state on a machine.
+
 ## Curated Skills
 
 - Keep upstream curated skill directories unchanged unless you are intentionally creating a protected local fork.
