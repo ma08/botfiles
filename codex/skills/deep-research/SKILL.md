@@ -69,6 +69,11 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --outdir <path/to/task-progress-artifacts/scratchpad/openai>
 ```
 
+Azure routing:
+- When `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the same runner automatically uses Azure Responses instead of direct OpenAI billing.
+- Set `AZURE_OPENAI_DEEP_RESEARCH_API_KEY` when the deep-research deployment lives on a different Azure OpenAI resource than `AZURE_OPENAI_API_KEY`; otherwise the script falls back to `AZURE_OPENAI_API_KEY`.
+- In Azure mode, `--models` values must be Azure deployment names. If omitted, the runner uses `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or falls back to `o3-deep-research`.
+
 Useful variants:
 
 ```bash
@@ -86,7 +91,8 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
 ```
 
 Model guidance:
-- Default fallback order is `o3-deep-research,o4-mini-deep-research`.
+- Direct OpenAI fallback order is `o3-deep-research,o4-mini-deep-research`.
+- Azure fallback order comes from `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or defaults to `o3-deep-research`.
 - Override with `--models` when needed.
 
 ## Gemini Execution

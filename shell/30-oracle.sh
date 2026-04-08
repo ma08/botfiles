@@ -97,6 +97,25 @@ _botfiles_oracle_model_specified() {
   return 1
 }
 
+_botfiles_oracle_route_specified() {
+  local expect_route_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_route_value" -eq 1 ]; then
+      return 0
+    fi
+    case "$arg" in
+      --base-url|--azure-endpoint|--azure-deployment|--azure-api-version)
+        expect_route_value=1
+        ;;
+      --base-url=*|--azure-endpoint=*|--azure-deployment=*|--azure-api-version=*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
 _botfiles_oracle_is_subcommand_invocation() {
   local expect_value=0
   local arg
@@ -129,12 +148,24 @@ oracle() {
   local args=("$@")
   local defaults=()
 
+  if [ -n "${ORACLE_AZURE_OPENAI_API_KEY:-}" ] && [ -z "${AZURE_OPENAI_API_KEY:-}" ]; then
+    export AZURE_OPENAI_API_KEY="$ORACLE_AZURE_OPENAI_API_KEY"
+  fi
+
   if ! _botfiles_oracle_is_subcommand_invocation "${args[@]}"; then
     if ! _botfiles_oracle_engine_specified "${args[@]}" && ! _botfiles_oracle_browser_requested "${args[@]}"; then
       defaults+=(--engine api)
     fi
     if ! _botfiles_oracle_model_specified "${args[@]}"; then
       defaults+=(--model gpt-5.4-pro)
+    fi
+    if ! _botfiles_oracle_browser_requested "${args[@]}" && ! _botfiles_oracle_route_specified "${args[@]}"; then
+      if [ -n "${ORACLE_AZURE_OPENAI_ENDPOINT:-}" ] && [ -n "${ORACLE_AZURE_OPENAI_DEPLOYMENT:-}" ]; then
+        defaults+=(--azure-endpoint "$ORACLE_AZURE_OPENAI_ENDPOINT" --azure-deployment "$ORACLE_AZURE_OPENAI_DEPLOYMENT")
+        if [ -n "${ORACLE_AZURE_OPENAI_API_VERSION:-}" ]; then
+          defaults+=(--azure-api-version "$ORACLE_AZURE_OPENAI_API_VERSION")
+        fi
+      fi
     fi
   fi
 

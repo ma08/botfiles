@@ -395,6 +395,7 @@ cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
 ```
 
 This file is ignored by git and sourced via `.botenv`.
+It now carries the shared Azure key for the Codex Azure profile plus the default Oracle Azure route and optional Azure deep-research endpoint/key/deployment settings.
 
 ## Skills
 
