@@ -261,6 +261,7 @@ Behavior:
 - Creates a detached zellij session whose name matches the resolved task slug.
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
 - Launches Codex as the session's default shell so attaching lands on the live Codex UI.
+- If the detached session comes up but the pane does not visibly show Codex/start-new-task output within a short verification window, the helper fails instead of treating session creation alone as success.
 - Uses the current machine's default Codex profile instead of forcing a profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
 - Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
@@ -367,9 +368,15 @@ You can include clickable session links (`Open Session: ...`) in WhatsApp and em
      python ~/pro/botfiles/codex/hooks/send.py --title "Zellij Link Smoke" "verify zellij link"
    ```
 
+To repair the local route after a reboot or Tailscale config drift, run:
+```bash
+~/pro/botfiles/bin/ensure-zellij-web-link-route
+```
+
 Notes:
 - `ZELLIJ_WEB_BASE_URL` must match the machine sending the notification (machine-local setting).
 - Session URLs are built as: `<ZELLIJ_WEB_BASE_URL>/<url-encoded-zellij-session-name>`.
+- `start-zellij-session-for-task` will attempt this repair automatically before it prints a local zellij web link.
 - If notifications run outside zellij (`ZELLIJ_SESSION_NAME` missing), link falls back to `n/a`.
 
 ### System Name

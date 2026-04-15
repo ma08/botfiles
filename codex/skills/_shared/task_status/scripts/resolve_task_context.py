@@ -87,9 +87,12 @@ def main() -> int:
     github_issue_title = TRACKER_KIND_NONE
     github_issue_state = TRACKER_KIND_NONE
     tracker_slug = TRACKER_KIND_NONE
-    canonical_project_root = current_project_root
-    canonical_status_root = resolve_task_status_root(current_project_root, caller_path=Path(__file__))
-    canonical_resolution = "current-project"
+    default_project_root = Path.home() / "pro" / "personal_os"
+    if not default_project_root.is_dir():
+        default_project_root = current_project_root
+    canonical_project_root = default_project_root
+    canonical_status_root = resolve_task_status_root(canonical_project_root, caller_path=Path(__file__))
+    canonical_resolution = "default-personal-os"
     canonical_matches: list[Path] = []
     existing_tracker_task_homes = []
 
