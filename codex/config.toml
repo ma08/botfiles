@@ -21,9 +21,10 @@ history.persistence = "save-all" # Docs: https://developers.openai.com/codex/con
 
 [profiles.azure]
 # Rollback options:
+# model = "gpt-5.4"
 # model = "gpt-5.3-codex"
 # model = "gpt-5.2-codex"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
 approvals_reviewer = "user"
@@ -191,3 +192,6 @@ guardian_approval = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 2
