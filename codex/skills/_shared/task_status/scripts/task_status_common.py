@@ -15,7 +15,7 @@ from pathlib import Path
 from shlex import quote as shell_quote
 from shutil import which
 from typing import Iterable
-from urllib.parse import quote as url_quote
+from urllib.parse import quote as url_quote, urlparse
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
@@ -327,7 +327,71 @@ def resolve_agent_name(
         return "codex"
     if source.get("CLAUDE_CODE_SESSION_ID", "").strip() or source.get("CLAUDE_SESSION_ID", "").strip():
         return "claude"
+    if (
+        source.get("HERMES_SESSION_ID", "").strip()
+        or source.get("HERMES_PROFILE", "").strip()
+        or source.get("HERMES_SESSION_TITLE", "").strip()
+        or source.get("SESSION_TITLE", "").strip()
+    ):
+        return "hermes"
     return default_agent
+
+
+def _resolve_hermes_session_from_state(env: dict[str, str] | None = None) -> str:
+    source = env or {}
+    hermes_home = Path(source.get("HERMES_HOME", "").strip()).expanduser() if source.get("HERMES_HOME", "").strip() else Path.home() / ".hermes"
+    state_db = hermes_home / "state.db"
+    if not state_db.is_file():
+        return "none"
+
+    profile = source.get("HERMES_PROFILE", "").strip()
+    requested_title = source.get("HERMES_SESSION_TITLE", "").strip() or source.get("SESSION_TITLE", "").strip()
+    requested_source = source.get("HERMES_SESSION_SOURCE", "").strip()
+
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(str(state_db))
+        conn.row_factory = sqlite3.Row
+        try:
+            if requested_title:
+                exact = conn.execute(
+                    "SELECT id FROM sessions WHERE title = ? ORDER BY started_at DESC LIMIT 1",
+                    (requested_title,),
+                ).fetchone()
+                if exact and exact["id"]:
+                    return str(exact["id"]).strip() or "none"
+
+                escaped = requested_title.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                numbered = conn.execute(
+                    "SELECT id FROM sessions WHERE title LIKE ? ESCAPE '\\' ORDER BY started_at DESC LIMIT 1",
+                    (f"{escaped} #%",),
+                ).fetchone()
+                if numbered and numbered["id"]:
+                    return str(numbered["id"]).strip() or "none"
+
+            clauses = ["parent_session_id IS NULL"]
+            params: list[str] = []
+            if requested_source:
+                clauses.append("source = ?")
+                params.append(requested_source)
+            elif profile:
+                clauses.append("source = ?")
+                params.append("cli")
+
+            query = "SELECT id FROM sessions"
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY started_at DESC LIMIT 1"
+            row = conn.execute(query, params).fetchone()
+            if row and row["id"]:
+                return str(row["id"]).strip() or "none"
+        finally:
+            conn.close()
+    except Exception:
+        return "none"
+
+    return "none"
 
 
 def resolve_agent_session_id(
@@ -340,6 +404,7 @@ def resolve_agent_session_id(
         "CODEX_THREAD_ID",
         "CODEX_SESSION_ID",
         "AGENT_SESSION_ID",
+        "HERMES_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CLAUDE_SESSION_ID",
         "SESSION_ID",
@@ -347,6 +412,10 @@ def resolve_agent_session_id(
         value = source.get(key, "").strip()
         if value:
             return value
+    if resolve_agent_name(source, default_agent="unknown") == "hermes":
+        resolved = _resolve_hermes_session_from_state(source)
+        if resolved and resolved != "none":
+            return resolved
     # Claude Code doesn't export a session ID env var, so fall back to
     # the most recent history.jsonl entry for the project.
     if source.get("CLAUDECODE", "").strip() in TRUE_VALUES:
@@ -362,7 +431,52 @@ def build_zellij_link(session_name: str, env: dict[str, str] | None = None) -> s
     base_url = source.get("ZELLIJ_WEB_BASE_URL", "").strip().rstrip("/")
     if not enabled or not base_url or session_name == "none":
         return "none"
+    if not zellij_tailscale_route_available(base_url):
+        return "none"
     return f"{base_url}/{url_quote(session_name, safe='')}"
+
+
+def zellij_tailscale_route_available(base_url: str) -> bool:
+    parsed = urlparse(base_url.strip())
+    host = (parsed.hostname or "").strip().lower()
+    if not host or not host.endswith(".ts.net"):
+        return True
+
+    if parsed.port is not None:
+        port = parsed.port
+    elif parsed.scheme == "https":
+        port = 443
+    elif parsed.scheme == "http":
+        port = 80
+    else:
+        return False
+
+    tailscale_bin = which("tailscale")
+    if not tailscale_bin:
+        return False
+
+    try:
+        result = subprocess.run(
+            [tailscale_bin, "serve", "status", "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=3,
+        )
+        payload = json.loads(result.stdout or "{}")
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
+        return False
+
+    expected_proxies = {"http://127.0.0.1:8082", "127.0.0.1:8082"}
+    for hostport, config in (payload.get("Web") or {}).items():
+        if not str(hostport).endswith(f":{port}"):
+            continue
+        handlers = (config or {}).get("Handlers") or {}
+        proxy = ((handlers.get("/") or {}).get("Proxy") or "").strip()
+        if proxy in expected_proxies:
+            return True
+
+    return False
 
 
 def build_attach_command(session_name: str) -> str:

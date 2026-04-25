@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BOTFILES_ROOT="${BOTFILES_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+LOCAL_PROXY_TARGET="http://127.0.0.1:8082"
+
+if [ -f "$BOTFILES_ROOT/.botenv" ]; then
+  # shellcheck disable=SC1090
+  source "$BOTFILES_ROOT/.botenv"
+fi
+
+if [ -f "$BOTFILES_ROOT/secrets/local/claude-hooks.rc" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$BOTFILES_ROOT/secrets/local/claude-hooks.rc"
+  set +a
+fi
+
+die() {
+  printf 'ensure-zellij-web-link-route: %s\n' "$*" >&2
+  exit 1
+}
+
+pick_python_cmd() {
+  if command -v python >/dev/null 2>&1; then
+    printf 'python\n'
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3\n'
+    return 0
+  fi
+
+  return 1
+}
+
+is_zellij_web_ready() {
+  curl -fsS --max-time 2 "$LOCAL_PROXY_TARGET" >/dev/null 2>&1
+}
+
+python_cmd="$(pick_python_cmd)" || die "python or python3 is required"
+
+if [ "${ZELLIJ_WEB_ENABLE_LINKS:-false}" != "true" ]; then
+  printf 'zellij web links are disabled; nothing to do.\n'
+  exit 0
+fi
+
+if [ -z "${ZELLIJ_WEB_BASE_URL:-}" ]; then
+  printf 'ZELLIJ_WEB_BASE_URL is empty; nothing to do.\n'
+  exit 0
+fi
+
+read -r base_host base_port is_tailscale <<EOF
+$("$python_cmd" - "$ZELLIJ_WEB_BASE_URL" <<'PY'
+from urllib.parse import urlparse
+import sys
+
+parsed = urlparse(sys.argv[1].strip())
+host = (parsed.hostname or "").rstrip(".").lower()
+if parsed.port is not None:
+    port = parsed.port
+elif parsed.scheme == "https":
+    port = 443
+elif parsed.scheme == "http":
+    port = 80
+else:
+    port = 0
+
+print(host, port, "1" if host.endswith(".ts.net") else "0")
+PY
+)
+EOF
+
+if [ "$is_tailscale" != "1" ]; then
+  printf 'base URL is not a Tailscale host; skipping serve repair.\n'
+  exit 0
+fi
+
+case "$base_port" in
+  ''|0)
+    die "could not determine an HTTPS port from ZELLIJ_WEB_BASE_URL=$ZELLIJ_WEB_BASE_URL"
+    ;;
+esac
+
+command -v zellij >/dev/null 2>&1 || die "zellij is required"
+command -v tailscale >/dev/null 2>&1 || die "tailscale is required"
+command -v curl >/dev/null 2>&1 || die "curl is required"
+
+route_active() {
+  local port="$1"
+
+  tailscale serve status --json 2>/dev/null | "$python_cmd" -c '
+import json
+import sys
+
+port = str(sys.argv[1])
+expected = {sys.argv[2], sys.argv[2].removeprefix("http://")}
+
+try:
+    payload = json.load(sys.stdin)
+except json.JSONDecodeError:
+    raise SystemExit(1)
+
+for hostport, config in (payload.get("Web") or {}).items():
+    if not str(hostport).endswith(f":{port}"):
+        continue
+    handlers = (config or {}).get("Handlers") or {}
+    proxy = ((handlers.get("/") or {}).get("Proxy") or "").strip()
+    if proxy in expected:
+        raise SystemExit(0)
+
+raise SystemExit(1)
+' "$port" "$LOCAL_PROXY_TARGET"
+}
+
+wait_for_route() {
+  local port="$1"
+  local attempts="${2:-5}"
+  local i
+
+  for ((i = 1; i <= attempts; i += 1)); do
+    if route_active "$port"; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
+if ! is_zellij_web_ready; then
+  zellij web --start --daemonize >/dev/null 2>&1 || die "failed to start zellij web"
+  sleep 1
+fi
+
+is_zellij_web_ready || die "zellij web is not responding on $LOCAL_PROXY_TARGET"
+
+if ! route_active "$base_port"; then
+  tailscale serve --bg --yes --https="$base_port" "$LOCAL_PROXY_TARGET" >/dev/null
+fi
+
+wait_for_route "$base_port" 5 || die "tailscale serve route for port $base_port is still missing after repair"
+
+printf 'Ensured zellij web route: %s -> %s\n' "$ZELLIJ_WEB_BASE_URL" "$LOCAL_PROXY_TARGET"

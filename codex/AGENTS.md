@@ -32,6 +32,7 @@ These are user-level instructions for the Codex agent shared across all projects
 - Assume botfiles lives at `~/pro/botfiles`
 - Assume personal OS lives at `~/pro/personal_os`
 - Prefer reusable, machine-agnostic paths (`~/pro/...`) over machine-specific absolute paths
+- When a task needs cloud actions from the CLI, consult `~/pro/personal_os/context/cloud-access.md` first. Treat it as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes before assuming auth is already in place or changing login state.
 
 ## Shell Environment (two-layer bootstrap)
 
@@ -77,7 +78,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Prefer the local `oracle` wrapper over raw `npx -y @steipete/oracle`; the wrapper is the supported path for this machine's Node/runtime setup and should enforce the intended default engine/model behavior.
 - On Linux/SSH shells without `DISPLAY`, the local `oracle` wrapper auto-runs explicit browser-mode requests under `xvfb-run` so Chrome can launch headfully.
 - Browser mode still requires a signed-in ChatGPT Chrome profile, inline cookies, or a configured remote Oracle browser host; `xvfb-run` only fixes the display/launch side.
-- For shell-wide API auth outside repos that provide their own `.env`, use `~/pro/botfiles/secrets/local/codex-openai.rc`. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
+- For shell-wide API auth outside repos that provide their own `.env`, keep the default Azure Oracle route in `~/pro/botfiles/secrets/local/codex-azure.rc` and keep `~/pro/botfiles/secrets/local/codex-openai.rc` only for direct OpenAI fallback. Oracle also auto-loads a repo-local `.env` when present, so local repo runs do not require extra shell exports.
 - On non-Pro models, pass an explicit `--timeout` or use background mode for long Oracle runs instead of relying on `auto`.
 
 ## Reviewer Agent
@@ -89,6 +90,8 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
 - Use `get-task-details` to retrieve current status path plus linked issue, machine, coding-agent session id, and zellij context
 - Use the `finish-task` skill when the user wants the standard wrap-up flow for a tracked task: gate on actual closeout readiness, sync status/tracker notes, handle any required downstream heads-up, and clean branches/worktrees only after confirmation
+- Use the `continue-task` skill when taking over an interrupted tracked task from a previous session; resolve the existing task home first, sync that `status.md` to the current session, and use transcript tail only as fallback before resuming work
+- Use the `start-new-task` skill to continue past scaffolding when enough information is already available: gather tracker/local context, ask targeted interactive questions only for critical planning gaps, and present a written first-pass plan for approval instead of stopping at a generic “continue into planning?” prompt
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
 - New folders use time-prefixed names: `<HH>h<MM>m<SS>sPST-<task-slug>` (e.g., `21h45m59sPST-fix-auth-timeout`)
 - Full path example: `context/daily/2026-02-24/21h45m59sPST-fix-auth-timeout/`
@@ -126,6 +129,17 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - **Screenshots & images**: save generated or working screenshots to `task-progress-artifacts/scratchpad/` by default; user-provided or user-referenced input images belong in `user_inputs/input_artifacts/`.
 - **Short-lived S3 URLs** (typically screenshots): download input-context files to `user_inputs/input_artifacts/`; download work-product captures to `task-progress-artifacts/scratchpad/`, then promote only the important long-term evidence to top-level `task-progress-artifacts/`.
 - **Self-contained folders**: copy content into the task folder rather than referencing external paths that may disappear. The task folder should be a complete, portable package.
+
+## Cross-Session Orchestration
+
+- For regular non-Symphony multi-session work, prefer the shared skills `cross-session-context`, `cross-session-message`, and `pr-autoreview-loop`.
+- Target other sessions by tracker ref or task slug first. Use `--task-dir`, `--status-file`, or `--zellij-session` only for lower-level or debug workflows.
+- Treat task/status metadata as the primary source of truth, transcript tail as a targeted fallback, and live zellij inspection as diagnostic context.
+- Keep cross-session sends preview-first. `send-zellij-message` should stay in dry-run mode until the resolved session/tab target is clearly correct; use `--execute` and `--submit enter` explicitly.
+- For large multiline Codex prompts, `send-zellij-message` now adds a delayed confirm Enter automatically after `--submit enter` because one immediate Enter can leave the prompt staged in the composer.
+- Do not use cross-session message send as remote control. It is for bounded prompt delivery into a known live target only.
+- For PR-bearing non-Symphony review loops, use `pr-autoreview-loop` to match current-head reviewer output, address findings, push, and wait again until the sweep is clean or genuinely blocked.
+- When the PR loop reports `blocked`, or reviewer/check infrastructure fails without an in-session retry path, stop and ask for human input instead of silently spinning.
 
 ## Ad-hoc Scripts (Required)
 

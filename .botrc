@@ -25,6 +25,12 @@ alias codex-azure="codex --profile azure"
 alias codex-openai="codex --profile openai_api"
 alias codex-chatgpt="codex --profile chatgpt"
 
+# --- Codex yolo aliases (parallel to ccy for Claude) ----------------------
+alias codexy="codex --yolo"
+alias codexy-azure="codex --yolo --profile azure"
+alias codexy-openai="codex --yolo --profile openai_api"
+alias codexy-chatgpt="codex --yolo --profile chatgpt"
+
 # --- Claude Code aliases ---------------------------------------------------
 alias cc="claude"                                        # normal start
 alias ccc="claude --continue"                            # continue last session
@@ -48,7 +54,7 @@ alias zja="zellij attach -c"         # attach to session (create if missing)
 alias zjk="zellij kill-session"      # kill a specific session
 
 # --- Shell: list current dir entries with full paths -----------------------
-alias lsf='ls -ld $(pwd)/*'
+alias lsf='ls -ld $(pwd)/.* $(pwd)/*'
 
 # --- Load modular shell extensions (skip 10-* loaded by .botenv) -----------
 if [ -d "$BOTFILES_ROOT/shell" ]; then

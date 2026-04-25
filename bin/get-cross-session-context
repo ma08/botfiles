@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Resolve another live task/session and print context for cross-session orchestration."""
+from __future__ import annotations
+
+import argparse
+import sys
+from dataclasses import asdict
+from pathlib import Path
+
+from session_orchestration_common import (
+    TRACKER_KIND_NONE,
+    add_target_resolution_arguments,
+    extract_transcript_messages,
+    inspect_session_target,
+    json_dump,
+    resolve_target,
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_target_resolution_arguments(parser)
+    parser.add_argument(
+        "--include-transcript-tail",
+        type=int,
+        default=0,
+        help="Include the last N assistant/user transcript messages when a transcript path is available.",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable text.")
+    return parser.parse_args()
+
+
+def print_candidate(label: str, candidate: dict, *, tab_name: str | None = None) -> None:
+    metadata = candidate["metadata"]
+    session = inspect_session_target(
+        metadata.get("zellij_session", TRACKER_KIND_NONE),
+        tracker_human_id=metadata.get("tracker_human_id", TRACKER_KIND_NONE),
+        explicit_tab_name=tab_name,
+    )
+    print(f"{label}:")
+    print(f"  Project Root: {candidate.get('project_root', TRACKER_KIND_NONE)}")
+    print(f"  Task Folder: {candidate.get('task_dir', TRACKER_KIND_NONE)}")
+    print(f"  Status File: {candidate.get('status_file', TRACKER_KIND_NONE)}")
+    print(f"  Tracker Kind: {metadata.get('tracker_kind', TRACKER_KIND_NONE)}")
+    print(f"  Tracker URL: {metadata.get('tracker_url', TRACKER_KIND_NONE)}")
+    print(f"  Tracker Human ID: {metadata.get('tracker_human_id', TRACKER_KIND_NONE)}")
+    print(f"  Tracker Title: {metadata.get('tracker_title', TRACKER_KIND_NONE)}")
+    print(f"  Machine: {metadata.get('machine', TRACKER_KIND_NONE)}")
+    print(f"  Coding Agent: {metadata.get('coding_agent', TRACKER_KIND_NONE)}")
+    print(f"  Agent Session ID: {metadata.get('agent_session_id', TRACKER_KIND_NONE)}")
+    print(f"  Transcript Path: {metadata.get('transcript_path', TRACKER_KIND_NONE)}")
+    print(f"  Zellij Session: {session.session_name}")
+    print(f"  Zellij State: {session.state}")
+    print(f"  Zellij Link: {metadata.get('zellij_link', TRACKER_KIND_NONE)}")
+    print(
+        "  Selected Tab: "
+        f"{session.selected_tab_name or TRACKER_KIND_NONE} "
+        f"({session.tab_selection_reason})"
+    )
+    if session.tab_names:
+        print(f"  Tab Names: {', '.join(session.tab_names)}")
+    if session.clients:
+        print("  Clients:")
+        for client in session.clients:
+            print(
+                "    - "
+                f"{client.client_id} {client.pane_id} {client.running_command}"
+            )
+    if session.warnings:
+        print("  Warnings:")
+        for warning in session.warnings:
+            print(f"    - {warning}")
+    print("  Recap:")
+    for line in candidate.get("recap", []):
+        print(f"    - {line}")
+
+
+def main() -> int:
+    args = parse_args()
+    result = resolve_target(
+        project_root=Path(args.project_root),
+        target=args.target,
+        task_dir=args.task_dir,
+        status_file=args.status_file,
+        zellij_session=args.zellij_session,
+    )
+    if result.get("status") == "resolved":
+        primary = result["primary"]
+        session = inspect_session_target(
+            primary["metadata"].get("zellij_session", TRACKER_KIND_NONE),
+            tracker_human_id=primary["metadata"].get("tracker_human_id", TRACKER_KIND_NONE),
+            explicit_tab_name=args.tab_name,
+        )
+        transcript_messages = []
+        if args.include_transcript_tail > 0:
+            transcript_messages = extract_transcript_messages(
+                primary["metadata"].get("transcript_path", TRACKER_KIND_NONE),
+                agent_session_id=primary["metadata"].get("agent_session_id", TRACKER_KIND_NONE),
+                limit=args.include_transcript_tail,
+            )
+        if args.json:
+            payload = dict(result)
+            payload["session"] = asdict(session)
+            if transcript_messages:
+                payload["transcript_messages"] = transcript_messages
+            print(json_dump(payload))
+            return 0
+
+        print(f"Resolution Source: {result.get('resolution_source', TRACKER_KIND_NONE)}")
+        print(f"Query: {result.get('query', TRACKER_KIND_NONE)}")
+        print(f"Current Machine: {result.get('current_machine', TRACKER_KIND_NONE)}")
+        print("")
+        print_candidate("Primary", primary, tab_name=args.tab_name)
+        if transcript_messages:
+            print("")
+            print("Transcript Tail:")
+            for message in transcript_messages:
+                phase = f"/{message['phase']}" if message.get("phase") else ""
+                print(
+                    f"  - [{message.get('timestamp', '')}] "
+                    f"{message.get('role', 'unknown')}{phase}: {message.get('text', '')}"
+                )
+        return 0
+
+    if args.json:
+        print(json_dump(result))
+    else:
+        print(f"Resolution Source: {result.get('resolution_source', TRACKER_KIND_NONE)}")
+        print(f"Query: {result.get('query', TRACKER_KIND_NONE)}")
+        print(f"Current Machine: {result.get('current_machine', TRACKER_KIND_NONE)}")
+        warning = result.get("warning")
+        if warning:
+            print(f"Warning: {warning}")
+        candidates = result.get("candidates") or []
+        if candidates:
+            print("")
+            for index, candidate in enumerate(candidates, start=1):
+                print_candidate(f"Candidate {index}", candidate, tab_name=args.tab_name)
+                if index != len(candidates):
+                    print("")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

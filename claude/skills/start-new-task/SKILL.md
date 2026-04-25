@@ -75,7 +75,7 @@ Use output fields:
 Search for an existing task folder with the same slug:
 - If found, ask resume vs create-new.
 - For tracker-linked work, search the canonical task root first when one is emitted by `resolve_task_context.py`.
-- If resume, hand off to `/save-task-status`.
+- If resume, hand off to `/continue-task` unless the current session already owns the task and only needs a checkpoint-style refresh.
 
 ### Step 5: Create Folder Structure
 
@@ -117,8 +117,45 @@ Behavior:
 - For Linear trackers, this targets the issue description and requires `LINEAR_API_KEY`.
 - If dependencies are missing (`gh`, auth, zellij env), core task creation still succeeds.
 
-### Step 8: Confirm and Continue
-Ask the user to confirm scope; proceed if they say to continue.
+### Step 8: Gather Planning Context Immediately
+Do not stop after scaffolding unless you are blocked on task targeting or an unresolved resume-vs-new choice.
+
+After `status.md` exists and task metadata is synced:
+- Read the primary tracker when one exists.
+- For Linear tasks, inspect related issues (`blocks`, `blockedBy`, `relatedTo`, duplicates) when they are likely to affect planning.
+- Search the most relevant local context roots before asking the user for more information:
+  - the canonical task-status root and nearby `context/` history for the resolved tracker/slug
+  - the invoking project root when it differs from the canonical root
+  - any explicitly referenced local repos, docs, or `context/` paths mentioned in the tracker or user input
+- Capture the most relevant tracker snapshot or reference notes under `user_inputs/input_artifacts/` when practical.
+
+### Step 9: Decide Whether Context Is Sufficient
+Treat context as sufficient when you can already identify:
+- the likely execution venue or routing path
+- the main goal / acceptance criteria
+- the load-bearing constraints or dependencies
+- a plausible first-pass implementation or investigation plan
+
+If critical planning context is still missing:
+- Ask one focused question at a time with `AskUserQuestion`.
+- Include a clear recommended option and use the tool's question format to surface the main tradeoffs cleanly.
+- Prefer answering questions by inspecting code, docs, tracker history, or saved task artifacts instead of asking the user.
+- Save substantive answers as additional Markdown notes under `user_inputs/`.
+
+### Step 10: Draft the First-Pass Plan and Ask for Approval
+- Update `status.md` with the current state and a `## Proposed Plan` section before asking for implementation approval.
+- Present the plan review using `AskUserQuestion` instead of a plain-text “should I continue?” follow-up.
+- Include these options at minimum:
+  - `Approve plan`
+  - `Grill more`
+  - `Revise plan`
+  - `Deny plan`
+- Add a fifth option only when a task-specific branch is genuinely useful (for example, handoff, split scope, or defer).
+- Put the option you currently recommend first.
+- If the user chooses `Grill more`, invoke the `grill-me` skill and keep refining the plan.
+- If the user chooses `Revise plan`, update the written plan and ask again.
+- If the user chooses `Deny plan`, stop and capture the blocker or changed direction in the task file.
+- Only start implementation after explicit plan approval.
 
 ## Current-Task Semantics
 - Starting a new task automatically switches the current task for this session.

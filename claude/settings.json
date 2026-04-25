@@ -1,10 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 36500,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "cleanupPeriodDays": 36500,
-  "$comment": "cleanupPeriodDays docs: https://code.claude.com/docs/en/settings ; schema: https://www.schemastore.org/claude-code-settings.json ; caveat: https://code.claude.com/docs/en/data-usage",
   "model": "us.anthropic.claude-opus-4-6-v1",
   "hooks": {
     "Notification": [
@@ -56,13 +55,16 @@
     "playground@claude-plugins-official": true,
     "Notion@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
-    "hookify@claude-plugins-official": true
+    "hookify@claude-plugins-official": true,
+    "linear@claude-plugins-official": true,
+    "notion@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
   "autoMemoryEnabled": true,
   "skipDangerousModePermissionPrompt": true,
+  "$comment": "cleanupPeriodDays docs: https://code.claude.com/docs/en/settings ; schema: https://www.schemastore.org/claude-code-settings.json ; caveat: https://code.claude.com/docs/en/data-usage",
   "feedbackSurveyState": {
     "lastShownTime": 1754085632943
-  },
-  "effortLevel": "high"
+  }
 }

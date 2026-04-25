@@ -49,6 +49,20 @@ pick_python_cmd() {
   return 1
 }
 
+load_zellij_link_env() {
+  if [ -n "${ZELLIJ_WEB_ENABLE_LINKS:-}" ] && [ -n "${ZELLIJ_WEB_BASE_URL:-}" ]; then
+    return 0
+  fi
+
+  local rc_path="$BOTFILES_ROOT/secrets/local/claude-hooks.rc"
+  if [ -f "$rc_path" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$rc_path"
+    set +a
+  fi
+}
+
 field_from_resolve_output() {
   local key="$1"
   local output="$2"
@@ -124,8 +138,11 @@ build_launch_script() {
   local python_cmd="$4"
   local bootstrap_b64
   local attach_cmd
+  local ensure_web_cmd
   local rename_cmd
   local create_bootstrap_cmd
+  local run_cmd
+  local verify_cmd
 
   bootstrap_b64="$(
     BOOTSTRAP_SCRIPT="$bootstrap_script" "$python_cmd" - <<'PY'
@@ -152,13 +169,31 @@ payload = base64.b64decode(sys.argv[2])
 path.write_bytes(payload)
 path.chmod(0o755)
 PY'
-  printf -v attach_cmd 'zellij attach --create-background %q options --default-shell "$bootstrap_path" >/dev/null' "$session_name"
+  printf -v attach_cmd 'zellij attach --create-background %q >/dev/null' "$session_name"
+  printf -v ensure_web_cmd '%s\n' \
+'botfiles_root="${BOTFILES_ROOT:-$HOME/pro/botfiles}"' \
+'if [ -x "$botfiles_root/bin/ensure-zellij-web-link-route" ]; then' \
+'  "$botfiles_root/bin/ensure-zellij-web-link-route" >/dev/null 2>&1 || true' \
+'fi'
+  printf -v run_cmd 'ZELLIJ_SESSION_NAME=%q zellij run -- "$bootstrap_path" >/dev/null 2>&1' "$session_name"
   printf -v rename_cmd 'zellij -s %q action rename-tab %q >/dev/null 2>&1 || true' "$session_name" "$tab_name"
+  printf -v verify_cmd '%s\n' \
+'for _attempt in 1 2 3 4 5; do' \
+'  if zellij -s '"$session_name"' action dump-screen -f -p terminal_1 2>/dev/null | grep -Eq "(codex|OpenAI Codex|approvals-and-sandbox|start-new-task)"; then' \
+'    exit 0' \
+'  fi' \
+'  sleep 1' \
+'done' \
+'echo "start-zellij-session-for-task: detached session came up, but Codex did not become visible in the pane" >&2' \
+'exit 1'
 
-  printf 'set -euo pipefail\n%s\n%s\nsleep 1\n%s\n' \
+  printf 'set -euo pipefail\n%s\n%s\n%s\n%s\nsleep 1\n%s\n%s\n' \
     "$create_bootstrap_cmd" \
+    "$ensure_web_cmd" \
     "$attach_cmd" \
-    "$rename_cmd"
+    "$run_cmd" \
+    "$rename_cmd" \
+    "$verify_cmd"
 }
 
 session_exists_local() {
@@ -190,6 +225,8 @@ remote_path_exists() {
 build_zellij_link() {
   local session_name="$1"
   local python_cmd
+
+  load_zellij_link_env
 
   if [ "${ZELLIJ_WEB_ENABLE_LINKS:-false}" != "true" ] || [ -z "${ZELLIJ_WEB_BASE_URL:-}" ]; then
     printf 'none\n'

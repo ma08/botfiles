@@ -261,13 +261,39 @@ Behavior:
 - Creates a detached zellij session whose name matches the resolved task slug.
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
 - Launches Codex as the session's default shell so attaching lands on the live Codex UI.
+- If the detached session comes up but the pane does not visibly show Codex/start-new-task output within a short verification window, the helper fails instead of treating session creation alone as success.
 - Uses the current machine's default Codex profile instead of forcing a profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
 - Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
+- That seeded `start-new-task` flow is expected to continue through initial tracker/local context review and first-pass plan approval in the child session when enough information is already available.
 - Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.
 - For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.
+
+### Cross-Session Orchestration
+
+Use these repo-managed helpers for regular non-Symphony multi-session work:
+
+```bash
+get-cross-session-context --project-root "$PWD" ZON-71 --include-transcript-tail 3
+send-zellij-message --project-root "$PWD" --text "Please post a short status update." ZON-71
+send-zellij-message --project-root "$PWD" --text "Please post a short status update." --execute --submit enter ZON-71
+pr-autoreview-loop status --repo ~/pro/botfiles --pr 123
+pr-autoreview-loop wait --repo ~/pro/botfiles --pr 123
+```
+
+Behavior:
+- `get-cross-session-context` resolves another tracked task/session by tracker ref, task slug, or explicit task/session override.
+- Task/status metadata is the primary contract; transcript tail is the targeted fallback; live zellij inspection is diagnostic only.
+- `send-zellij-message` is dry-run by default and requires `--execute` for actual writes.
+- `send-zellij-message` automatically adds a delayed confirm Enter for large multiline Codex payloads because one immediate Enter can leave the text staged instead of submitted.
+- `send-zellij-message` refuses ambiguous multi-tab targets and cross-machine targets unless you intentionally use an explicit local `--zellij-session` override for debug work.
+- `pr-autoreview-loop` matches only current-head reviewer artifacts, preferring `review-run-meta` top-level comments and falling back to exact-head GitHub review objects.
+- `pr-autoreview-loop` is designed to support a semi-autonomous fix loop: wait for review, address findings, push, wait again, and stop only when clean or genuinely blocked.
+- `pr-autoreview-loop` reports `blocked` instead of waiting forever when a repo has no detectable reviewer infrastructure and no valid current-head reviewer artifact exists yet.
+
+See `docs/cross-session-orchestration-contract.md` for the shared v1 contract.
 
 Optional environment variables (set before sourcing `.botrc`) let you override host aliases:
 
@@ -342,9 +368,15 @@ You can include clickable session links (`Open Session: ...`) in WhatsApp and em
      python ~/pro/botfiles/codex/hooks/send.py --title "Zellij Link Smoke" "verify zellij link"
    ```
 
+To repair the local route after a reboot or Tailscale config drift, run:
+```bash
+~/pro/botfiles/bin/ensure-zellij-web-link-route
+```
+
 Notes:
 - `ZELLIJ_WEB_BASE_URL` must match the machine sending the notification (machine-local setting).
 - Session URLs are built as: `<ZELLIJ_WEB_BASE_URL>/<url-encoded-zellij-session-name>`.
+- `start-zellij-session-for-task` will attempt this repair automatically before it prints a local zellij web link.
 - If notifications run outside zellij (`ZELLIJ_SESSION_NAME` missing), link falls back to `n/a`.
 
 ### System Name
@@ -357,7 +389,7 @@ export SYSTEM_NAME="MyMachineName"
 
 `SYSTEM_NAME` is reused across:
 - WhatsApp notifications (origin context)
-- Task-status metadata sync (`start-new-task`, `save-task-status`, `get-task-details`)
+- Task-status metadata sync (`start-new-task`, `continue-task`, `save-task-status`, `get-task-details`)
 - Task closeout orchestration (`finish-task`)
 
 If not set, tooling falls back to hostname.
@@ -371,6 +403,7 @@ cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
 ```
 
 This file is ignored by git and sourced via `.botenv`.
+It now carries the shared Azure key for the Codex Azure profile plus the default Oracle Azure route and optional Azure deep-research endpoint/key/deployment settings.
 
 ## Skills
 
@@ -386,6 +419,7 @@ After running `setup.sh`:
 Shared workflow skills now cover the full tracked-task lifecycle:
 
 - `start-new-task` scaffolds a tracker-aware task folder and initial metadata.
+- `continue-task` adopts an existing tracked task after an interruption, syncs that `status.md` to the new session, and uses transcript tail only as fallback context.
 - `get-task-details` resolves the active task folder, status path, tracker URL, transcript path, and session metadata.
 - `save-task-status` updates the durable task record throughout execution.
 - `finish-task` standardizes closeout when the user asks to wrap up a task: it checks closeout readiness first, syncs status/tracker notes, handles any required downstream heads-up, and performs local cleanup only after confirmation.

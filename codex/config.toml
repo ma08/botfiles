@@ -15,17 +15,26 @@ notify = [
   "codex-notify",
 ]
 file_opener = "cursor"
-profile = "openai_api"
+profile = "azure"
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
 [profiles.azure]
 # Rollback options:
+# model = "gpt-5.4"
 # model = "gpt-5.3-codex"
 # model = "gpt-5.2-codex"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_provider = "azure"
 model_reasoning_effort = "xhigh"
+approvals_reviewer = "user"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[profiles.azure.features]
+js_repl = false
+guardian_approval = true
+prevent_idle_sleep = false
 
 [profiles.openai_api]
 model = "gpt-5.4"
@@ -124,6 +133,15 @@ trust_level = "trusted"
 [projects."/Volumes/RS"]
 trust_level = "trusted"
 
+[projects."/home/azureuser/pro/hermes_setup"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/thesis-workspace/repos/thesis"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/pro/thesis-workspace"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
@@ -174,3 +192,6 @@ guardian_approval = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 2

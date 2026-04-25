@@ -1,0 +1,598 @@
+#!/usr/bin/env python3
+"""Inspect or wait on a current-head PR autoreview loop without Symphony."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from session_orchestration_common import TRACKER_KIND_NONE, json_dump
+
+REVIEW_RUN_META_RE = re.compile(r"<!--\s*review-run-meta\s+([^>]+?)\s*-->")
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+PR_URL_RE = re.compile(
+    r"^https://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/pull/(?P<number>\d+)$"
+)
+
+SUCCESS_CONCLUSIONS = {"success", "neutral", "skipped"}
+FAILURE_CONCLUSIONS = {
+    "failure",
+    "cancelled",
+    "timed_out",
+    "action_required",
+    "startup_failure",
+    "stale",
+    "error",
+}
+TERMINAL_STATES = {"clean", "findings", "blocked", "closed"}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    for name in ("status", "wait"):
+        subparser = subparsers.add_parser(name)
+        subparser.add_argument("--repo", default=".", help="Path inside the target Git repository.")
+        subparser.add_argument(
+            "--pr",
+            help="PR number or URL. Defaults to the current branch PR.",
+        )
+        subparser.add_argument(
+            "--review-check-substring",
+            default="codex-review",
+            help="Case-insensitive substring used to find the autoreview check in statusCheckRollup.",
+        )
+        subparser.add_argument(
+            "--json",
+            action="store_true",
+            help="Emit JSON instead of human-readable text.",
+        )
+
+    wait_parser = subparsers.choices["wait"]
+    wait_parser.add_argument(
+        "--poll-seconds",
+        type=int,
+        default=30,
+        help="Polling interval while waiting for the next current-head autoreview artifact.",
+    )
+    wait_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=1_800,
+        help="Maximum total wait time before giving up.",
+    )
+    return parser.parse_args()
+
+
+def run_command(args: list[str], *, cwd: Path) -> tuple[int, str, str]:
+    process = subprocess.run(
+        args,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return process.returncode, process.stdout, process.stderr
+
+
+def gh_json(args: list[str], *, cwd: Path) -> Any:
+    code, stdout, stderr = run_command(["gh", *args], cwd=cwd)
+    if code != 0:
+        raise RuntimeError((stderr or stdout).strip() or "gh command failed")
+    return json.loads(stdout or "null")
+
+
+def find_git_root(start: Path) -> Path:
+    code, stdout, stderr = run_command(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=start,
+    )
+    if code != 0:
+        raise RuntimeError((stderr or stdout).strip() or "not inside a git repository")
+    return Path(stdout.strip()).resolve()
+
+
+def parse_iso(value: str | None) -> datetime | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def normalize_check_state(item: dict[str, Any]) -> str:
+    status = str(item.get("status") or "").strip().lower()
+    conclusion = str(item.get("conclusion") or "").strip().lower()
+    if status not in {"completed", "complete"} or not conclusion:
+        return "pending"
+    if conclusion in SUCCESS_CONCLUSIONS:
+        return "success"
+    if conclusion in FAILURE_CONCLUSIONS:
+        return "failure"
+    return "pending"
+
+
+def parse_pr_url(url: str) -> tuple[str, str, int]:
+    match = PR_URL_RE.match((url or "").strip())
+    if not match:
+        raise RuntimeError(f"Unable to parse PR URL: {url}")
+    return (
+        match.group("owner"),
+        match.group("repo"),
+        int(match.group("number")),
+    )
+
+
+def extract_section(body: str, heading: str) -> str:
+    target = heading.strip().lower()
+    lines = body.splitlines()
+    capture = False
+    capture_level = 0
+    captured: list[str] = []
+
+    for line in lines:
+        match = HEADING_RE.match(line.strip())
+        if match:
+            level = len(match.group(1))
+            current_heading = match.group(2).strip().lower()
+            if capture and level <= capture_level:
+                break
+            if not capture and current_heading == target:
+                capture = True
+                capture_level = level
+                continue
+        if capture:
+            captured.append(line)
+    return "\n".join(captured).strip()
+
+
+def markdown_bullets(text: str) -> list[str]:
+    bullets: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("- "):
+            continue
+        bullets.append(line[2:].strip())
+    return bullets
+
+
+def squash_text(text: str, *, max_chars: int = 260) -> str:
+    squashed = re.sub(r"\s+", " ", (text or "").strip())
+    if len(squashed) <= max_chars:
+        return squashed
+    return squashed[: max_chars - 3].rstrip() + "..."
+
+
+def parse_review_run_meta(body: str) -> dict[str, str] | None:
+    match = REVIEW_RUN_META_RE.search(body or "")
+    if not match:
+        return None
+    fields: dict[str, str] = {}
+    for token in match.group(1).split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        fields[key.strip()] = value.strip()
+    required = {
+        "head_sha",
+        "review_state",
+        "engine",
+        "provider",
+        "model",
+        "trigger",
+        "published_at",
+    }
+    if not required.issubset(fields):
+        return None
+    if fields["review_state"] not in {"clean", "findings", "blocked"}:
+        return None
+    if not parse_iso(fields["published_at"]):
+        return None
+    return fields
+
+
+def build_comment_artifact(comment: dict[str, Any], current_head_sha: str) -> dict[str, Any] | None:
+    meta = parse_review_run_meta(str(comment.get("body") or ""))
+    if not meta or meta["head_sha"] != current_head_sha:
+        return None
+    body = str(comment.get("body") or "")
+    summary = squash_text(extract_section(body, "Summary"))
+    findings = markdown_bullets(extract_section(body, "Findings"))
+    return {
+        "source_kind": "comment",
+        "review_state": meta["review_state"],
+        "published_at": meta["published_at"],
+        "timestamp": parse_iso(meta["published_at"]).isoformat(),
+        "url": comment.get("url") or "",
+        "author_login": ((comment.get("author") or {}).get("login") or "").strip(),
+        "engine": meta["engine"],
+        "provider": meta["provider"],
+        "model": meta["model"],
+        "trigger": meta["trigger"],
+        "summary": summary,
+        "findings": findings,
+        "body": body,
+    }
+
+
+def map_review_state(review_state: str) -> str:
+    normalized = (review_state or "").strip().upper()
+    if normalized == "APPROVED":
+        return "clean"
+    if normalized in {"COMMENTED", "CHANGES_REQUESTED"}:
+        return "findings"
+    if normalized == "DISMISSED":
+        return "blocked"
+    return TRACKER_KIND_NONE
+
+
+def build_review_artifact(review: dict[str, Any], current_head_sha: str) -> dict[str, Any] | None:
+    commit_id = str(review.get("commit_id") or "").strip()
+    if commit_id != current_head_sha:
+        return None
+    review_state = map_review_state(str(review.get("state") or ""))
+    if review_state == TRACKER_KIND_NONE:
+        return None
+    submitted_at = str(review.get("submitted_at") or "").strip()
+    if not parse_iso(submitted_at):
+        return None
+    body = str(review.get("body") or "")
+    summary = squash_text(body)
+    findings = markdown_bullets(body)
+    return {
+        "source_kind": "review",
+        "review_state": review_state,
+        "published_at": submitted_at,
+        "timestamp": parse_iso(submitted_at).isoformat(),
+        "url": review.get("html_url") or "",
+        "author_login": ((review.get("user") or {}).get("login") or "").strip(),
+        "engine": TRACKER_KIND_NONE,
+        "provider": "github",
+        "model": TRACKER_KIND_NONE,
+        "trigger": TRACKER_KIND_NONE,
+        "summary": summary,
+        "findings": findings,
+        "body": body,
+    }
+
+
+def select_latest_artifact(artifacts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not artifacts:
+        return None
+    return max(
+        artifacts,
+        key=lambda artifact: parse_iso(artifact["published_at"])
+        or datetime.fromtimestamp(0, tz=timezone.utc),
+    )
+
+
+def select_review_check(checks: list[dict[str, Any]], substring: str) -> dict[str, Any] | None:
+    needle = (substring or "").strip().lower()
+    matches: list[dict[str, Any]] = []
+    for check in checks:
+        name = str(check.get("name") or "")
+        workflow_name = str(check.get("workflowName") or "")
+        if needle and needle not in name.lower() and needle not in workflow_name.lower():
+            continue
+        matches.append(check)
+    if not matches:
+        return None
+    return max(
+        matches,
+        key=lambda item: parse_iso(
+            item.get("completedAt") or item.get("startedAt") or ""
+        )
+        or datetime.fromtimestamp(0, tz=timezone.utc),
+    )
+
+
+def fetch_reviews(owner: str, repo: str, number: int, *, repo_root: Path) -> list[dict[str, Any]]:
+    payload = gh_json(
+        ["api", f"repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100"],
+        cwd=repo_root,
+    )
+    return payload if isinstance(payload, list) else []
+
+
+def fetch_workflow_count(owner: str, repo: str, *, repo_root: Path) -> int | None:
+    try:
+        payload = gh_json(
+            ["api", f"repos/{owner}/{repo}/actions/workflows?per_page=100"],
+            cwd=repo_root,
+        )
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    total_count = payload.get("total_count")
+    if isinstance(total_count, int):
+        return total_count
+    workflows = payload.get("workflows")
+    if isinstance(workflows, list):
+        return len(workflows)
+    return None
+
+
+def inspect_pr(repo_root: Path, pr_arg: str | None, review_check_substring: str) -> dict[str, Any]:
+    pr_view_args = [
+        "pr",
+        "view",
+        *( [pr_arg] if pr_arg else [] ),
+        "--json",
+        "number,url,title,state,headRefOid,comments,statusCheckRollup",
+    ]
+    pr_view = gh_json(pr_view_args, cwd=repo_root)
+    owner, repo, number = parse_pr_url(pr_view["url"])
+    current_head_sha = str(pr_view.get("headRefOid") or "").strip()
+    comments = pr_view.get("comments") or []
+    reviews = fetch_reviews(owner, repo, number, repo_root=repo_root)
+    checks = pr_view.get("statusCheckRollup") or []
+
+    comment_artifacts = [
+        artifact
+        for artifact in (
+            build_comment_artifact(comment, current_head_sha)
+            for comment in comments
+        )
+        if artifact
+    ]
+    review_artifacts = [
+        artifact
+        for artifact in (
+            build_review_artifact(review, current_head_sha)
+            for review in reviews
+        )
+        if artifact
+    ]
+    latest_artifact = select_latest_artifact(comment_artifacts + review_artifacts)
+    reviewer_check = select_review_check(checks, review_check_substring)
+    reviewer_check_state = (
+        normalize_check_state(reviewer_check) if reviewer_check else TRACKER_KIND_NONE
+    )
+
+    pr_state = str(pr_view.get("state") or "").strip().upper()
+    overall_state = "pending"
+    next_action = "Wait for the current-head autoreview to publish."
+
+    if pr_state != "OPEN":
+        overall_state = "closed"
+        next_action = "PR is not open; use an open PR for the autoreview loop."
+    elif latest_artifact:
+        if latest_artifact["review_state"] == "clean":
+            if reviewer_check and reviewer_check_state == "pending":
+                overall_state = "pending"
+                next_action = "Autoreview comment is clean, but the review check is still pending."
+            elif reviewer_check and reviewer_check_state == "failure":
+                overall_state = "blocked"
+                next_action = (
+                    "The autoreview check failed without a clean terminal sweep. "
+                    "Inspect the check run before continuing."
+                )
+            else:
+                overall_state = "clean"
+                next_action = "No current-head autoreview findings remain."
+        elif latest_artifact["review_state"] == "findings":
+            overall_state = "findings"
+            next_action = "Address the current-head autoreview findings, push, then wait again."
+        else:
+            overall_state = "blocked"
+            next_action = (
+                "The latest current-head autoreview run reported a blocked state. Human input is required."
+            )
+    elif reviewer_check:
+        if reviewer_check_state == "pending":
+            overall_state = "pending"
+            next_action = "Autoreview check is still pending."
+        elif reviewer_check_state == "success":
+            overall_state = "pending"
+            next_action = (
+                "Autoreview check succeeded, but no current-head reviewer artifact matched the "
+                "`review-run-meta` contract yet."
+            )
+        else:
+            overall_state = "blocked"
+            next_action = (
+                "Autoreview check failed before publishing a usable current-head reviewer artifact."
+            )
+    elif not checks:
+        workflow_count = fetch_workflow_count(owner, repo, repo_root=repo_root)
+        if workflow_count == 0:
+            overall_state = "blocked"
+            next_action = (
+                "No GitHub Actions workflows are configured for this repo, so no autoreview/check "
+                "can publish. Add reviewer infrastructure or publish a valid current-head "
+                "reviewer artifact manually."
+            )
+
+    other_failing_checks = [
+        {
+            "name": item.get("name") or "",
+            "workflow_name": item.get("workflowName") or "",
+            "status": item.get("status") or "",
+            "conclusion": item.get("conclusion") or "",
+            "details_url": item.get("detailsUrl") or "",
+        }
+        for item in checks
+        if item is not reviewer_check and normalize_check_state(item) == "failure"
+    ]
+
+    return {
+        "state": overall_state,
+        "next_action": next_action,
+        "repo_root": str(repo_root),
+        "pr": {
+            "owner": owner,
+            "repo": repo,
+            "number": number,
+            "url": pr_view.get("url") or "",
+            "title": pr_view.get("title") or "",
+            "state": pr_state,
+            "head_sha": current_head_sha,
+        },
+        "reviewer_artifact": latest_artifact,
+        "reviewer_check": {
+            "name": reviewer_check.get("name") or "",
+            "workflow_name": reviewer_check.get("workflowName") or "",
+            "status": reviewer_check.get("status") or "",
+            "conclusion": reviewer_check.get("conclusion") or "",
+            "details_url": reviewer_check.get("detailsUrl") or "",
+            "state": reviewer_check_state,
+        }
+        if reviewer_check
+        else None,
+        "other_failing_checks": other_failing_checks,
+        "matching_comment_runs": len(comment_artifacts),
+        "matching_review_runs": len(review_artifacts),
+        "workflow_count": workflow_count if "workflow_count" in locals() else None,
+    }
+
+
+def render_report(report: dict[str, Any]) -> None:
+    pr = report["pr"]
+    print(f"PR: #{pr['number']} {pr['title']}")
+    print(f"URL: {pr['url']}")
+    print(f"PR State: {pr['state']}")
+    print(f"Current Head SHA: {pr['head_sha']}")
+    print(f"Autoreview State: {report['state']}")
+    print(f"Next Action: {report['next_action']}")
+
+    artifact = report.get("reviewer_artifact")
+    if artifact:
+        print("")
+        print("Reviewer Artifact:")
+        print(f"  Source: {artifact['source_kind']}")
+        print(f"  Review State: {artifact['review_state']}")
+        print(f"  Published At: {artifact['published_at']}")
+        print(f"  URL: {artifact['url']}")
+        print(f"  Author: {artifact['author_login']}")
+        if artifact.get("engine", TRACKER_KIND_NONE) != TRACKER_KIND_NONE:
+            print(
+                f"  Engine: {artifact['engine']} / {artifact['provider']} / {artifact['model']}"
+            )
+        if artifact.get("summary"):
+            print(f"  Summary: {artifact['summary']}")
+        findings = artifact.get("findings") or []
+        if findings:
+            print("  Findings:")
+            for finding in findings:
+                print(f"    - {finding}")
+    else:
+        print("")
+        print("Reviewer Artifact: none")
+
+    reviewer_check = report.get("reviewer_check")
+    if reviewer_check:
+        print("")
+        print("Reviewer Check:")
+        print(f"  Name: {reviewer_check['name']}")
+        if reviewer_check.get("workflow_name"):
+            print(f"  Workflow: {reviewer_check['workflow_name']}")
+        print(f"  Status: {reviewer_check['status']}")
+        print(f"  Conclusion: {reviewer_check['conclusion']}")
+        print(f"  Derived State: {reviewer_check['state']}")
+        print(f"  URL: {reviewer_check['details_url']}")
+
+    other_failing_checks = report.get("other_failing_checks") or []
+    if other_failing_checks:
+        print("")
+        print("Other Failing Checks:")
+        for check in other_failing_checks:
+            print(
+                "  - "
+                f"{check['name']} ({check['workflow_name']}) "
+                f"{check['status']}/{check['conclusion']} {check['details_url']}"
+            )
+
+
+def exit_code_for_state(state: str) -> int:
+    if state == "clean":
+        return 0
+    if state == "findings":
+        return 10
+    if state == "blocked":
+        return 11
+    if state == "closed":
+        return 12
+    return 13
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        repo_root = find_git_root(Path(args.repo).expanduser().resolve())
+    except RuntimeError as exc:
+        print(f"pr-autoreview-loop: {exc}", file=sys.stderr)
+        return 2
+
+    if args.command == "status":
+        try:
+            report = inspect_pr(repo_root, args.pr, args.review_check_substring)
+        except Exception as exc:  # noqa: BLE001
+            print(f"pr-autoreview-loop: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json_dump(report))
+        else:
+            render_report(report)
+        return exit_code_for_state(report["state"])
+
+    deadline = time.time() + max(1, args.timeout_seconds)
+    last_signature: tuple[str, str, str] | None = None
+    last_report: dict[str, Any] | None = None
+
+    while True:
+        try:
+            report = inspect_pr(repo_root, args.pr, args.review_check_substring)
+        except Exception as exc:  # noqa: BLE001
+            print(f"pr-autoreview-loop: {exc}", file=sys.stderr)
+            return 2
+
+        last_report = report
+        artifact = report.get("reviewer_artifact") or {}
+        reviewer_check = report.get("reviewer_check") or {}
+        signature = (
+            report["state"],
+            str(artifact.get("published_at") or ""),
+            str(reviewer_check.get("conclusion") or ""),
+        )
+        if signature != last_signature and not args.json:
+            print(
+                f"[wait] state={report['state']} "
+                f"artifact={artifact.get('published_at', 'none')} "
+                f"check={reviewer_check.get('conclusion', 'none')}"
+            )
+            last_signature = signature
+
+        if report["state"] in TERMINAL_STATES:
+            if args.json:
+                print(json_dump(report))
+            else:
+                render_report(report)
+            return exit_code_for_state(report["state"])
+
+        if time.time() >= deadline:
+            timeout_report = dict(last_report)
+            timeout_report["state"] = "pending"
+            timeout_report["next_action"] = (
+                "Timed out while waiting for the current-head autoreview to reach a terminal state."
+            )
+            if args.json:
+                print(json_dump(timeout_report))
+            else:
+                render_report(timeout_report)
+            return 13
+
+        time.sleep(max(1, args.poll_seconds))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

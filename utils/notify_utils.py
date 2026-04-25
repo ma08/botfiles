@@ -1044,19 +1044,23 @@ def send_notification(
         _log("WhatsApp not enabled, skipping")
 
     if config["email_enabled"]:
-        send_email_notification(
-            config=config,
-            title=title,
-            message=message,
-            system_name=system_name,
-            session_name=session_name,
-            agent_session_id=agent_session_id,
-            session_url=session_url,
-            tracker_url=tracker_url,
-            attach_command=attach_command,
-            task_label=task_label,
-            preview_line=preview_line,
-            coding_agent=coding_agent,
-        )
+        try:
+            send_email_notification(
+                config=config,
+                title=title,
+                message=message,
+                system_name=system_name,
+                session_name=session_name,
+                agent_session_id=agent_session_id,
+                session_url=session_url,
+                tracker_url=tracker_url,
+                attach_command=attach_command,
+                task_label=task_label,
+                preview_line=preview_line,
+                coding_agent=coding_agent,
+            )
+        except Exception as e:
+            _log(f"Email send failed but WhatsApp path already ran: {e}")
+            print(f"Email notification failed: {e}", file=sys.stderr)
     else:
         _log("Email not enabled, skipping")

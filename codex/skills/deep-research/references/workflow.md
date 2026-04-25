@@ -36,6 +36,8 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
   --outdir <task-progress-artifacts/scratchpad/openai>
 ```
 
+If `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the same command uses Azure Responses automatically. In Azure mode, keep `--models` aligned with Azure deployment names and prefer setting `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` when you want a durable default.
+
 Exa lane:
 - Start with `mcp__exa__deep_researcher_start`.
 - Poll with `mcp__exa__deep_researcher_check` until completed.

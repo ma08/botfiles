@@ -14,11 +14,16 @@ Purpose:
 
 Inputs:
 - OPENAI_API_KEY (environment or .env near cwd)
+- Optional Azure deep-research route via:
+  - AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT or AZURE_OPENAI_DEEP_RESEARCH_BASE_URL
+  - AZURE_OPENAI_DEEP_RESEARCH_API_KEY (falls back to AZURE_OPENAI_API_KEY)
+  - AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS (comma-separated Azure deployment names)
 - Prompt text from --prompt or --prompt-file
 
 Outputs (under --outdir):
 - openai-submit-*.json
 - openai-check-*.json
+- openai-provider-used.txt
 - openai-response-id.txt
 - openai-model-used.txt
 - openai-report-<response_id>.md
@@ -40,8 +45,9 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-API_BASE = "https://api.openai.com/v1"
-DEFAULT_MODELS = ["o3-deep-research", "o4-mini-deep-research"]
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_DEFAULT_MODELS = ["o3-deep-research", "o4-mini-deep-research"]
+AZURE_DEFAULT_DEPLOYMENTS = ["o3-deep-research"]
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
 
 
@@ -58,7 +64,20 @@ def find_env_candidates(start: Path) -> list[Path]:
     return candidates
 
 
-def load_api_key(env_file: Path | None = None) -> str:
+def split_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def normalize_azure_base_url(value: str) -> str:
+    base = value.strip().rstrip("/")
+    if not base:
+        return ""
+    if base.endswith("/openai/v1"):
+        return base
+    return f"{base}/openai/v1"
+
+
+def load_api_config(env_file: Path | None = None) -> dict[str, Any]:
     if env_file and env_file.exists():
         load_dotenv(env_file)
     else:
@@ -66,28 +85,64 @@ def load_api_key(env_file: Path | None = None) -> str:
             load_dotenv(candidate)
             break
 
+    azure_base = normalize_azure_base_url(
+        os.getenv("AZURE_OPENAI_DEEP_RESEARCH_BASE_URL", "")
+        or os.getenv("AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT", "")
+    )
+    azure_key = (
+        os.getenv("AZURE_OPENAI_DEEP_RESEARCH_API_KEY", "").strip()
+        or os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+    )
+    azure_models = split_csv(os.getenv("AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS", ""))
+
+    if azure_base:
+        if not azure_key:
+            raise RuntimeError(
+                "Azure deep-research route configured but no Azure API key was found. "
+                "Set AZURE_OPENAI_DEEP_RESEARCH_API_KEY or AZURE_OPENAI_API_KEY."
+            )
+        return {
+            "provider": "azure",
+            "api_base": azure_base,
+            "api_key": azure_key,
+            "default_models": azure_models or AZURE_DEFAULT_DEPLOYMENTS,
+        }
+
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not found in environment or .env")
-    return api_key
+        raise RuntimeError(
+            "OPENAI_API_KEY not found and no Azure deep-research endpoint was configured."
+        )
+    return {
+        "provider": "openai",
+        "api_base": OPENAI_API_BASE,
+        "api_key": api_key,
+        "default_models": OPENAI_DEFAULT_MODELS,
+    }
 
 
-def post_response(api_key: str, payload: dict[str, Any]) -> requests.Response:
+def build_headers(api_config: dict[str, Any]) -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    if api_config["provider"] == "azure":
+        headers["api-key"] = str(api_config["api_key"])
+    else:
+        headers["Authorization"] = f"Bearer {api_config['api_key']}"
+    return headers
+
+
+def post_response(api_config: dict[str, Any], payload: dict[str, Any]) -> requests.Response:
     return requests.post(
-        f"{API_BASE}/responses",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        f"{api_config['api_base']}/responses",
+        headers=build_headers(api_config),
         data=json.dumps(payload),
         timeout=180,
     )
 
 
-def get_response(api_key: str, response_id: str) -> requests.Response:
+def get_response(api_config: dict[str, Any], response_id: str) -> requests.Response:
     return requests.get(
-        f"{API_BASE}/responses/{response_id}",
-        headers={"Authorization": f"Bearer {api_key}"},
+        f"{api_config['api_base']}/responses/{response_id}",
+        headers=build_headers(api_config),
         timeout=180,
     )
 
@@ -135,7 +190,7 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
 
 
 def submit_job(
-    api_key: str,
+    api_config: dict[str, Any],
     prompt: str,
     models: list[str],
     outdir: Path,
@@ -154,7 +209,7 @@ def submit_job(
             "input": prompt,
             "tools": tools,
         }
-        response = post_response(api_key, payload)
+        response = post_response(api_config, payload)
 
         ts = iso_now()
         snapshot = outdir / f"openai-submit-{model}-{ts}.json"
@@ -166,6 +221,9 @@ def submit_job(
 
         if response.status_code < 300 and isinstance(data, dict) and data.get("id"):
             response_id = str(data["id"])
+            (outdir / "openai-provider-used.txt").write_text(
+                f"{api_config['provider']}\n", encoding="utf-8"
+            )
             (outdir / "openai-response-id.txt").write_text(
                 f"{response_id}\n", encoding="utf-8"
             )
@@ -182,8 +240,10 @@ def submit_job(
     raise RuntimeError(f"Unable to submit deep research request. Last error: {last_error}")
 
 
-def check_job(api_key: str, response_id: str, outdir: Path) -> tuple[str, dict[str, Any]]:
-    response = get_response(api_key, response_id)
+def check_job(
+    api_config: dict[str, Any], response_id: str, outdir: Path
+) -> tuple[str, dict[str, Any]]:
+    response = get_response(api_config, response_id)
     response.raise_for_status()
     data = response.json()
     ts = iso_now()
@@ -224,8 +284,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--response-id", default="", help="Existing response id to check")
     parser.add_argument(
         "--models",
-        default=",".join(DEFAULT_MODELS),
-        help="Comma-separated model fallback order",
+        default="",
+        help="Comma-separated model or Azure deployment fallback order",
     )
     parser.add_argument(
         "--outdir",
@@ -279,14 +339,14 @@ def main() -> int:
     outdir = args.outdir.resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    api_key = load_api_key(args.env_file)
+    api_config = load_api_config(args.env_file)
 
     response_id = str(args.response_id or "").strip()
     if args.action in {"submit", "submit_and_check"}:
         prompt = resolve_prompt(args)
-        models = [m.strip() for m in str(args.models).split(",") if m.strip()]
+        models = split_csv(str(args.models or "")) or list(api_config["default_models"])
         response_id, model = submit_job(
-            api_key=api_key,
+            api_config=api_config,
             prompt=prompt,
             models=models,
             outdir=outdir,
@@ -304,7 +364,7 @@ def main() -> int:
         raise RuntimeError("No response id provided and outdir/openai-response-id.txt not found")
 
     if args.action == "check":
-        status, payload = check_job(api_key, response_id, outdir)
+        status, payload = check_job(api_config, response_id, outdir)
         print(f"response_id={response_id} status={status}")
         if status in TERMINAL_STATUSES:
             write_extracted_outputs(outdir, response_id, payload)
@@ -313,9 +373,10 @@ def main() -> int:
 
     start = time.time()
     timeout_seconds = args.timeout_minutes * 60
+    no_timeout = args.timeout_minutes <= 0
 
     while True:
-        status, payload = check_job(api_key, response_id, outdir)
+        status, payload = check_job(api_config, response_id, outdir)
         print(f"response_id={response_id} status={status}")
 
         if status in TERMINAL_STATUSES:
@@ -323,7 +384,7 @@ def main() -> int:
             print(f"terminal_status={status}")
             return 0 if status == "completed" else 2
 
-        if (time.time() - start) > timeout_seconds:
+        if not no_timeout and (time.time() - start) > timeout_seconds:
             print("timeout reached", file=sys.stderr)
             return 3
 
