@@ -74,6 +74,12 @@ Do not treat `finish-task` as permission to force-close unfinished work.
   `context/` task artifacts as part of closeout readiness. Do not close the
   external PR or tracker while the corresponding task context folder is still
   uncommitted unless the user explicitly chooses a different bookkeeping plan.
+- When local uncommitted changes exist, classify them before asking what to do:
+  in-scope closeout changes, unrelated user/workspace changes, or ambiguous.
+  If in-scope changes are present and the task is otherwise ready to close, the
+  user prompt must include an option to commit and push the scoped changes, then
+  continue the tracker closeout. Do not make tracker-only closeout the only
+  terminal option for a task whose relevant local work is still uncommitted.
 
 ## Step 3: Ask for explicit confirmation before destructive actions
 
@@ -92,6 +98,18 @@ these as separate toggles when the user's request did not already specify them:
 If the user explicitly asked for a full merge-and-close flow, that counts as
 permission for the matching items above, but still surface any ambiguity first.
 
+When uncommitted changes are present, make the confirmation choices reflect the
+actual closeout paths. Include options like:
+
+- Commit scoped changes and close/move tracker
+- Commit scoped changes and hand off for review
+- Tracker-only handoff, leaving local changes uncommitted
+- Pause for manual cleanup
+
+Only offer the combined commit-and-close option for changes you can scope
+clearly. If unrelated or ambiguous dirty files are mixed in, show the scoped file
+set and ask before staging anything.
+
 ## Step 4: Execute closeout in a safe order
 
 1. Update local task state first.
@@ -102,6 +120,9 @@ permission for the matching items above, but still surface any ambiguity first.
    - If the task does not have a dedicated branch and is meant to land on the
      current repo's default branch, keep the relevant implementation files and
      the task context folder in scoped commits on that same branch.
+   - For dirty working trees, stage only the files explicitly identified as
+     in-scope for the closeout. Leave unrelated local changes untouched and
+     mention them in the final handoff.
    - If a task-tracking repo such as `personal_os` owns closeout artifacts that
      belong in version control, commit and push that bookkeeping deliberately in
      the same closeout sequence. For cross-repo work, this is usually a separate
@@ -154,7 +175,9 @@ Report only the concrete closeout results:
   as separate closeout surfaces that must both be handled in the same closeout
   sequence; do not assume one PR should contain both.
 - Dirty or unrelated changes are present: do not delete branches/worktrees or
-  auto-close the task until the user explicitly decides how to handle them.
+  auto-close the task until the user explicitly decides how to handle them. If
+  the dirty changes are in-scope, offer to commit/push the scoped changes and
+  then close or move the tracker in one confirmed closeout path.
 - If the repo has no `gh` auth, no tracker auth, or no deterministic way to
   inspect PR state, stop after the local status update and ask for the missing
   access.
