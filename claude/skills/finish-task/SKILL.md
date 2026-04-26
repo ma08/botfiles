@@ -37,6 +37,10 @@ If no target is provided, resolve the current task for this session with
    - the code repo or worktree that owns the implementation
    - the task-tracking repo (for example `personal_os`) when it differs from
      the code repo
+   - task artifact folders such as `context/daily/.../<task-slug>/` that need
+     to be committed as durable closeout context
+   - whether each repo uses a dedicated task branch/PR or intentionally works
+     on its default branch, such as `personal_os` tasks done directly on `main`
    - tracker surfaces such as Linear issues, GitHub issues, PRs, and any
      downstream linked tasks
 3. Capture the current local state before touching anything:
@@ -62,6 +66,13 @@ Do not treat `finish-task` as permission to force-close unfinished work.
 - If there are multiple candidate PRs, multiple repos, dirty uncommitted
   changes, or unclear merge strategy, stop and ask the smallest targeted
   question needed to disambiguate.
+- For no-dedicated-branch tasks, do not require or invent a PR. Confirm the
+  work is on the expected default branch, usually `main`, and that the relevant
+  task context folder is included in the intended commit/push set.
+- For cross-repo tasks coordinated from `personal_os`, treat uncommitted
+  `context/` task artifacts as part of closeout readiness. Do not close the
+  external PR or tracker while the corresponding task context folder is still
+  uncommitted unless the user explicitly chooses a different bookkeeping plan.
 
 ## Step 3: Ask for explicit confirmation before destructive actions
 
@@ -72,6 +83,8 @@ these as separate toggles when the user's request did not already specify them:
 - delete the remote branch
 - delete local branches or remove worktrees
 - move a tracker to `Done` or close a GitHub issue
+- commit or push task context artifacts to a default branch such as
+  `personal_os/main`
 - create bookkeeping commits in a task-tracking repo such as `personal_os`
 - close a dedicated zellij session
 
@@ -85,10 +98,14 @@ permission for the matching items above, but still surface any ambiguity first.
    - Record final validation, merge intent, and any residual risk
    - Run `save-task-status` before external writes so the task record reflects
      the pre-merge state
+   - If the task does not have a dedicated branch and is meant to land on the
+     current repo's default branch, keep the relevant implementation files and
+     the task context folder in scoped commits on that same branch.
    - If a task-tracking repo such as `personal_os` owns closeout artifacts that
-     belong in version control, commit and push that bookkeeping deliberately as
-     its own closeout surface instead of silently folding it into the code repo
-     PR
+     belong in version control, commit and push that bookkeeping deliberately in
+     the same closeout sequence. For cross-repo work, this is usually a separate
+     `personal_os` commit/push alongside the code repo PR merge, not a hidden
+     addition to the code repo PR.
 2. Land the code change if applicable.
    - Ensure the working tree is intentionally clean
    - Merge with the repo's expected strategy or the user's specified strategy
@@ -129,9 +146,12 @@ Report only the concrete closeout results:
 ## Special cases
 
 - No PR exists: still use this flow for local-only or tracker-only closeout;
-  skip merge steps and focus on status sync, closing notes, and cleanup.
+  skip PR merge steps. If the work was intentionally done on the default branch,
+  verify the scoped commit/push that lands the task, including any relevant
+  `context/` folder, before closing the tracker.
 - Multiple repos are involved: treat the code repo and the task-tracking repo
-  as separate closeout surfaces; do not assume one PR should contain both.
+  as separate closeout surfaces that must both be handled in the same closeout
+  sequence; do not assume one PR should contain both.
 - Dirty or unrelated changes are present: do not delete branches/worktrees or
   auto-close the task until the user explicitly decides how to handle them.
 - If the repo has no `gh` auth, no tracker auth, or no deterministic way to
