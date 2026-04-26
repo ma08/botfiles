@@ -1,6 +1,20 @@
 # Botfiles
 
-Configuration files for Claude Code and Codex CLI, designed to be synced across multiple machines.
+Opinionated configuration files for coding-agent workflows, designed to stay portable across machines and agent ecosystems.
+
+This is my personal "botfiles" repo: a play on Unix-style dotfiles, but focused on agent behavior rather than only shell/editor setup. It keeps Codex, Claude Code, hooks, skills, task-status conventions, zellij helpers, and notification wiring aligned across the machines where I run long-lived coding agents.
+
+## How To Read This Repo
+
+This repo is public as a reference, not as a turnkey product. It is highly custom and reflects my own machines, tools, task folders, and workflow preferences.
+
+The useful path for most readers is to borrow a slice:
+
+- copy the idea of durable task folders (`status.md`, `user_inputs/`, `task-progress-artifacts/`)
+- adapt the hook/notification pattern for your own alerting setup
+- reuse individual skills or task-status helpers
+- point a coding agent at the repo and ask it which pieces are worth adapting to your environment
+- ignore machine-specific aliases, hostnames, model profiles, and private workflow assumptions that do not match your setup
 
 ## What's Included
 
@@ -18,8 +32,12 @@ Configuration files for Claude Code and Codex CLI, designed to be synced across 
 - **secrets/** - Centralized secret templates and local runtime secret files
 - **.botenv** — Non-interactive-safe core bootstrap (secrets, PATH, EDITOR, TERM, UV_BIN)
 - **.botrc** - Interactive shell layer (aliases, functions) that sources `.botenv`
+- **bin/** - Repo-managed command wrappers for Oracle, Google Workspace, zellij session launch, and cross-session helpers
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 - **zellij/** - Canonical Zellij config (including remaps away from `Ctrl+g` and `Ctrl+t`)
+- **docs/** - Shared contracts for task-status metadata and cross-session orchestration
+- **context/** - Public-safe examples of task records and artifacts from botfiles work
+- **hermes/** - Early shared workflow assets for Hermes-style agents
 
 ## Prerequisites
 
@@ -466,6 +484,20 @@ botfiles/
 ├── README.md
 ├── .gitignore
 ├── setup.sh
+├── bin/
+│   ├── oracle
+│   ├── oracle-mcp
+│   ├── start-zellij-session-for-task
+│   ├── get-cross-session-context
+│   ├── send-zellij-message
+│   └── ...
+├── docs/
+│   ├── task-status-tracker-contract.md
+│   └── cross-session-orchestration-contract.md
+├── context/
+│   └── daily/
+├── hermes/
+│   └── README.md
 ├── shell/
 │   ├── 10-uv-bin.sh
 │   ├── 20-ssh-workflows.sh
@@ -491,7 +523,12 @@ botfiles/
 │   │   ├── oracle_awaiter.toml
 │   │   └── reviewer.toml
 │   └── skills/
-│       └── README.md
+│       ├── README.md
+│       ├── _shared/
+│       ├── start-new-task/
+│       ├── continue-task/
+│       ├── finish-task/
+│       └── ...
 └── claude/
     ├── agents/
     │   ├── oracle-awaiter.md
@@ -507,10 +544,11 @@ botfiles/
     │   ├── utils.py
     │   └── whatsapp.py
     └── skills/
-        └── notion/
-            ├── README.md
-            ├── SKILL.md
-            └── examples/
+        ├── _shared/
+        ├── start-new-task/
+        ├── continue-task/
+        ├── finish-task/
+        └── ...
 ```
 
 ## Updating
@@ -655,4 +693,4 @@ If other machines should be able to connect to this one using the `work-*` comma
 
 ## License
 
-Private configuration files.
+Public reference for personal configuration files. No open-source license is currently included; treat the repository as source material for ideas unless a license is added.
