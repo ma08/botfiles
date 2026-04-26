@@ -74,7 +74,13 @@ fi
 # https://github.com/anomalyco/opencode/issues/1721
 OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS=3600000
 
-# Originally set for good opencode
+# Originally set for good opencode.
 # export COLORTERM=truecolor  # disabled: causes garish colors in Claude Code under Zellij
 
-alias symcode="/home/azureuser/pro/symcode-sidebar-experiment/packages/opencode/dist/opencode-linux-x64/bin/symcode"
+# Optional local Symcode experiment launcher. Guarded so this shared botfiles
+# layer stays portable on machines without the experiment checkout.
+_botrc_symcode="$HOME/pro/symcode-sidebar-experiment/packages/opencode/dist/opencode-linux-x64/bin/symcode"
+if [ -x "$_botrc_symcode" ]; then
+  alias symcode="$_botrc_symcode"
+fi
+unset _botrc_symcode

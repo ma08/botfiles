@@ -25,7 +25,6 @@ The useful path for most readers is to borrow a slice:
   - Sends notifications when Claude needs permission
   - Sends notifications when Claude asks a question
 - **skills/** - Claude Code skills for extended capabilities
-  - **notion/** - Notion workspace integration
 - **claude/agents/** - Source-controlled custom Claude Code subagents, synced into `~/.claude/agents` (`oracle-awaiter`, `reviewer`)
 - **codex/agents/** - Source-controlled custom Codex agents, synced into `~/.codex/agents` (`oracle_awaiter`, `reviewer`)
 - **codex/** - Codex CLI config, synced skills, and global AGENTS instructions
@@ -36,7 +35,7 @@ The useful path for most readers is to borrow a slice:
 - **shell/** - Reusable shell modules loaded by `.botrc` (for example SSH workflow helpers)
 - **zellij/** - Canonical Zellij config (including remaps away from `Ctrl+g` and `Ctrl+t`)
 - **docs/** - Shared contracts for task-status metadata and cross-session orchestration
-- **context/** - Public-safe examples of task records and artifacts from botfiles work
+- **context/** - A few committed examples of task records and artifacts produced by task-related skills
 - **hermes/** - Early shared workflow assets for Hermes-style agents
 
 ## Prerequisites
@@ -442,10 +441,11 @@ Shared workflow skills now cover the full tracked-task lifecycle:
 - `save-task-status` updates the durable task record throughout execution.
 - `finish-task` standardizes closeout when the user asks to wrap up a task: it checks closeout readiness first, syncs status/tracker notes, handles any required downstream heads-up, and performs local cleanup only after confirmation.
 
-### Notion Skill
+### Archived Notion Skill
 
-Integrates with Notion workspaces for reading/writing pages, searching, and managing databases.
-I created this myself to have a skill-only Notion-Claude Code integration that avoids MCPs which were causing [context bloating](https://x.com/curious_queue/status/2008612572992315850?s=20).
+An older Claude-only Notion skill is kept under `claude/backup_skills/notion/` as an archived reference. It is not part of the active `claude/skills/` symlink target installed by `setup.sh`.
+
+I originally created it to have a skill-only Notion-Claude Code integration that avoided MCPs which were causing [context bloating](https://x.com/curious_queue/status/2008612572992315850?s=20). If you want to revive it, move or copy the archived skill back into `claude/skills/notion/` and re-test it against the current Notion SDK.
 
 **Setup:**
 
@@ -470,10 +470,10 @@ I created this myself to have a skill-only Notion-Claude Code integration that a
 
 **Test the connection:**
 ```bash
-node ~/.claude/skills/notion/examples/test-connection.js
+node claude/backup_skills/notion/examples/test-connection.js
 ```
 
-See `claude/skills/notion/README.md` for detailed usage.
+See `claude/backup_skills/notion/README.md` for detailed usage.
 
 ## Directory Structure
 
@@ -482,6 +482,7 @@ botfiles/
 ├── .botenv
 ├── .botrc
 ├── README.md
+├── LICENSE
 ├── .gitignore
 ├── setup.sh
 ├── bin/
@@ -514,6 +515,7 @@ botfiles/
 │       ├── claude-vertex.rc.example
 │       ├── codex-azure.rc.example
 │       ├── codex-openai.rc.example
+│       ├── linear.rc.example
 │       ├── machine.rc.example
 │       └── opencode-azure.rc.example
 ├── codex/
@@ -693,4 +695,4 @@ If other machines should be able to connect to this one using the `work-*` comma
 
 ## License
 
-Public reference for personal configuration files. No open-source license is currently included; treat the repository as source material for ideas unless a license is added.
+MIT License. See `LICENSE`.
