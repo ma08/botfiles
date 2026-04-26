@@ -77,6 +77,7 @@ When working on any task, **proactively** maintain task status documentation.
 ### Proactive Behavior
 - **At task start**: Use `/start-new-task` to scaffold a task folder with `status.md`, `user_inputs/initial.md`, `user_inputs/input_artifacts/`, `task-progress-artifacts/`, and `task-progress-artifacts/scratchpad/`. For interrupted tracked resumes from another session, use `/continue-task` instead. Keep `/save-task-status` for checkpoint updates once the current session already owns the task. When enough context is already available, keep going in the same turn: gather tracker/local context, ask `AskUserQuestion` only for critical planning gaps, and present a first-pass written plan for approval instead of stopping at boilerplate setup.
 - **At any checkpoint**: Use `/get-task-details` to retrieve the active status path plus issue/machine/coding-agent session metadata.
+- **At closeout**: Use `/finish-task` when the user wants the standard end-of-task flow: resolve the current task, gate on real merge/closeout readiness, sync tracker notes/state, handle required downstream heads-up, and clean branches/worktrees only after explicit confirmation.
 - **At milestones**: Update the status file when completing sub-tasks, making key decisions, or discovering important information
 - **Save artifacts continuously**:
 - When you produce or encounter log output, write scripts, capture errors, or generate any useful output — immediately save it under `task-progress-artifacts/` in the task folder. Don't wait until session end.

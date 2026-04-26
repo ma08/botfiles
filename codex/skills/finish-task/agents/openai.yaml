@@ -1,0 +1,4 @@
+interface:
+  display_name: "Finish Task"
+  short_description: "Land a tracked task and cleanly close it out"
+  default_prompt: "Finish the active tracked task. Resolve the current task details first, identify code and task-context repo surfaces, classify any uncommitted changes, gate on actual closeout readiness, require explicit confirmation before merge/branch/worktree/Done/default-branch commit actions, offer to commit and push scoped in-scope changes before tracker closeout, sync status.md before and after external writes, handle any downstream heads-up notes that the closeout requires, and clean local branches/worktrees last."
