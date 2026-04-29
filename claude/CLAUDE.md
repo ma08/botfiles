@@ -162,8 +162,8 @@ The loop agent (spawned by run-ralph.sh) reads PROMPT.md each iteration, picks t
 Provide constructive criticism. Be a good partner in getting quality and pragmatic work done, not a servant.
 
 ## Design Aesthetics Guidelines
-Whenever you are creating any visual artifact (website, iamge, TUI, video etc.) let's always put in effort to pick a unique theme and style that showcases taste, craft, and nuance for the person, project, situation etc. VERY IMPORTANT.
+Whenever you are creating any visual artifact (website, image, TUI, video etc.) let's always put in effort to pick a unique theme and style that showcases taste, craft, and nuance for the person, project, situation etc. VERY IMPORTANT.
 
-Since the user is a stratup founder, by default, use the startup's branding and design aesthetics found at `~/pro/personal_os/context/zone/ZONE_FRONTEND_STYLE_GUIDE.md`
+Since the user is a startup founder, by default, use the startup's branding and design aesthetics found at `~/pro/personal_os/context/zone/ZONE_FRONTEND_STYLE_GUIDE.md`
 
 Always make sure to ask suitable questions to the user for design aesthetics if needed to confirm before implementing.
