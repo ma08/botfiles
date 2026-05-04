@@ -39,6 +39,13 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Treat that file as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes.
 - Use the `~/pro/...` path form when referring to it, and consult it before assuming cloud auth is already available or changing login state on a machine.
 
+## gstack
+
+- gstack is installed from `~/pro/gstack`; its setup links Claude Code skills into `~/.claude/skills` (`~/pro/botfiles/claude/skills`).
+- Use gstack skills when the user requests gstack or when a gstack workflow clearly matches the task. Common short slash commands include `/office-hours`, `/autoplan`, `/review`, `/qa`, `/cso`, `/browse`, and `/gstack-upgrade`.
+- For brainstorming, roadmap, product strategy, or YC-application idea work, prefer `/office-hours` as the entry point.
+- Follow existing repo/session browser and tool-use rules. Use gstack `/browse` when the user requests gstack browsing or a loaded gstack skill requires it, not as a blanket replacement for all browser tooling.
+
 ## Curated Skills
 
 - Keep upstream curated skill directories unchanged unless you are intentionally creating a protected local fork.

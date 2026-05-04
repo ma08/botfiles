@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/review/design-checklist.md

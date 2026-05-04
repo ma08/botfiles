@@ -54,6 +54,13 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Keep Codex/Claude skill counterparts aligned to avoid drift
 - Codex system skills in `~/.codex/skills/.system/` are machine-managed and should not be source-controlled in `botfiles`
 
+## gstack
+
+- gstack is installed from `~/pro/gstack`; its setup links generated Codex skills into `~/.codex/skills` (`~/pro/botfiles/codex/skills`).
+- Use gstack skills when the user requests gstack or when a gstack workflow clearly matches the task. Codex discovers them from `gstack-*` directories, but the skill names are short frontmatter names such as `office-hours`, `autoplan`, `review`, `qa`, `cso`, `browse`, and `gstack-upgrade`.
+- For brainstorming, roadmap, product strategy, or YC-application idea work, prefer `office-hours` as the entry point.
+- Do not let gstack browsing guidance override higher-priority Codex web, Playwright, or tool-use instructions. Use gstack browser workflows when the user requests gstack browsing or a loaded gstack skill requires them.
+
 ## Curated Skills
 
 - Keep upstream curated skill directories unchanged unless you are intentionally creating a protected local fork.

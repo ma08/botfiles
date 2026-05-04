@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/qa-only/SKILL.md

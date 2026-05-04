@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/document-release/SKILL.md

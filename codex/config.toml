@@ -183,6 +183,7 @@ url = "https://developers.openai.com/mcp"
 url = "https://mcp.linear.app/mcp"
 
 [features]
+goals = true
 steer = true
 shell_snapshot = true
 # apps = true

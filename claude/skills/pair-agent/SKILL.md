@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/pair-agent/SKILL.md

@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/gstack-upgrade/SKILL.md

@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/landing-report/SKILL.md

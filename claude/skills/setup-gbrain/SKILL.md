@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/setup-gbrain/SKILL.md

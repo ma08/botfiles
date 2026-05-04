@@ -1,0 +1,1 @@
+/home/azureuser/pro/gstack/design-review/SKILL.md
