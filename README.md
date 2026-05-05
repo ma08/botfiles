@@ -4,6 +4,51 @@ Opinionated configuration files for coding-agent workflows, designed to stay por
 
 This is my personal "botfiles" repo: a play on Unix-style dotfiles, but focused on agent behavior rather than only shell/editor setup. It keeps Codex, Claude Code, hooks, skills, task-status conventions, zellij helpers, and notification wiring aligned across the machines where I run long-lived coding agents.
 
+Read the companion X Article: [Botfiles: A Dotfiles-Inspired Model-Agnostic Setup for 24/7 Agents](https://x.com/curious_queue/status/2049660997993152855).
+
+[![Botfiles article cover: a dotfiles-inspired model-agnostic setup for 24/7 agents](docs/assets/readme/botfiles-article-cover.jpg)](https://x.com/curious_queue/status/2049660997993152855)
+
+## Visual Map
+
+Use this as a faster path through the long README. Each image jumps to the section it explains.
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <a href="#whats-included"><img src="docs/assets/readme/botfiles-repo-map.jpg" alt="Map of the botfiles repo showing instructions, skills, hooks, task state, and handoff context" width="260"></a><br>
+      <strong><a href="#whats-included">Repo map</a></strong><br>
+      <sub>What lives in botfiles and why.</sub>
+    </td>
+    <td width="33%" align="center">
+      <a href="#ssh-workflow-commands"><img src="docs/assets/readme/remote-development-stack.jpg" alt="Architecture of the remote development stack for 24/7 agent work" width="260"></a><br>
+      <strong><a href="#ssh-workflow-commands">Remote stack</a></strong><br>
+      <sub>SSH, mosh, zellij, and remote agent sessions.</sub>
+    </td>
+    <td width="33%" align="center">
+      <a href="#tracked-task-lifecycle-skills"><img src="docs/assets/readme/task-context-workflow.jpg" alt="Task context workflow showing task folders and lifecycle skills" width="260"></a><br>
+      <strong><a href="#tracked-task-lifecycle-skills">Task lifecycle</a></strong><br>
+      <sub>How sessions start, save state, resume, and finish.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <a href="#cross-session-orchestration"><img src="docs/assets/readme/cross-session-workflow.jpg" alt="Cross-session workflow for resolving task state and sending bounded messages" width="260"></a><br>
+      <strong><a href="#cross-session-orchestration">Cross-session work</a></strong><br>
+      <sub>Inspect and message live agent sessions without remote control.</sub>
+    </td>
+    <td width="33%" align="center">
+      <a href="#zellij-web-links-in-notifications"><img src="docs/assets/readme/email-hook-context.jpg" alt="Email hook payload with task context, tracker IDs, and zellij web links" width="260"></a><br>
+      <strong><a href="#zellij-web-links-in-notifications">Notifications</a></strong><br>
+      <sub>Task context, tracker IDs, and zellij links in alerts.</sub>
+    </td>
+    <td width="33%" align="center">
+      <a href="#whats-included"><img src="docs/assets/readme/hermes-supervisor-cron.jpg" alt="Pickup and supervise cron pattern for a semi-autonomous software factory" width="260"></a><br>
+      <strong><a href="#whats-included">Hermes experiments</a></strong><br>
+      <sub>Pickup and supervise loops for agent-team UX.</sub>
+    </td>
+  </tr>
+</table>
+
 ## How To Read This Repo
 
 This repo is public as a reference, not as a turnkey product. It is highly custom and reflects my own machines, tools, task folders, and workflow preferences.
