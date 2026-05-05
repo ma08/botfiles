@@ -57,17 +57,30 @@ Use this as a faster path through the long README. Each image jumps to the secti
   </tr>
 </table>
 
-## How To Read This Repo
+## Start Here
 
-This repo is public as a reference, not as a turnkey product. It is highly custom and reflects my own machines, tools, task folders, and workflow preferences.
+This repo is public as a reference implementation, not a turnkey product. It reflects my own machines, tools, task folders, and workflow preferences, so the useful move is to copy patterns rather than clone the whole setup unchanged.
 
-The useful path for most readers is to borrow a slice:
+### Who This Is For
 
-- copy the idea of durable task folders (`status.md`, `user_inputs/`, `task-progress-artifacts/`)
-- adapt the hook/notification pattern for your own alerting setup
-- reuse individual skills or task-status helpers
-- point a coding agent at the repo and ask it which pieces are worth adapting to your environment
-- ignore machine-specific aliases, hostnames, model profiles, and private workflow assumptions that do not match your setup
+- Solo builders using Codex, Claude Code, or other CLI coding agents.
+- People who want agent context to survive across models, machines, and sessions.
+- Teams exploring long-running remote agent workspaces.
+- Anyone who wants examples of task folders, skills, hooks, zellij workflows, and notification loops.
+
+### Copy These Ideas First
+
+1. **Durable task folders**: keep `status.md`, `user_inputs/`, and `task-progress-artifacts/` outside any single chat transcript.
+2. **Shared agent instructions**: store global preferences in versioned files such as `codex/AGENTS.md` and `claude/CLAUDE.md`.
+3. **Reusable skills**: keep repeatable workflows as file-backed skills that can be mirrored across agents.
+4. **Resume-friendly sessions**: use zellij plus task metadata so interrupted work can be found, inspected, and continued.
+5. **Notification hooks**: send compact task context and session links to the places where you actually notice them.
+
+### Ignore These At First
+
+- My exact machine names, SSH aliases, tailnet hostnames, and model/provider profiles.
+- Any local secret values or private workflow assumptions.
+- The full setup script if all you want is one pattern. Start with a single idea, adapt it, and expand only when it earns its keep.
 
 ## What's Included
 
