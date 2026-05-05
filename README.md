@@ -11,7 +11,20 @@ Read the companion X Article: [Botfiles: A Dotfiles-Inspired Model-Agnostic Setu
 Paste this into your coding agent before deciding what to copy:
 
 ```text
-Read through https://github.com/ma08/botfiles and grill me on what parts I should incorporate into my own coding-agent setup. Focus on reusable patterns, not copying Sourya's machine-specific configuration. Ask me targeted questions about my agents, machines, notification preferences, task-tracking habits, and tolerance for automation before recommending changes.
+Read through https://github.com/ma08/botfiles and grill me on what
+parts I should incorporate into my own coding-agent setup.
+
+Focus on reusable patterns, not copying Sourya's machine-specific
+configuration.
+
+Ask me targeted questions about:
+- my agents
+- my machines
+- notification preferences
+- task-tracking habits
+- tolerance for automation
+
+Then recommend the smallest useful changes I should make.
 ```
 
 [![Botfiles article cover: a dotfiles-inspired model-agnostic setup for 24/7 agents](docs/assets/readme/botfiles-article-cover.jpg)](https://x.com/curious_queue/status/2049660997993152855)
@@ -89,7 +102,20 @@ This repo is public as a reference implementation, not a turnkey product. It ref
 If you want to borrow from this repo, paste this into your coding agent:
 
 ```text
-Read through https://github.com/ma08/botfiles and grill me on what parts I should incorporate into my own coding-agent setup. Focus on reusable patterns, not copying Sourya's machine-specific configuration. Ask me targeted questions about my agents, machines, notification preferences, task-tracking habits, and tolerance for automation before recommending changes.
+Read through https://github.com/ma08/botfiles and grill me on what
+parts I should incorporate into my own coding-agent setup.
+
+Focus on reusable patterns, not copying Sourya's machine-specific
+configuration.
+
+Ask me targeted questions about:
+- my agents
+- my machines
+- notification preferences
+- task-tracking habits
+- tolerance for automation
+
+Then recommend the smallest useful changes I should make.
 ```
 
 ### Ignore These At First
