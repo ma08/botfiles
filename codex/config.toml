@@ -208,3 +208,9 @@ default_mode_request_user_input = true
 
 [plugins."figma@openai-curated"]
 enabled = true
+
+[plugins."gmail@openai-curated"]
+enabled = true
+
+[plugins."github@openai-curated"]
+enabled = true
