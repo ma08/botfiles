@@ -41,12 +41,15 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 ## Local Screenshot Payloads
 
-- When the user pastes a payload beginning with `screenshot-local:`, treat it as a durable local screenshot reference, not as prose to summarize.
-- The payload can include `path`, `machine`, `hostname`, `user`, `ssh_host`, `name`, and a `retrieve` hint. Prefer the explicit `ssh_host` when present; otherwise resolve the machine through botfiles fleet notes or existing SSH config.
+- When the user pastes a payload beginning with `screenshot-info:`, treat it as a durable local screenshot reference, not as prose to summarize. Also support the legacy `screenshot-local:` payload format.
+- Current payloads are intentionally compact:
+  - `machine`: SSH host alias for the machine that has the file, such as `sourya-mac`
+  - `path`: absolute path to the screenshot on that machine
 - If you are running on the same machine as the screenshot path, copy the file directly into the active task's `user_inputs/input_artifacts/`.
-- If you are running on another machine, retrieve the image with SSH/SCP into the active task's `user_inputs/input_artifacts/`, for example:
+- If you are running on another machine, treat `machine` as the SSH host and retrieve the image with SSH/SCP into the active task's `user_inputs/input_artifacts/`, for example:
   - `mkdir -p user_inputs/input_artifacts`
   - `scp 'sourya-mac:/Users/sourya4/Pictures/Screenshots/example.png' user_inputs/input_artifacts/`
+- If `machine` is not a working SSH alias, consult `~/pro/personal_os/context/machine-ssh-aliases.md` and `~/.ssh/config` to find the right alias. For legacy payloads, prefer `ssh_host` when present.
 - After copying the image, update `user_inputs/input_artifacts/index.md` with the source payload details, capture time, and local artifact path.
 - Prefer analyzing the captured local artifact over asking for or relying on an expiring S3 URL. If SSH/SCP fails and no local path is reachable, ask for the S3 URL or a fresh payload.
 
@@ -112,7 +115,7 @@ Every tracked task gets a folder at `<task-status-root>/YYYY-MM-DD/<HH>h<MM>m<SS
 - **input_artifacts/**: Under `user_inputs/`, store user-provided or user-referenced files, images, and local copies of input artifacts. Maintain `user_inputs/input_artifacts/index.md` when artifacts are captured or when an external artifact cannot be copied locally.
 - **task-progress-artifacts/**: Keep curated deliverables and key evidence in top-level `task-progress-artifacts/`. Put raw log snippets, adhoc scripts, config snapshots, command outputs, screenshots, and error traces in `task-progress-artifacts/scratchpad/`. Copy content into the folder (don't just reference external paths that may disappear). The task folder should be a self-contained package.
 - **Timezone**: All timestamps in task files use PST explicitly. Use `TZ=America/Los_Angeles date` for reliable PST regardless of VM timezone. Format: `YYYY-MM-DD ~HH:MMam/pm PST`.
-- **Machine identity**: Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so metadata and notifications remain consistent across workflows.
+- **Machine identity**: Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so metadata and notifications remain consistent across workflows. Set `BOT_MACHINE_SSH_ALIAS` there to the SSH alias other machines should use for this machine; screenshot payloads use it as their compact `machine` value.
 - **Legacy folders**: Existing folders without time prefix or `user_inputs/` continue to work unchanged.
 
 ## Cross-Session Orchestration

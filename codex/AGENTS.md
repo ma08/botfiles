@@ -36,12 +36,15 @@ These are user-level instructions for the Codex agent shared across all projects
 
 ## Local Screenshot Payloads
 
-- When the user pastes a payload beginning with `screenshot-local:`, treat it as a durable local screenshot reference, not as prose to summarize.
-- The payload can include `path`, `machine`, `hostname`, `user`, `ssh_host`, `name`, and a `retrieve` hint. Prefer the explicit `ssh_host` when present; otherwise resolve the machine through botfiles fleet notes or existing SSH config.
+- When the user pastes a payload beginning with `screenshot-info:`, treat it as a durable local screenshot reference, not as prose to summarize. Also support the legacy `screenshot-local:` payload format.
+- Current payloads are intentionally compact:
+  - `machine`: SSH host alias for the machine that has the file, such as `sourya-mac`
+  - `path`: absolute path to the screenshot on that machine
 - If you are running on the same machine as the screenshot path, copy the file directly into the active task's `user_inputs/input_artifacts/`.
-- If you are running on another machine, retrieve the image with SSH/SCP into the active task's `user_inputs/input_artifacts/`, for example:
+- If you are running on another machine, treat `machine` as the SSH host and retrieve the image with SSH/SCP into the active task's `user_inputs/input_artifacts/`, for example:
   - `mkdir -p user_inputs/input_artifacts`
   - `scp 'sourya-mac:/Users/sourya4/Pictures/Screenshots/example.png' user_inputs/input_artifacts/`
+- If `machine` is not a working SSH alias, consult `~/pro/personal_os/context/machine-ssh-aliases.md` and `~/.ssh/config` to find the right alias. For legacy payloads, prefer `ssh_host` when present.
 - After copying the image, update `user_inputs/input_artifacts/index.md` with the source payload details, capture time, and local artifact path.
 - Prefer analyzing the captured local artifact over asking for or relying on an expiring S3 URL. If SSH/SCP fails and no local path is reachable, ask for the S3 URL or a fresh payload.
 
@@ -112,6 +115,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - Save generated artifacts under `task-progress-artifacts/`, keeping curated outputs at the top level and raw/intermediate material under `task-progress-artifacts/scratchpad/`
 - Keep task input context under `user_inputs/`, with Markdown notes at the root and non-Markdown files in `user_inputs/input_artifacts/`
 - Set `SYSTEM_NAME` in `~/pro/botfiles/secrets/local/machine.rc` so task metadata and notifications identify the machine consistently
+- Set `BOT_MACHINE_SSH_ALIAS` in `~/pro/botfiles/secrets/local/machine.rc` to the SSH alias other machines should use for this machine; screenshot payloads use this as their compact `machine` value
 
 ### Plan Acceptance Persistence (Required)
 
