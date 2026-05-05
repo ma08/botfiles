@@ -14,7 +14,7 @@ Paste this into your coding agent before deciding what to copy:
 Read through https://github.com/ma08/botfiles and grill me on what
 parts I should incorporate into my own coding-agent setup.
 
-Focus on reusable patterns, not copying Sourya's machine-specific
+Focus on reusable patterns, not copying this repo's machine-specific
 configuration.
 
 Ask me targeted questions about:
@@ -105,7 +105,7 @@ If you want to borrow from this repo, paste this into your coding agent:
 Read through https://github.com/ma08/botfiles and grill me on what
 parts I should incorporate into my own coding-agent setup.
 
-Focus on reusable patterns, not copying Sourya's machine-specific
+Focus on reusable patterns, not copying this repo's machine-specific
 configuration.
 
 Ask me targeted questions about:
