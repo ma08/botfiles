@@ -516,8 +516,40 @@ export SYSTEM_NAME="MyMachineName"
 - WhatsApp notifications (origin context)
 - Task-status metadata sync (`start-new-task`, `continue-task`, `save-task-status`, `get-task-details`)
 - Task closeout orchestration (`finish-task`)
+- Screenshot local-agent payloads produced by `ma08/macos-screenshot-to-s3`
 
 If not set, tooling falls back to hostname.
+
+### Screenshot Local Payloads
+
+`ma08/macos-screenshot-to-s3` can put a compact local-agent payload on the clipboard after a screenshot:
+
+```text
+screenshot-local:
+  path: /Users/sourya4/Pictures/Screenshots/example.png
+  machine: Sourya-Macbook
+  hostname: Souryas-Macbook-Pro.local
+  user: sourya4
+  ssh_host: sourya-mac
+  name: example.png
+  agent_note: copy this image into the active task's user_inputs/input_artifacts/
+  retrieve: scp 'sourya-mac:/Users/sourya4/Pictures/Screenshots/example.png' user_inputs/input_artifacts/
+```
+
+When a coding agent receives this payload:
+
+1. If it is running on the same machine, copy the `path` directly into the active task's `user_inputs/input_artifacts/`.
+2. If it is running elsewhere, prefer the explicit `ssh_host` and retrieve the file with `scp` into `user_inputs/input_artifacts/`.
+3. Update `user_inputs/input_artifacts/index.md` with the original payload source, capture time, and copied local artifact path.
+4. Analyze the captured local artifact instead of relying on an expiring S3 URL.
+
+For the primary Mac, configure the screenshot app with:
+
+```bash
+export SCREENSHOT_TO_S3_SSH_HOST_HINT="sourya-mac"
+```
+
+The launchd wrapper in `screenshot-to-s3` sources `~/pro/botfiles/.botenv`, so this hint can live in botfiles local env if desired.
 
 ### Codex Provider Credentials
 
@@ -793,6 +825,8 @@ If other machines should be able to connect to this one using the `work-*` comma
 1. Add an SSH host alias in `~/.ssh/config` on the connecting machines
 2. Ensure `zellij` is installed on the new machine (required for `work-*` attach/create)
 3. Optionally set `BOT_*_HOST` env vars (see [SSH Workflow Commands](#ssh-workflow-commands))
+
+The same SSH aliases are useful for screenshot local-agent payloads. When a payload includes `ssh_host: sourya-mac`, remote agents should be able to fetch the file with `scp` if their SSH config has that alias.
 
 ### Current fleet
 

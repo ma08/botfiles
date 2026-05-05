@@ -34,6 +34,17 @@ These are user-level instructions for the Codex agent shared across all projects
 - Prefer reusable, machine-agnostic paths (`~/pro/...`) over machine-specific absolute paths
 - When a task needs cloud actions from the CLI, consult `~/pro/personal_os/context/cloud-access.md` first. Treat it as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes before assuming auth is already in place or changing login state.
 
+## Local Screenshot Payloads
+
+- When the user pastes a payload beginning with `screenshot-local:`, treat it as a durable local screenshot reference, not as prose to summarize.
+- The payload can include `path`, `machine`, `hostname`, `user`, `ssh_host`, `name`, and a `retrieve` hint. Prefer the explicit `ssh_host` when present; otherwise resolve the machine through botfiles fleet notes or existing SSH config.
+- If you are running on the same machine as the screenshot path, copy the file directly into the active task's `user_inputs/input_artifacts/`.
+- If you are running on another machine, retrieve the image with SSH/SCP into the active task's `user_inputs/input_artifacts/`, for example:
+  - `mkdir -p user_inputs/input_artifacts`
+  - `scp 'sourya-mac:/Users/sourya4/Pictures/Screenshots/example.png' user_inputs/input_artifacts/`
+- After copying the image, update `user_inputs/input_artifacts/index.md` with the source payload details, capture time, and local artifact path.
+- Prefer analyzing the captured local artifact over asking for or relying on an expiring S3 URL. If SSH/SCP fails and no local path is reachable, ask for the S3 URL or a fresh payload.
+
 ## Shell Environment (two-layer bootstrap)
 
 Botfiles uses a two-layer shell model:
