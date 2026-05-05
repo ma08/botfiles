@@ -1,0 +1,4 @@
+interface:
+  display_name: "xurl"
+  short_description: "Use xurl for safe X API workflows"
+  default_prompt: "Use $xurl to check my X API auth status and run a safe read-only query."
