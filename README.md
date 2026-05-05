@@ -6,6 +6,14 @@ This is my personal "botfiles" repo: a play on Unix-style dotfiles, but focused 
 
 Read the companion X Article: [Botfiles: A Dotfiles-Inspired Model-Agnostic Setup for 24/7 Agents](https://x.com/curious_queue/status/2049660997993152855).
 
+## Ask Your Agent To Adapt This Repo
+
+Paste this into your coding agent before deciding what to copy:
+
+```text
+Read through https://github.com/ma08/botfiles and grill me on what parts I should incorporate into my own coding-agent setup. Focus on reusable patterns, not copying Sourya's machine-specific configuration. Ask me targeted questions about my agents, machines, notification preferences, task-tracking habits, and tolerance for automation before recommending changes.
+```
+
 [![Botfiles article cover: a dotfiles-inspired model-agnostic setup for 24/7 agents](docs/assets/readme/botfiles-article-cover.jpg)](https://x.com/curious_queue/status/2049660997993152855)
 
 ## Visual Map
