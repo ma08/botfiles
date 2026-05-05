@@ -4,17 +4,125 @@ Opinionated configuration files for coding-agent workflows, designed to stay por
 
 This is my personal "botfiles" repo: a play on Unix-style dotfiles, but focused on agent behavior rather than only shell/editor setup. It keeps Codex, Claude Code, hooks, skills, task-status conventions, zellij helpers, and notification wiring aligned across the machines where I run long-lived coding agents.
 
-## How To Read This Repo
+Read the companion X Article: [Botfiles: A Dotfiles-Inspired Model-Agnostic Setup for 24/7 Agents](https://x.com/curious_queue/status/2049660997993152855).
 
-This repo is public as a reference, not as a turnkey product. It is highly custom and reflects my own machines, tools, task folders, and workflow preferences.
+## Ask Your Agent To Adapt This Repo
 
-The useful path for most readers is to borrow a slice:
+Paste this into your coding agent before deciding what to copy:
 
-- copy the idea of durable task folders (`status.md`, `user_inputs/`, `task-progress-artifacts/`)
-- adapt the hook/notification pattern for your own alerting setup
-- reuse individual skills or task-status helpers
-- point a coding agent at the repo and ask it which pieces are worth adapting to your environment
-- ignore machine-specific aliases, hostnames, model profiles, and private workflow assumptions that do not match your setup
+```text
+Read through https://github.com/ma08/botfiles and grill me on what
+parts I should incorporate into my own coding-agent setup.
+
+Focus on reusable patterns, not copying this repo's machine-specific
+configuration.
+
+Ask me targeted questions about:
+- my agents
+- my machines
+- notification preferences
+- task-tracking habits
+- tolerance for automation
+
+Then recommend the smallest useful changes I should make.
+```
+
+[![Botfiles article cover: a dotfiles-inspired model-agnostic setup for 24/7 agents](docs/assets/readme/botfiles-article-cover.jpg)](https://x.com/curious_queue/status/2049660997993152855)
+
+## Visual Map
+
+Use this as a faster path through the long README. Each image jumps to the section it explains.
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="#whats-included"><img src="docs/assets/readme/botfiles-repo-map.jpg" alt="Map of the botfiles repo showing instructions, skills, hooks, task state, and handoff context" width="760"></a><br>
+      <strong><a href="#whats-included">Repo map</a></strong><br>
+      <sub>What lives in botfiles and why.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="#ssh-workflow-commands"><img src="docs/assets/readme/remote-development-stack.jpg" alt="Architecture of the remote development stack for 24/7 agent work" width="760"></a><br>
+      <strong><a href="#ssh-workflow-commands">Remote stack</a></strong><br>
+      <sub>SSH, mosh, zellij, and remote agent sessions.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="#tracked-task-lifecycle-skills"><img src="docs/assets/readme/task-context-workflow.jpg" alt="Task context workflow showing task folders and lifecycle skills" width="760"></a><br>
+      <strong><a href="#tracked-task-lifecycle-skills">Task lifecycle</a></strong><br>
+      <sub>How sessions start, save state, resume, and finish.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="#cross-session-orchestration"><img src="docs/assets/readme/cross-session-workflow.jpg" alt="Cross-session workflow for resolving task state and sending bounded messages" width="760"></a><br>
+      <strong><a href="#cross-session-orchestration">Cross-session work</a></strong><br>
+      <sub>Inspect and message live agent sessions without remote control.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="#zellij-web-links-in-notifications"><img src="docs/assets/readme/email-hook-context.jpg" alt="Email hook payload with task context, tracker IDs, and zellij web links" width="760"></a><br>
+      <strong><a href="#zellij-web-links-in-notifications">Notifications</a></strong><br>
+      <sub>Task context, tracker IDs, and zellij links in alerts.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="#whats-included"><img src="docs/assets/readme/hermes-supervisor-cron.jpg" alt="Pickup and supervise cron pattern for a semi-autonomous software factory" width="760"></a><br>
+      <strong><a href="#whats-included">Hermes experiments</a></strong><br>
+      <sub>Pickup and supervise loops for agent-team UX.</sub>
+    </td>
+  </tr>
+</table>
+
+## Start Here
+
+This repo is public as a reference implementation, not a turnkey product. It reflects my own machines, tools, task folders, and workflow preferences, so the useful move is to copy patterns rather than clone the whole setup unchanged.
+
+### Who This Is For
+
+- Solo builders using Codex, Claude Code, or other CLI coding agents.
+- People who want agent context to survive across models, machines, and sessions.
+- Teams exploring long-running remote agent workspaces.
+- Anyone who wants examples of task folders, skills, hooks, zellij workflows, and notification loops.
+
+### Copy These Ideas First
+
+1. **Durable task folders**: keep `status.md`, `user_inputs/`, and `task-progress-artifacts/` outside any single chat transcript.
+2. **Shared agent instructions**: store global preferences in versioned files such as `codex/AGENTS.md` and `claude/CLAUDE.md`.
+3. **Reusable skills**: keep repeatable workflows as file-backed skills that can be mirrored across agents.
+4. **Resume-friendly sessions**: use zellij plus task metadata so interrupted work can be found, inspected, and continued.
+5. **Notification hooks**: send compact task context and session links to the places where you actually notice them.
+
+### Ask Your Agent To Adapt It
+
+If you want to borrow from this repo, paste this into your coding agent:
+
+```text
+Read through https://github.com/ma08/botfiles and grill me on what
+parts I should incorporate into my own coding-agent setup.
+
+Focus on reusable patterns, not copying this repo's machine-specific
+configuration.
+
+Ask me targeted questions about:
+- my agents
+- my machines
+- notification preferences
+- task-tracking habits
+- tolerance for automation
+
+Then recommend the smallest useful changes I should make.
+```
+
+### Ignore These At First
+
+- My exact machine names, SSH aliases, tailnet hostnames, and model/provider profiles.
+- Any local secret values or private workflow assumptions.
+- The full setup script if all you want is one pattern. Start with a single idea, adapt it, and expand only when it earns its keep.
 
 ## What's Included
 
