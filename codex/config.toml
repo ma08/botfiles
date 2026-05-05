@@ -142,6 +142,15 @@ trust_level = "trusted"
 [projects."/home/azureuser/pro/thesis-workspace"]
 trust_level = "trusted"
 
+[projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-32"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-59"]
+trust_level = "trusted"
+
+[projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-157"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
