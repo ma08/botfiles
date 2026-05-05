@@ -35,7 +35,7 @@ Edit each file and replace placeholder values.
 | `secrets/templates/codex-azure.rc.example` | `secrets/local/codex-azure.rc` | Codex Azure provider key |
 | `secrets/templates/codex-openai.rc.example` | `secrets/local/codex-openai.rc` | Codex OpenAI provider key |
 | `secrets/templates/opencode-azure.rc.example` | `secrets/local/opencode-azure.rc` | OpenCode Azure resource config |
-| `secrets/templates/machine.rc.example` | `secrets/local/machine.rc` | Shared machine identity (`SYSTEM_NAME`) for notifications + task metadata |
+| `secrets/templates/machine.rc.example` | `secrets/local/machine.rc` | Shared machine identity (`SYSTEM_NAME`) and SSH alias (`BOT_MACHINE_SSH_ALIAS`) for notifications, task metadata, and screenshot payloads |
 | `secrets/templates/claude-hooks.rc.example` | `secrets/local/claude-hooks.rc` | Claude/Codex hook notifications (WhatsApp, Gmail, optional zellij web links) |
 
 ## Security Notes

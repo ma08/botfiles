@@ -510,6 +510,7 @@ Define machine identity once in `secrets/local/machine.rc`:
 
 ```bash
 export SYSTEM_NAME="MyMachineName"
+export BOT_MACHINE_SSH_ALIAS="my-ssh-host-alias"
 ```
 
 `SYSTEM_NAME` is reused across:
@@ -517,7 +518,35 @@ export SYSTEM_NAME="MyMachineName"
 - Task-status metadata sync (`start-new-task`, `continue-task`, `save-task-status`, `get-task-details`)
 - Task closeout orchestration (`finish-task`)
 
+`BOT_MACHINE_SSH_ALIAS` is the SSH host alias that other machines should use to reach this machine. Screenshot local-agent payloads produced by `ma08/macos-screenshot-to-s3` use it as their compact `machine` value.
+
 If not set, tooling falls back to hostname.
+
+### Screenshot Local Payloads
+
+`ma08/macos-screenshot-to-s3` can put a compact local-agent payload on the clipboard after a screenshot:
+
+```text
+screenshot-info:
+  machine: sourya-mac
+  path: /Users/sourya4/Pictures/Screenshots/example.png
+```
+
+When a coding agent receives this payload:
+
+1. If it is running on the same machine, copy the `path` directly into the active task's `user_inputs/input_artifacts/`.
+2. If it is running elsewhere, treat `machine` as the SSH host alias and retrieve the file with `scp` into `user_inputs/input_artifacts/`.
+3. Update `user_inputs/input_artifacts/index.md` with the original payload source, capture time, and copied local artifact path.
+4. Analyze the captured local artifact instead of relying on an expiring S3 URL.
+5. If `machine` is not a working SSH alias, consult `~/pro/personal_os/context/machine-ssh-aliases.md` and `~/.ssh/config`; for legacy `screenshot-local:` payloads, prefer `ssh_host` when present.
+
+For the primary Mac, configure the screenshot app with:
+
+```bash
+export BOT_MACHINE_SSH_ALIAS="sourya-mac"
+```
+
+The launchd wrapper in `screenshot-to-s3` sources `~/pro/botfiles/.botenv`, so this alias can live in botfiles local env.
 
 ### Codex Provider Credentials
 
@@ -793,6 +822,8 @@ If other machines should be able to connect to this one using the `work-*` comma
 1. Add an SSH host alias in `~/.ssh/config` on the connecting machines
 2. Ensure `zellij` is installed on the new machine (required for `work-*` attach/create)
 3. Optionally set `BOT_*_HOST` env vars (see [SSH Workflow Commands](#ssh-workflow-commands))
+
+The same SSH aliases are used as screenshot local-agent `machine` values. When a payload includes `machine: sourya-mac`, remote agents should be able to fetch the file with `scp` if their SSH config has that alias. See `~/pro/personal_os/context/machine-ssh-aliases.md` for the current alias map.
 
 ### Current fleet
 
