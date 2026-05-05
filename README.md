@@ -76,6 +76,14 @@ This repo is public as a reference implementation, not a turnkey product. It ref
 4. **Resume-friendly sessions**: use zellij plus task metadata so interrupted work can be found, inspected, and continued.
 5. **Notification hooks**: send compact task context and session links to the places where you actually notice them.
 
+### Ask Your Agent To Adapt It
+
+If you want to borrow from this repo, paste this into your coding agent:
+
+```text
+Read through https://github.com/ma08/botfiles and grill me on what parts I should incorporate into my own coding-agent setup. Focus on reusable patterns, not copying Sourya's machine-specific configuration. Ask me targeted questions about my agents, machines, notification preferences, task-tracking habits, and tolerance for automation before recommending changes.
+```
+
 ### Ignore These At First
 
 - My exact machine names, SSH aliases, tailnet hostnames, and model/provider profiles.
