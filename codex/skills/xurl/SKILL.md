@@ -1,6 +1,6 @@
 ---
 name: xurl
-description: Use the xurl CLI for authenticated X/Twitter API work, including reading posts, searching, checking timelines and mentions, inspecting followers/following, posting, replying, quoting, sending DMs, uploading media, and using raw X API v2 endpoints. Use when the user asks to interact with X/Twitter through xurl or asks for agent-safe X API workflows.
+description: Use the xurl CLI for authenticated X/Twitter API work, including reading posts, searching, checking timelines and mentions, inspecting followers/following, posting, replying, quoting, sending DMs, uploading media, and using raw X API v2 endpoints. Use when the user asks to interact with X/Twitter through xurl or needs raw/unsupported X API workflows. Prefer the birdclaw skill first for cache-backed follower/following analysis, unfollower checks, mutuals, non-mutual following, top followers, and leadgen exports.
 ---
 
 # xurl
@@ -11,6 +11,7 @@ Source basis: `xdevplatform/xurl` `SKILL.md` on `main` at commit `1a17984e820546
 
 ## Mandatory Safety
 
+- Prefer the `birdclaw` skill over direct `xurl` for follower/following analysis, unfollower checks, mutuals, non-mutual following, top followers, and leadgen exports whenever Birdclaw can answer from cache or its explicit sync workflow.
 - Never read, print, parse, summarize, upload, or send `~/.xurl` or copies of it to model context.
 - Never ask the user to paste credentials, tokens, client IDs, client secrets, or app secrets into chat.
 - Never run auth or app-registration commands with inline secret flags in an agent session.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Birdclaw"
+  short_description: "Cache-first X/Twitter analysis"
+  default_prompt: "Use $birdclaw to check my cached X follower graph before making any live API calls."
