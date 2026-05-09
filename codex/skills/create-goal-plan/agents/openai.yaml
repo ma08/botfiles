@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Goal Plan"
+  short_description: "Create crisp Codex goal-plan files"
+  default_prompt: "Use $create-goal-plan to write a concise goal plan file for this task."
