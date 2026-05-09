@@ -22,6 +22,10 @@
 - Use `Merging` only after the work is effectively approved and the remaining task is landing the change, merging, or completing closely related release housekeeping. It is not a synonym for "almost done."
 - If the relevant Linear workspace does not expose one of these states, use the nearest available equivalent and note the mismatch in the status comment or handoff.
 
+## Paths and Storage Conventions
+
+- For data-heavy projects, experiments, or tasks, prefer creating the project/work directory under `~/pro/lab/` so new large datasets, artifacts, checkpoints, and generated outputs land on the dedicated data disk by default.
+
 ## Shell Environment (two-layer bootstrap)
 
 Botfiles uses a two-layer shell model:

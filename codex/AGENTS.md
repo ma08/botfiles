@@ -32,6 +32,7 @@ These are user-level instructions for the Codex agent shared across all projects
 - Assume botfiles lives at `~/pro/botfiles`
 - Assume personal OS lives at `~/pro/personal_os`
 - Prefer reusable, machine-agnostic paths (`~/pro/...`) over machine-specific absolute paths
+- For data-heavy projects, experiments, or tasks, prefer creating the project/work directory under `~/pro/lab/` so new large datasets, artifacts, checkpoints, and generated outputs land on the dedicated data disk by default.
 - When a task needs cloud actions from the CLI, consult `~/pro/personal_os/context/cloud-access.md` first. Treat it as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes before assuming auth is already in place or changing login state.
 
 ## Local Screenshot Payloads
