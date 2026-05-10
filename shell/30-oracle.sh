@@ -1,34 +1,46 @@
 # Oracle CLI wrappers.
 # Keep upstream skill instructions pristine; local runtime quirks live here.
 
-_botfiles_oracle_exec_node22() {
+_botfiles_oracle_exec_node24() {
   local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
   local nvm_sh="$nvm_dir/nvm.sh"
 
   if [ -s "$nvm_sh" ]; then
     # shellcheck disable=SC1090
     . "$nvm_sh"
-    if nvm which 22 >/dev/null 2>&1; then
+    local nvm_candidate=""
+    if nvm which 24 >/dev/null 2>&1; then
+      nvm_candidate="24"
+    elif nvm which node >/dev/null 2>&1; then
+      nvm_candidate="node"
+    fi
+    if [ -n "$nvm_candidate" ]; then
       (
-        nvm use 22 >/dev/null
+        nvm use "$nvm_candidate" >/dev/null
+        local node_major
+        node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+        if [ "${node_major:-0}" -lt 24 ]; then
+          echo "oracle wrapper: Node 24+ is required. Install with: . \"$nvm_sh\" && nvm install 24" >&2
+          return 1
+        fi
         "$@"
       )
       return
     fi
-    echo "oracle wrapper: Node 22 is required. Install with: . \"$nvm_sh\" && nvm install 22" >&2
+    echo "oracle wrapper: Node 24+ is required. Install with: . \"$nvm_sh\" && nvm install 24" >&2
     return 1
   fi
 
   if command -v node >/dev/null 2>&1; then
     local node_major
     node_major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
-    if [ "${node_major:-0}" -ge 22 ]; then
+    if [ "${node_major:-0}" -ge 24 ]; then
       "$@"
       return
     fi
   fi
 
-  echo "oracle wrapper: Node 22+ is required. Install Node 22 or configure nvm under \$HOME/.nvm." >&2
+  echo "oracle wrapper: Node 24+ is required. Install Node 24 or configure nvm under \$HOME/.nvm." >&2
   return 1
 }
 
@@ -169,13 +181,23 @@ oracle() {
     fi
   fi
 
+  local oracle_cmd=(npx -y @steipete/oracle@latest)
+  if [ "${#defaults[@]}" -gt 0 ]; then
+    oracle_cmd+=("${defaults[@]}")
+  fi
+  if [ "${#args[@]}" -gt 0 ]; then
+    oracle_cmd+=("${args[@]}")
+  fi
+
   if [ -z "${DISPLAY:-}" ] && _botfiles_oracle_browser_requested "${args[@]}" && command -v xvfb-run >/dev/null 2>&1; then
-    _botfiles_oracle_exec_node22 xvfb-run -a npx -y @steipete/oracle "${defaults[@]}" "${args[@]}"
+    local xvfb_cmd=(xvfb-run -a)
+    xvfb_cmd+=("${oracle_cmd[@]}")
+    _botfiles_oracle_exec_node24 "${xvfb_cmd[@]}"
     return
   fi
-  _botfiles_oracle_exec_node22 npx -y @steipete/oracle "${defaults[@]}" "${args[@]}"
+  _botfiles_oracle_exec_node24 "${oracle_cmd[@]}"
 }
 
 oracle-mcp() {
-  _botfiles_oracle_exec_node22 npx -y @steipete/oracle oracle-mcp "$@"
+  _botfiles_oracle_exec_node24 npx -y @steipete/oracle@latest oracle-mcp "$@"
 }
