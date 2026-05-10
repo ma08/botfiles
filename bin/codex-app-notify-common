@@ -44,6 +44,39 @@ codex_app_pid_alive() {
   kill -0 "$pid" >/dev/null 2>&1
 }
 
+codex_app_bool_enabled() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+codex_app_proxy_dry_run_status() {
+  local pid_file="$1"
+  if ! codex_app_pid_alive "$pid_file"; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  if [ -z "$pid" ] || [ ! -r "/proc/$pid/cmdline" ]; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  if tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | grep -qx -- "--dry-run"; then
+    printf 'true\n'
+    return 0
+  fi
+  if [ -r "/proc/$pid/environ" ] && tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | grep -qi '^CODEX_APP_NOTIFY_DRY_RUN=\(1\|true\|yes\|on\)$'; then
+    printf 'true\n'
+    return 0
+  fi
+
+  printf 'false\n'
+}
+
 codex_app_tcp_open() {
   local host="$1"
   local port="$2"

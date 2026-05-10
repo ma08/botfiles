@@ -13,9 +13,24 @@ log_file="$(codex_app_state_path notify-proxy.log)"
 event_log="$(codex_app_state_path events.jsonl)"
 state_path="$(codex_app_state_path state.json)"
 listen_url="ws://127.0.0.1:${CODEX_APP_NOTIFY_PROXY_PORT}"
+desired_dry_run="false"
+dry_run_arg=()
+if codex_app_bool_enabled "$CODEX_APP_NOTIFY_DRY_RUN"; then
+  desired_dry_run="true"
+  dry_run_arg=(--dry-run)
+fi
 
 if codex_app_port_listening "127.0.0.1" "$CODEX_APP_NOTIFY_PROXY_PORT"; then
+  if codex_app_pid_alive "$pid_file"; then
+    current_dry_run="$(codex_app_proxy_dry_run_status "$pid_file")"
+    if [ "$current_dry_run" != "unknown" ] && [ "$current_dry_run" != "$desired_dry_run" ]; then
+      printf 'Codex app notify proxy is already listening at %s with dry_run=%s, but requested dry_run=%s\n' "$listen_url" "$current_dry_run" "$desired_dry_run" >&2
+      printf 'Run codex-app-notify-stop, then start again with the desired CODEX_APP_NOTIFY_DRY_RUN value.\n' >&2
+      exit 1
+    fi
+  fi
   printf 'Codex app notify proxy already listening at %s\n' "$listen_url"
+  printf 'Dry run: %s\n' "$(codex_app_proxy_dry_run_status "$pid_file")"
   exit 0
 fi
 
@@ -23,11 +38,6 @@ if codex_app_pid_alive "$pid_file"; then
   printf 'Codex app notify proxy pid exists but port is closed: %s\n' "$pid_file" >&2
   exit 1
 fi
-
-dry_run_arg=()
-case "${CODEX_APP_NOTIFY_DRY_RUN}" in
-  1|true|TRUE|yes|YES|on|ON) dry_run_arg=(--dry-run) ;;
-esac
 
 codex_app_start_background \
   "codex-app-notify-proxy" \

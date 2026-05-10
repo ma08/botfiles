@@ -14,7 +14,9 @@ printf 'Upstream: %s\n' "$CODEX_APP_NOTIFY_UPSTREAM"
 printf 'PID file: %s\n' "$pid_file"
 if codex_app_pid_alive "$pid_file"; then
   printf 'Process: running pid=%s\n' "$(cat "$pid_file")"
+  printf 'Dry run: %s\n' "$(codex_app_proxy_dry_run_status "$pid_file")"
 else
   printf 'Process: not running from pid file\n'
+  printf 'Dry run: unknown\n'
 fi
 codex_app_print_listener_status "127.0.0.1" "$CODEX_APP_NOTIFY_PROXY_PORT"
