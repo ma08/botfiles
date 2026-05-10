@@ -18,6 +18,7 @@ mkdir -p secrets/local
 cp secrets/templates/claude-bedrock.rc.example secrets/local/claude-bedrock.rc
 cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
 cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
+cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.rc
 cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
 cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
 cp secrets/templates/machine.rc.example secrets/local/machine.rc
@@ -33,6 +34,7 @@ Edit each file and replace placeholder values.
 | `secrets/templates/claude-bedrock.rc.example` | `secrets/local/claude-bedrock.rc` | Claude Code Bedrock auth (`AWS_BEARER_TOKEN_BEDROCK`) |
 | `secrets/templates/claude-vertex.rc.example` | `secrets/local/claude-vertex.rc` | Claude Code Vertex config |
 | `secrets/templates/codex-azure.rc.example` | `secrets/local/codex-azure.rc` | Codex Azure provider key |
+| `secrets/templates/codex-app-server.rc.example` | `secrets/local/codex-app-server.rc` | Optional Codex App Server notification proxy defaults |
 | `secrets/templates/codex-openai.rc.example` | `secrets/local/codex-openai.rc` | Codex OpenAI provider key |
 | `secrets/templates/opencode-azure.rc.example` | `secrets/local/opencode-azure.rc` | OpenCode Azure resource config |
 | `secrets/templates/machine.rc.example` | `secrets/local/machine.rc` | Shared machine identity (`SYSTEM_NAME`) and SSH alias (`BOT_MACHINE_SSH_ALIAS`) for notifications, task metadata, and screenshot payloads |

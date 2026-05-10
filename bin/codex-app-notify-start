@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/codex-app-server-start"
+"$SCRIPT_DIR/codex-app-notify-proxy-start"
+printf 'Codex App Server notification path is ready.\n'

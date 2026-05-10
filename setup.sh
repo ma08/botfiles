@@ -303,6 +303,20 @@ check_secrets() {
         fi
     }
 
+    check_optional_secret_file() {
+        local label="$1"
+        local runtime_path="$2"
+        local template_path="$3"
+        local display_path="${runtime_path#$SCRIPT_DIR/}"
+
+        if [ -f "$runtime_path" ]; then
+            echo "  [OK] $display_path ($label)"
+        else
+            echo "  [OPTIONAL] $display_path ($label)"
+            echo "    cp $template_path $runtime_path"
+        fi
+    }
+
     echo "=== Centralized Secrets (strict cutover) ==="
     check_secret_file \
         "AWS Bedrock for Claude Code" \
@@ -328,8 +342,13 @@ check_secrets() {
         "Claude/Codex hook notifications" \
         "$SCRIPT_DIR/secrets/local/claude-hooks.rc" \
         "$SCRIPT_DIR/secrets/templates/claude-hooks.rc.example"
+    check_optional_secret_file \
+        "Codex App Server notification defaults" \
+        "$SCRIPT_DIR/secrets/local/codex-app-server.rc" \
+        "$SCRIPT_DIR/secrets/templates/codex-app-server.rc.example"
 
     unset -f check_secret_file
+    unset -f check_optional_secret_file
 
     echo ""
 }

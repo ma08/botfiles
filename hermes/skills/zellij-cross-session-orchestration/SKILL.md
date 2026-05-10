@@ -40,6 +40,12 @@ Optional target override:
 start-zellij-session-for-task --project-root "<project-root>" --target ml <...>
 ```
 
+Raw Codex fallback for hosts without the App Server notification wrappers:
+
+```bash
+start-zellij-session-for-task --project-root "<project-root>" --no-codex-app-notify <...>
+```
+
 Supported targets from the botfiles docs:
 - `here` (default)
 - `ml`
@@ -50,10 +56,10 @@ Behavior to preserve:
 - resolves tracker/slug context with shared task-status tooling
 - creates a detached zellij session named from the resolved task slug
 - renames the initial tab to `[TRACKER-ID]` when available
-- launches Codex into a real spawned pane in the detached session (not only via `options --default-shell`) so attach/dump-screen can verify visible Codex UI
+- launches Codex through `codex-app-notify-session` into a real spawned pane in the detached session (not only via `options --default-shell`) so attach/dump-screen can verify visible Codex UI and `request_user_input` prompts can notify via the App Server proxy
 - clears inherited `CODEX_*` metadata before starting child Codex
 - seeds the child session with `$start-new-task <original input>`
-- uses `codex --dangerously-bypass-approvals-and-sandbox`
+- uses `codex-app-notify-session --dangerously-bypass-approvals-and-sandbox` by default; use `--no-codex-app-notify` only as an explicit raw-Codex fallback
 - fails early for remote targets if the project root is not present there
 - supports `--dry-run` for inspection-only requests
 - on current Linux/Zellij behavior, prefer a two-step launch pattern for detached sessions: create the background session first, then inject the bootstrap command as a real pane command (for example via `ZELLIJ_SESSION_NAME=<session> zellij run -- <bootstrap-script>`) rather than relying on `attach --create-background ... options --default-shell <script>` to materialize a visible pane

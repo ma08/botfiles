@@ -31,6 +31,22 @@ alias codexy-azure="codex --yolo --profile azure"
 alias codexy-openai="codex --yolo --profile openai_api"
 alias codexy-chatgpt="codex --yolo --profile chatgpt"
 
+# --- Codex App Server notification aliases --------------------------------
+alias codexn="codex-app-notify-session"
+alias codexn-azure="codex-app-notify-session --profile azure"
+alias codexn-openai="codex-app-notify-session --profile openai_api"
+alias codexn-chatgpt="codex-app-notify-session --profile chatgpt"
+
+alias codexny="codex-app-notify-session --dangerously-bypass-approvals-and-sandbox"
+alias codexny-azure="codex-app-notify-session --profile azure --dangerously-bypass-approvals-and-sandbox"
+alias codexny-openai="codex-app-notify-session --profile openai_api --dangerously-bypass-approvals-and-sandbox"
+alias codexny-chatgpt="codex-app-notify-session --profile chatgpt --dangerously-bypass-approvals-and-sandbox"
+
+alias codexn-start="codex-app-notify-start"
+alias codexn-stop="codex-app-notify-stop"
+alias codexn-status="codex-app-notify-status"
+alias codexn-logs="codex-app-notify-proxy-logs"
+
 # --- Claude Code aliases ---------------------------------------------------
 alias cc="claude"                                        # normal start
 alias ccc="claude --continue"                            # continue last session
@@ -52,6 +68,7 @@ alias zj="zellij"                    # quick start
 alias zjs="zellij list-sessions"     # list active sessions
 alias zja="zellij attach -c"         # attach to session (create if missing)
 alias zjk="zellij kill-session"      # kill a specific session
+alias start-zellij-session-for-task-raw="start-zellij-session-for-task --no-codex-app-notify"
 
 # --- Shell: list current dir entries with full paths -----------------------
 alias lsf='ls -ld $(pwd)/.* $(pwd)/*'

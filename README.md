@@ -202,6 +202,7 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    cp secrets/templates/linear.rc.example secrets/local/linear.rc
    cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
    cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
+   cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.rc
    cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
    # Edit secrets/local/*.rc with your values
    ```
@@ -294,6 +295,98 @@ Codex notify flow:
 - `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
 - `shell/10-uv-bin.sh` resolves `UV_BIN` once for Linux/macOS portability.
 
+### Codex App Server `request_user_input` Notifications
+
+Codex turn-complete notifications still use the normal Codex notify hook above.
+For prompts created by Codex's `request_user_input` tool, use the App Server
+notification path:
+
+```text
+Codex TUI -> local notification proxy -> loopback Codex App Server
+```
+
+The proxy forwards WebSocket frames unchanged, detects
+`item/tool/requestUserInput`, sends `Codex Needs Input` through the existing
+WhatsApp/Gmail channels, dedupes by `threadId + turnId + itemId + requestId`,
+and clears pending state on `serverRequest/resolved`.
+
+Direct terminal aliases are opt-in:
+
+```bash
+codexn              # codex through the App Server notification proxy
+codexn-azure        # profile azure
+codexn-openai       # profile openai_api
+codexny-azure       # bypass approvals/sandbox plus profile azure
+codexn-start        # start app-server + proxy
+codexn-status       # show app-server/proxy status
+codexn-logs         # show sanitized proxy event log
+codexn-stop         # stop proxy + app-server
+```
+
+Detached zellij task launches use the notification path by default when
+possible:
+
+```bash
+start-zellij-session-for-task ZON-170
+```
+
+Use raw Codex only for fallback/debug work:
+
+```bash
+start-zellij-session-for-task --no-codex-app-notify ZON-170
+start-zellij-session-for-task-raw ZON-170
+```
+
+Optional defaults live in `secrets/local/codex-app-server.rc`; the template is
+`secrets/templates/codex-app-server.rc.example`. The built-in defaults bind both
+listeners to `127.0.0.1`:
+
+```bash
+export CODEX_APP_SERVER_PORT=17370
+export CODEX_APP_NOTIFY_PROXY_PORT=17371
+export CODEX_APP_NOTIFY_DRY_RUN=false
+```
+
+Hands-on dry-run test:
+
+```bash
+cd ~/pro/botfiles
+CODEX_APP_NOTIFY_DRY_RUN=true codexn-start
+codex-app-notify-session --profile azure
+```
+
+In the Codex TUI, ask:
+
+```text
+Please use request_user_input to ask me one multiple-choice question with A, B, and C.
+```
+
+Expected result:
+- the TUI prompt still works normally
+- `codexn-logs` shows one `request_user_input` event
+- after answering, `codexn-logs` shows `serverRequest/resolved`
+- restarting the proxy with the same state does not resend the same prompt
+
+Real notification smoke test:
+
+```bash
+~/pro/botfiles/codex/hooks/run-codex-send.sh --title "Codex Notify Smoke" "manual channel test"
+codexn-azure
+```
+
+Then trigger the same `request_user_input` prompt and confirm one WhatsApp
+message, and one Gmail message when `EMAIL_ENABLED=true`.
+
+Security notes:
+- Keep plain `ws://` listeners on loopback by default.
+- For Mac-to-VM access, prefer SSH port forwarding instead of binding the VM
+  listener to a public or tailnet interface.
+- If you intentionally expose App Server beyond loopback, configure WebSocket
+  auth and put authenticated non-local connections behind TLS.
+- Only Codex sessions launched through App Server/proxy produce these prompt
+  notifications; direct `codex*` sessions keep the existing turn-complete
+  notification behavior.
+
 ### Centralized Secrets
 
 All runtime secrets live in `secrets/local/*.rc` (git-ignored).
@@ -307,6 +400,7 @@ cp ~/pro/botfiles/secrets/templates/claude-bedrock.rc.example ~/pro/botfiles/sec
 cp ~/pro/botfiles/secrets/templates/claude-vertex.rc.example ~/pro/botfiles/secrets/local/claude-vertex.rc
 cp ~/pro/botfiles/secrets/templates/codex-azure.rc.example ~/pro/botfiles/secrets/local/codex-azure.rc
 cp ~/pro/botfiles/secrets/templates/codex-openai.rc.example ~/pro/botfiles/secrets/local/codex-openai.rc
+cp ~/pro/botfiles/secrets/templates/codex-app-server.rc.example ~/pro/botfiles/secrets/local/codex-app-server.rc
 cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
 cp ~/pro/botfiles/secrets/templates/machine.rc.example ~/pro/botfiles/secrets/local/machine.rc
 cp ~/pro/botfiles/secrets/templates/linear.rc.example ~/pro/botfiles/secrets/local/linear.rc
@@ -387,11 +481,18 @@ Behavior:
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
 - Launches Codex as the session's default shell so attaching lands on the live Codex UI.
 - If the detached session comes up but the pane does not visibly show Codex/start-new-task output within a short verification window, the helper fails instead of treating session creation alone as success.
+- Launches Codex through `codex-app-notify-session` by default so
+  `request_user_input` prompts can send WhatsApp/Gmail notifications through
+  the local App Server proxy.
+- Pass `--no-codex-app-notify` or use `start-zellij-session-for-task-raw` to
+  use raw Codex for fallback/debug work.
 - Uses the current machine's default Codex profile instead of forcing a profile override.
 - Clears inherited `CODEX_*` session metadata before starting the child Codex process.
 - Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
 - That seeded `start-new-task` flow is expected to continue through initial tracker/local context review and first-pass plan approval in the child session when enough information is already available.
-- Uses `codex --dangerously-bypass-approvals-and-sandbox`, the current CLI equivalent of the older `--yolo` shorthand.
+- Uses `codex-app-notify-session --dangerously-bypass-approvals-and-sandbox`,
+  preserving the current CLI equivalent of the older `--yolo` shorthand while
+  routing through the App Server notification proxy.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.
 - For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.
@@ -651,6 +752,7 @@ botfiles/
 │       ├── claude-hooks.rc.example
 │       ├── claude-vertex.rc.example
 │       ├── codex-azure.rc.example
+│       ├── codex-app-server.rc.example
 │       ├── codex-openai.rc.example
 │       ├── linear.rc.example
 │       ├── machine.rc.example
@@ -733,6 +835,7 @@ cp secrets/templates/claude-bedrock.rc.example  secrets/local/claude-bedrock.rc
 cp secrets/templates/claude-hooks.rc.example    secrets/local/claude-hooks.rc
 # Copy others as needed:
 cp secrets/templates/codex-azure.rc.example     secrets/local/codex-azure.rc
+cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.rc
 cp secrets/templates/codex-openai.rc.example    secrets/local/codex-openai.rc
 cp secrets/templates/claude-vertex.rc.example   secrets/local/claude-vertex.rc
 cp secrets/templates/opencode-azure.rc.example  secrets/local/opencode-azure.rc

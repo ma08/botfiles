@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/codex-app-notify-common"
+codex_app_load_env
+
+codex_app_stop_pidfile "Codex app-server" "$(codex_app_state_path app-server.pid)"

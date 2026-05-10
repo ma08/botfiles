@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# Shared helpers for Codex App Server notification wrappers.
+
+codex_app_resolve_botfiles_root() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  cd "$script_dir/.." && pwd
+}
+
+codex_app_load_env() {
+  BOTFILES_ROOT="$(codex_app_resolve_botfiles_root)"
+  export BOTFILES_ROOT
+
+  if [ -f "$BOTFILES_ROOT/.botenv" ]; then
+    unset _BOTENV_LOADED
+    # shellcheck disable=SC1090
+    source "$BOTFILES_ROOT/.botenv"
+  fi
+
+  : "${CODEX_APP_SERVER_PORT:=17370}"
+  : "${CODEX_APP_NOTIFY_PROXY_PORT:=17371}"
+  : "${CODEX_APP_NOTIFY_UPSTREAM:=ws://127.0.0.1:${CODEX_APP_SERVER_PORT}}"
+  : "${CODEX_APP_NOTIFY_STATE_DIR:=$HOME/.cache/botfiles/codex-app-server-notify}"
+  : "${CODEX_APP_NOTIFY_DRY_RUN:=false}"
+
+  export CODEX_APP_SERVER_PORT
+  export CODEX_APP_NOTIFY_PROXY_PORT
+  export CODEX_APP_NOTIFY_UPSTREAM
+  export CODEX_APP_NOTIFY_STATE_DIR
+  export CODEX_APP_NOTIFY_DRY_RUN
+}
+
+codex_app_state_path() {
+  printf '%s/%s\n' "$CODEX_APP_NOTIFY_STATE_DIR" "$1"
+}
+
+codex_app_pid_alive() {
+  local pid_file="$1"
+  [ -s "$pid_file" ] || return 1
+
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" >/dev/null 2>&1
+}
+
+codex_app_tcp_open() {
+  local host="$1"
+  local port="$2"
+  python - "$host" "$port" <<'PY' >/dev/null 2>&1
+import socket
+import sys
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+with socket.create_connection((host, port), timeout=0.5):
+    pass
+PY
+}
+
+codex_app_port_listening() {
+  local _host="$1"
+  local port="$2"
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -H -ltn 2>/dev/null | awk -v port=":$port" '$4 ~ port "$" { found = 1 } END { exit found ? 0 : 1 }'
+    return $?
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  return 2
+}
+
+codex_app_print_listener_status() {
+  local host="$1"
+  local port="$2"
+
+  if codex_app_port_listening "$host" "$port"; then
+    printf 'Listener: open\n'
+    return 0
+  fi
+
+  case "$?" in
+    2) printf 'Listener: unknown (install ss or lsof for non-invasive checks)\n' ;;
+    *) printf 'Listener: closed\n' ;;
+  esac
+}
+
+codex_app_wait_for_log() {
+  local pattern="$1"
+  local log_file="$2"
+  local pid_file="$3"
+  local attempts="${4:-40}"
+  local delay="${5:-0.25}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if ! codex_app_pid_alive "$pid_file"; then
+      return 1
+    fi
+    if [ -f "$log_file" ] && grep -Fq "$pattern" "$log_file"; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+
+  return 1
+}
+
+codex_app_http_ok() {
+  local url="$1"
+  python - "$url" <<'PY' >/dev/null 2>&1
+import sys
+import urllib.request
+
+with urllib.request.urlopen(sys.argv[1], timeout=0.8) as response:
+    if response.status >= 400:
+        raise SystemExit(1)
+PY
+}
+
+codex_app_stop_pidfile() {
+  local name="$1"
+  local pid_file="$2"
+
+  if ! [ -s "$pid_file" ]; then
+    printf '%s is not running (no pid file)\n' "$name"
+    return 0
+  fi
+
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  if [ -z "$pid" ] || ! kill -0 "$pid" >/dev/null 2>&1; then
+    rm -f "$pid_file"
+    printf '%s is not running\n' "$name"
+    return 0
+  fi
+
+  pkill -TERM -P "$pid" >/dev/null 2>&1 || true
+  kill -TERM "$pid" >/dev/null 2>&1 || true
+
+  for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if ! kill -0 "$pid" >/dev/null 2>&1; then
+      rm -f "$pid_file"
+      printf 'Stopped %s\n' "$name"
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  pkill -KILL -P "$pid" >/dev/null 2>&1 || true
+  kill -KILL "$pid" >/dev/null 2>&1 || true
+  rm -f "$pid_file"
+  printf 'Killed %s\n' "$name"
+}
+
+codex_app_start_with_stdin_pipe() {
+  local name="$1"
+  local pid_file="$2"
+  local log_file="$3"
+  shift 3
+
+  mkdir -p "$(dirname "$pid_file")" "$(dirname "$log_file")"
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid bash -c 'tail -f /dev/null | "$@"' "$name" "$@" >"$log_file" 2>&1 &
+  else
+    nohup bash -c 'tail -f /dev/null | "$@"' "$name" "$@" >"$log_file" 2>&1 &
+  fi
+  printf '%s\n' "$!" >"$pid_file"
+}
+
+codex_app_start_background() {
+  local name="$1"
+  local pid_file="$2"
+  local log_file="$3"
+  shift 3
+
+  mkdir -p "$(dirname "$pid_file")" "$(dirname "$log_file")"
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "$@" >"$log_file" 2>&1 &
+  else
+    nohup "$@" >"$log_file" 2>&1 &
+  fi
+  printf '%s\n' "$!" >"$pid_file"
+}
+
+codex_app_tail_log() {
+  local log_file="$1"
+  local lines="${2:-80}"
+
+  if ! [ -f "$log_file" ]; then
+    printf 'No log file yet: %s\n' "$log_file" >&2
+    return 1
+  fi
+  tail -n "$lines" "$log_file"
+}

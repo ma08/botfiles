@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/codex-app-notify-common"
+codex_app_load_env
+
+pid_file="$(codex_app_state_path app-server.pid)"
+listen_url="ws://127.0.0.1:${CODEX_APP_SERVER_PORT}"
+
+printf 'Codex app-server listen: %s\n' "$listen_url"
+printf 'PID file: %s\n' "$pid_file"
+if codex_app_pid_alive "$pid_file"; then
+  printf 'Process: running pid=%s\n' "$(cat "$pid_file")"
+else
+  printf 'Process: not running from pid file\n'
+fi
+codex_app_print_listener_status "127.0.0.1" "$CODEX_APP_SERVER_PORT"
