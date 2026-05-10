@@ -32,10 +32,16 @@ codex-app-notify-stop
 Start a direct terminal session through the proxy:
 
 ```bash
+codexy-azure
 codexn-azure
 codexn-openai
 codexny-azure
 ```
+
+Legacy convenience aliases such as `codex-azure` and `codexy-azure` use this
+path by default when `CODEX_APP_NOTIFY_DEFAULT` is unset or true. Set
+`CODEX_APP_NOTIFY_DEFAULT=false` for raw-Codex behavior from those aliases.
+The `codexn*` aliases always use the notification path.
 
 Detached zellij task sessions use this path by default:
 

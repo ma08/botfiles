@@ -21,15 +21,26 @@ unset _botrc_source
 unset _botrc_dir
 
 # --- Codex CLI profile shortcuts -------------------------------------------
-alias codex-azure="codex --profile azure"
-alias codex-openai="codex --profile openai_api"
-alias codex-chatgpt="codex --profile chatgpt"
+_botrc_codex_default() {
+  case "${CODEX_APP_NOTIFY_DEFAULT:-true}" in
+    0|false|FALSE|no|NO|off|OFF)
+      command codex "$@"
+      ;;
+    *)
+      codex-app-notify-session "$@"
+      ;;
+  esac
+}
+
+codex-azure() { _botrc_codex_default --profile azure "$@"; }
+codex-openai() { _botrc_codex_default --profile openai_api "$@"; }
+codex-chatgpt() { _botrc_codex_default --profile chatgpt "$@"; }
 
 # --- Codex yolo aliases (parallel to ccy for Claude) ----------------------
-alias codexy="codex --yolo"
-alias codexy-azure="codex --yolo --profile azure"
-alias codexy-openai="codex --yolo --profile openai_api"
-alias codexy-chatgpt="codex --yolo --profile chatgpt"
+codexy() { _botrc_codex_default --yolo "$@"; }
+codexy-azure() { _botrc_codex_default --yolo --profile azure "$@"; }
+codexy-openai() { _botrc_codex_default --yolo --profile openai_api "$@"; }
+codexy-chatgpt() { _botrc_codex_default --yolo --profile chatgpt "$@"; }
 
 # --- Codex App Server notification aliases --------------------------------
 alias codexn="codex-app-notify-session"

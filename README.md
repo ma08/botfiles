@@ -310,9 +310,14 @@ The proxy forwards WebSocket frames unchanged, detects
 WhatsApp/Gmail channels, dedupes by `threadId + turnId + itemId + requestId`,
 and clears pending state on `serverRequest/resolved`.
 
-Direct terminal aliases are opt-in:
+Direct terminal aliases:
 
 ```bash
+codex-azure        # uses App Server notifications by default
+codex-openai       # uses App Server notifications by default
+codex-chatgpt      # uses App Server notifications by default
+codexy             # yolo/bypass via App Server notifications by default
+codexy-azure       # yolo/bypass + profile azure via notifications by default
 codexn              # codex through the App Server notification proxy
 codexn-azure        # profile azure
 codexn-openai       # profile openai_api
@@ -321,6 +326,18 @@ codexn-start        # start app-server + proxy
 codexn-status       # show app-server/proxy status
 codexn-logs         # show sanitized proxy event log
 codexn-stop         # stop proxy + app-server
+```
+
+The legacy convenience aliases (`codex-azure`, `codexy-azure`, and related
+profile variants) read `CODEX_APP_NOTIFY_DEFAULT`, which defaults to `true`.
+Set it to `false` for a raw-Codex shell while keeping the explicit `codexn*`
+aliases config-independent:
+
+```bash
+export CODEX_APP_NOTIFY_DEFAULT=false
+codexy-azure
+
+codexny-azure      # still always uses the notification path
 ```
 
 Detached zellij task launches use the notification path by default when
@@ -344,6 +361,7 @@ listeners to `127.0.0.1`:
 ```bash
 export CODEX_APP_SERVER_PORT=17370
 export CODEX_APP_NOTIFY_PROXY_PORT=17371
+export CODEX_APP_NOTIFY_DEFAULT=true
 export CODEX_APP_NOTIFY_DRY_RUN=false
 ```
 
