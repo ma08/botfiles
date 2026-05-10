@@ -21,6 +21,9 @@ unset _botrc_source
 unset _botrc_dir
 
 # --- Codex CLI profile shortcuts -------------------------------------------
+unalias codex-azure codex-openai codex-chatgpt \
+  codexy codexy-azure codexy-openai codexy-chatgpt 2>/dev/null || true
+
 _botrc_codex_default() {
   case "${CODEX_APP_NOTIFY_DEFAULT:-true}" in
     0|false|FALSE|no|NO|off|OFF)
