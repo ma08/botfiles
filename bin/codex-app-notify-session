@@ -9,14 +9,18 @@ codex_app_load_env
 "$SCRIPT_DIR/codex-app-notify-start" >/dev/null
 
 remote_url="ws://127.0.0.1:${CODEX_APP_NOTIFY_PROXY_PORT}"
+codex_bin="$(codex_app_resolve_codex_binary)" || {
+  printf 'codex-app-notify-session: codex command not found\n' >&2
+  exit 1
+}
 
 case "${1:-}" in
   resume|fork)
     subcommand="$1"
     shift
-    exec codex "$subcommand" --remote "$remote_url" "$@"
+    exec "$codex_bin" "$subcommand" --remote "$remote_url" "$@"
     ;;
   *)
-    exec codex --remote "$remote_url" "$@"
+    exec "$codex_bin" --remote "$remote_url" "$@"
     ;;
 esac

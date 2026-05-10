@@ -58,6 +58,23 @@ with socket.create_connection((host, port), timeout=0.5):
 PY
 }
 
+codex_app_resolve_codex_binary() {
+  local candidate
+  while IFS= read -r candidate; do
+    case "$candidate" in
+      "$HOME/.codex/tmp/arg0/"*)
+        continue
+        ;;
+    esac
+    if [ -x "$candidate" ] && "$candidate" --help 2>/dev/null | grep -q -- "--remote"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done < <(type -P -a codex 2>/dev/null)
+
+  return 1
+}
+
 codex_app_port_listening() {
   local _host="$1"
   local port="$2"

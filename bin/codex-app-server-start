@@ -20,7 +20,7 @@ if codex_app_pid_alive "$pid_file"; then
   exit 1
 fi
 
-command -v codex >/dev/null 2>&1 || {
+codex_bin="$(codex_app_resolve_codex_binary)" || {
   printf 'codex-app-server-start: codex command not found\n' >&2
   exit 1
 }
@@ -29,7 +29,7 @@ codex_app_start_with_stdin_pipe \
   "codex-app-server" \
   "$pid_file" \
   "$log_file" \
-  codex app-server --listen "$listen_url"
+  "$codex_bin" app-server --listen "$listen_url"
 
 if codex_app_wait_for_log "listening on: $listen_url" "$log_file" "$pid_file"; then
   printf 'Started Codex app-server at %s\n' "$listen_url"
