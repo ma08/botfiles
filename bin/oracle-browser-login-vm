@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+runtime_dir="${ORACLE_LOGIN_RUNTIME_DIR:-$HOME/.oracle/login-desktop}"
+profile_dir="${ORACLE_BROWSER_PROFILE_DIR:-$HOME/.oracle/browser-profile}"
+display="${ORACLE_LOGIN_DISPLAY:-:59}"
+screen="${ORACLE_LOGIN_SCREEN:-1440x900x24}"
+vnc_port="${ORACLE_LOGIN_VNC_PORT:-5901}"
+web_port="${ORACLE_LOGIN_WEB_PORT:-6080}"
+chrome_debug_port="${ORACLE_LOGIN_CHROME_DEBUG_PORT:-9223}"
+chrome_path="${ORACLE_CHROME_PATH:-$HOME/pro/botfiles/bin/oracle-chrome-linux}"
+novnc_web="${ORACLE_NOVNC_WEB:-/usr/share/novnc}"
+
+mkdir -p "$runtime_dir" "$profile_dir"
+
+pid_file() {
+  printf '%s/%s.pid\n' "$runtime_dir" "$1"
+}
+
+kill_pid() {
+  local name="$1"
+  local file
+  file="$(pid_file "$name")"
+  if [ -f "$file" ]; then
+    local pid
+    pid="$(cat "$file" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -f "$file"
+  fi
+}
+
+start_service() {
+  local name="$1"
+  shift
+  local log_file="$runtime_dir/$name.log"
+  nohup "$@" >"$log_file" 2>&1 &
+  echo "$!" >"$(pid_file "$name")"
+}
+
+case "${1:-start}" in
+  start)
+    "$0" stop >/dev/null 2>&1 || true
+    rm -f "$profile_dir"/Singleton*
+
+    start_service xvfb Xvfb "$display" -screen 0 "$screen" -ac
+    sleep 1
+    start_service x11vnc x11vnc -display "$display" -localhost -forever -shared -nopw -rfbport "$vnc_port"
+    start_service websockify websockify --web "$novnc_web" "127.0.0.1:$web_port" "127.0.0.1:$vnc_port"
+    DISPLAY="$display" start_service chrome "$chrome_path" \
+      --user-data-dir="$profile_dir" \
+      --remote-debugging-port="$chrome_debug_port" \
+      --no-first-run \
+      --no-default-browser-check \
+      https://chatgpt.com/
+
+    echo "noVNC: http://127.0.0.1:$web_port/vnc.html?autoconnect=true&resize=scale"
+    echo "Profile: $profile_dir"
+    echo "Logs: $runtime_dir"
+    ;;
+  stop)
+    kill_pid chrome
+    kill_pid websockify
+    kill_pid x11vnc
+    kill_pid xvfb
+    ;;
+  status)
+    for name in xvfb x11vnc websockify chrome; do
+      file="$(pid_file "$name")"
+      if [ -f "$file" ] && kill -0 "$(cat "$file")" 2>/dev/null; then
+        echo "$name: running pid $(cat "$file")"
+      else
+        echo "$name: stopped"
+      fi
+    done
+    ;;
+  *)
+    echo "usage: $0 [start|stop|status]" >&2
+    exit 2
+    ;;
+esac
