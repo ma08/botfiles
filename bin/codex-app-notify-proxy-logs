@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/codex-app-notify-common"
+codex_app_load_env
+
+case "${1:-events}" in
+  events)
+    codex_app_tail_log "$(codex_app_state_path events.jsonl)" "${2:-80}"
+    ;;
+  process)
+    codex_app_tail_log "$(codex_app_state_path notify-proxy.log)" "${2:-80}"
+    ;;
+  *)
+    printf 'Usage: codex-app-notify-proxy-logs [events|process] [lines]\n' >&2
+    exit 2
+    ;;
+esac

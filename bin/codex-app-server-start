@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/codex-app-notify-common"
+codex_app_load_env
+
+pid_file="$(codex_app_state_path app-server.pid)"
+log_file="$(codex_app_state_path app-server.log)"
+listen_url="ws://127.0.0.1:${CODEX_APP_SERVER_PORT}"
+
+if codex_app_port_listening "127.0.0.1" "$CODEX_APP_SERVER_PORT"; then
+  printf 'Codex app-server already ready at %s\n' "$listen_url"
+  exit 0
+fi
+
+if codex_app_pid_alive "$pid_file"; then
+  printf 'Codex app-server pid exists but readiness failed: %s\n' "$pid_file" >&2
+  exit 1
+fi
+
+codex_bin="$(codex_app_resolve_codex_binary)" || {
+  printf 'codex-app-server-start: codex command not found\n' >&2
+  exit 1
+}
+
+codex_app_start_with_stdin_pipe \
+  "codex-app-server" \
+  "$pid_file" \
+  "$log_file" \
+  "$codex_bin" app-server --listen "$listen_url"
+
+if codex_app_wait_for_log "listening on: $listen_url" "$log_file" "$pid_file"; then
+  printf 'Started Codex app-server at %s\n' "$listen_url"
+  printf 'Log: %s\n' "$log_file"
+  exit 0
+fi
+
+printf 'Codex app-server did not become ready. Log: %s\n' "$log_file" >&2
+exit 1
