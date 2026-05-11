@@ -66,6 +66,7 @@ _AGENT_SESSION_ENV_KEYS = (
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
 )
+_CODEX_APP_NOTIFY_OWNER_METHODS = {"thread/resume", "thread/start", "turn/start"}
 _ZELLIJ_FOCUSED_TAB_RE = re.compile(r'tab name="(?P<name>[^"]+)"[^\n]*\bfocus=true\b')
 
 _LOG_FILE = _CLAUDE_HOOKS_DIR / "hooks.log"
@@ -393,6 +394,72 @@ def _normalize_tracker_url(raw_value: str) -> str:
     return value
 
 
+def _normalize_zellij_session(raw_value: str) -> str:
+    value = str(raw_value or "").strip()
+    if not value or value.lower() in {"none", "null", "unknown"}:
+        return ""
+    return value
+
+
+def _codex_app_notify_sessions_dir() -> Path:
+    state_dir = os.getenv("CODEX_APP_NOTIFY_STATE_DIR", "").strip()
+    if state_dir:
+        candidate = Path(state_dir).expanduser()
+        if candidate.parent.name == "sessions":
+            return candidate.parent
+        return candidate / "sessions"
+    return Path.home() / ".cache" / "botfiles" / "codex-app-server-notify" / "sessions"
+
+
+def get_codex_app_notify_zellij_session(agent_session_id: str) -> str:
+    """Resolve an app-notify zellij session from proxy client-owned thread logs."""
+    resolved_agent_session_id = (agent_session_id or "").strip()
+    if not resolved_agent_session_id:
+        return ""
+
+    sessions_dir = _codex_app_notify_sessions_dir()
+    if not sessions_dir.is_dir():
+        return ""
+
+    matches: list[tuple[float, str, str]] = []
+    for event_log in sessions_dir.glob("*/events.jsonl"):
+        try:
+            stat = event_log.stat()
+        except OSError:
+            continue
+
+        found_ts = ""
+        try:
+            with event_log.open(encoding="utf-8") as handle:
+                for line in handle:
+                    if resolved_agent_session_id not in line:
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if item.get("direction") != "client_to_server":
+                        continue
+                    if item.get("method") not in _CODEX_APP_NOTIFY_OWNER_METHODS:
+                        continue
+                    thread_id = str(item.get("threadId") or "").strip()
+                    if thread_id == resolved_agent_session_id:
+                        found_ts = str(item.get("ts") or "")
+        except OSError:
+            continue
+
+        if found_ts:
+            session_name = _normalize_zellij_session(event_log.parent.name)
+            if session_name:
+                matches.append((stat.st_mtime, found_ts, session_name))
+
+    if not matches:
+        return ""
+
+    matches.sort(reverse=True)
+    return matches[0][2]
+
+
 def _task_metadata_value_from_context_path(context_path: Path, field_name: str) -> str:
     task_dir = _task_dir_from_context_path(context_path)
     if not task_dir:
@@ -512,6 +579,50 @@ def get_task_tracker_url(
         )
 
     return ""
+
+
+def get_task_zellij_context(
+    *,
+    working_directory_override: str | os.PathLike[str] | None = None,
+    agent_session_id: str | None = None,
+    coding_agent_override: str | None = None,
+) -> dict[str, str]:
+    """Resolve zellij metadata from the task matched to this notification context."""
+    context_path = _resolve_context_path(working_directory_override)
+    cwd_session = _normalize_zellij_session(
+        _task_metadata_value_from_context_path(context_path, "zellij_session")
+    )
+    cwd_link = _normalize_tracker_url(
+        _task_metadata_value_from_context_path(context_path, "zellij_link")
+    )
+    if cwd_session or cwd_link:
+        return {"session_name": cwd_session, "session_url": cwd_link}
+
+    project_root = infer_project_root_from_path(context_path)
+    resolved_agent_session_id = (agent_session_id or "").strip() or _get_agent_session_id()
+    resolved_coding_agent = get_coding_agent_name(coding_agent_override)
+
+    if project_root:
+        status_session = _normalize_zellij_session(
+            _task_metadata_value_from_status_files(
+                resolved_agent_session_id,
+                project_root=project_root,
+                coding_agent=resolved_coding_agent,
+                field_name="zellij_session",
+            )
+        )
+        status_link = _normalize_tracker_url(
+            _task_metadata_value_from_status_files(
+                resolved_agent_session_id,
+                project_root=project_root,
+                coding_agent=resolved_coding_agent,
+                field_name="zellij_link",
+            )
+        )
+        if status_session or status_link:
+            return {"session_name": status_session, "session_url": status_link}
+
+    return {"session_name": "", "session_url": ""}
 
 
 def get_task_github_issue_url(
@@ -940,8 +1051,8 @@ def send_notification(
 
     config = get_config()
     system_name = get_system_name()
-    session_name = get_zellij_session_name()
-    agent_session_id = (agent_session_id_override or "").strip() or _get_agent_session_id()
+    explicit_agent_session_id = (agent_session_id_override or "").strip()
+    agent_session_id = explicit_agent_session_id or _get_agent_session_id()
     coding_agent = get_coding_agent_name(coding_agent_override)
     context_path = _resolve_context_path(working_directory_override)
     task_label = get_task_label(
@@ -955,18 +1066,42 @@ def send_notification(
         agent_session_id=agent_session_id,
         coding_agent_override=coding_agent,
     )
-    zellij_tab_name = get_zellij_focused_tab_name()
+    if explicit_agent_session_id or _task_dir_from_context_path(context_path):
+        task_zellij_context = get_task_zellij_context(
+            working_directory_override=context_path,
+            agent_session_id=agent_session_id,
+            coding_agent_override=coding_agent,
+        )
+    else:
+        task_zellij_context = {"session_name": "", "session_url": ""}
+    task_session_name = _normalize_zellij_session(task_zellij_context.get("session_name", ""))
+    app_notify_session_name = ""
+    if explicit_agent_session_id and not task_session_name:
+        app_notify_session_name = _normalize_zellij_session(
+            get_codex_app_notify_zellij_session(agent_session_id)
+        )
+    resolved_session_from_context = task_session_name or app_notify_session_name
+    session_name = resolved_session_from_context or get_zellij_session_name()
+    zellij_tab_name = "" if resolved_session_from_context else get_zellij_focused_tab_name()
     preview_line = build_notification_preview_line(
         task_label=task_label,
         session_name=session_name,
         zellij_tab_name=zellij_tab_name,
         agent_session_id=agent_session_id,
     )
-    session_url = build_zellij_session_url(
-        session_name=session_name,
-        base_url=config["zellij_web_base_url"],
-        links_enabled=config["zellij_web_enable_links"],
+    task_session_url = (
+        _normalize_tracker_url(task_zellij_context.get("session_url", ""))
+        if task_session_name
+        else ""
     )
+    if config["zellij_web_enable_links"]:
+        session_url = task_session_url or build_zellij_session_url(
+            session_name=session_name,
+            base_url=config["zellij_web_base_url"],
+            links_enabled=True,
+        )
+    else:
+        session_url = None
     attach_command = build_zellij_attach_command(session_name)
 
     _log(

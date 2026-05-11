@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
 
 from codex_app_server_notify_proxy import (
+    JsonlLogger,
     StateStore,
     ThreadContext,
     build_notification_message,
     decode_json_frame,
     first_question_summary,
+    handle_server_payload,
     parse_request_user_input,
 )
 
@@ -38,6 +41,42 @@ REQUEST_USER_INPUT_PAYLOAD = {
 
 
 class RequestUserInputParsingTests(unittest.TestCase):
+    def test_thread_context_tracks_owned_resumed_and_started_threads(self) -> None:
+        context = ThreadContext()
+        context.note_client_request(
+            {
+                "method": "thread/resume",
+                "id": 1,
+                "params": {
+                    "threadId": "thread-resumed",
+                    "cwd": "/home/azureuser/pro/personal_os",
+                },
+            }
+        )
+        self.assertTrue(context.owns_thread("thread-resumed"))
+        self.assertEqual(context.cwd_for_thread("thread-resumed"), "/home/azureuser/pro/personal_os")
+
+        context.note_client_request(
+            {
+                "method": "thread/start",
+                "id": 2,
+                "params": {"cwd": "/home/azureuser/pro/botfiles"},
+            }
+        )
+        context.note_server_payload(
+            {
+                "method": "thread/started",
+                "params": {
+                    "thread": {
+                        "id": "thread-started",
+                        "cwd": "/home/azureuser/pro/botfiles",
+                    }
+                },
+            }
+        )
+        self.assertTrue(context.owns_thread("thread-started"))
+        self.assertEqual(context.cwd_for_thread("thread-started"), "/home/azureuser/pro/botfiles")
+
     def test_parse_request_user_input_extracts_context_and_question_summary(self) -> None:
         context = ThreadContext()
         context.note_server_payload(
@@ -98,6 +137,66 @@ class RequestUserInputParsingTests(unittest.TestCase):
 
 
 class RequestUserInputStateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unowned_request_user_input_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = StateStore(Path(tmp) / "state.json")
+            logger = JsonlLogger(Path(tmp) / "events.jsonl")
+            notification_tasks: set = set()
+
+            await handle_server_payload(
+                REQUEST_USER_INPUT_PAYLOAD,
+                context=ThreadContext(),
+                state=state,
+                logger=logger,
+                notification_tasks=notification_tasks,
+                dry_run=True,
+            )
+
+            self.assertEqual(notification_tasks, set())
+            self.assertEqual(state.data["seen_requests"], {})
+            self.assertIn(
+                "request_user_input_ignored",
+                (Path(tmp) / "events.jsonl").read_text(encoding="utf-8"),
+            )
+
+    async def test_owned_request_user_input_notifies(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = StateStore(Path(tmp) / "state.json")
+            logger = JsonlLogger(Path(tmp) / "events.jsonl")
+            notification_tasks: set = set()
+            context = ThreadContext()
+            context.note_client_request(
+                {
+                    "method": "turn/start",
+                    "params": {
+                        "threadId": "thread-12345678",
+                        "cwd": "/home/azureuser/pro/personal_os",
+                    },
+                }
+            )
+
+            await handle_server_payload(
+                REQUEST_USER_INPUT_PAYLOAD,
+                context=context,
+                state=state,
+                logger=logger,
+                notification_tasks=notification_tasks,
+                dry_run=True,
+            )
+
+            if notification_tasks:
+                await asyncio.gather(*notification_tasks)
+            seen_records = list(state.data["seen_requests"].values())
+            self.assertEqual(len(seen_records), 1)
+            self.assertEqual(
+                seen_records[0]["thread_id"],
+                REQUEST_USER_INPUT_PAYLOAD["params"]["threadId"],
+            )
+            self.assertIn(
+                '"event": "request_user_input"',
+                (Path(tmp) / "events.jsonl").read_text(encoding="utf-8"),
+            )
+
     async def test_state_suppresses_duplicate_after_reload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             state_path = Path(tmp) / "state.json"

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/codex-app-notify-common"
 codex_app_load_env
 
-pid_file="$(codex_app_state_path app-server.pid)"
+pid_file="$(codex_app_server_state_path app-server.pid)"
 listen_url="ws://127.0.0.1:${CODEX_APP_SERVER_PORT}"
 
 printf 'Codex app-server listen: %s\n' "$listen_url"

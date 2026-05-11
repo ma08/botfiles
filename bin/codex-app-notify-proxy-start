@@ -21,13 +21,18 @@ if codex_app_bool_enabled "$CODEX_APP_NOTIFY_DRY_RUN"; then
 fi
 
 if codex_app_port_listening "127.0.0.1" "$CODEX_APP_NOTIFY_PROXY_PORT"; then
-  if codex_app_pid_alive "$pid_file"; then
-    current_dry_run="$(codex_app_proxy_dry_run_status "$pid_file")"
-    if [ "$current_dry_run" != "unknown" ] && [ "$current_dry_run" != "$desired_dry_run" ]; then
-      printf 'Codex app notify proxy is already listening at %s with dry_run=%s, but requested dry_run=%s\n' "$listen_url" "$current_dry_run" "$desired_dry_run" >&2
-      printf 'Run codex-app-notify-stop, then start again with the desired CODEX_APP_NOTIFY_DRY_RUN value.\n' >&2
-      exit 1
-    fi
+  if ! codex_app_pid_alive "$pid_file"; then
+    printf 'Codex app notify proxy port is already in use, but this session has no running pid file: %s\n' "$pid_file" >&2
+    printf 'Port: %s\n' "$listen_url" >&2
+    printf 'This may be a session-hash collision or an unrelated listener. Stop the conflicting listener or set a different CODEX_APP_NOTIFY_PROXY_PORT_BASE/SPAN.\n' >&2
+    exit 1
+  fi
+
+  current_dry_run="$(codex_app_proxy_dry_run_status "$pid_file")"
+  if [ "$current_dry_run" != "unknown" ] && [ "$current_dry_run" != "$desired_dry_run" ]; then
+    printf 'Codex app notify proxy is already listening at %s with dry_run=%s, but requested dry_run=%s\n' "$listen_url" "$current_dry_run" "$desired_dry_run" >&2
+    printf 'Run codex-app-notify-stop, then start again with the desired CODEX_APP_NOTIFY_DRY_RUN value.\n' >&2
+    exit 1
   fi
   printf 'Codex app notify proxy already listening at %s\n' "$listen_url"
   printf 'Dry run: %s\n' "$(codex_app_proxy_dry_run_status "$pid_file")"
