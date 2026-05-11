@@ -6,4 +6,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/codex-app-notify-common"
 codex_app_load_env
 
-codex_app_tail_log "$(codex_app_state_path app-server.log)" "${1:-80}"
+codex_app_tail_log "$(codex_app_server_state_path app-server.log)" "${1:-80}"

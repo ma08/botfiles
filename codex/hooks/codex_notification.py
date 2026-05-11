@@ -88,10 +88,15 @@ def _extract_session_id_from_payload(value: Any, depth: int = 0) -> str:
 
 
 def _resolve_agent_session_id(input_data: dict) -> str:
+    payload_session_id = _extract_session_id_from_payload(input_data)
+    if _looks_like_session_id(payload_session_id):
+        return payload_session_id.strip()
+
     env_session_id = _get_agent_session_id()
     if _looks_like_session_id(env_session_id):
         return env_session_id.strip()
-    return _extract_session_id_from_payload(input_data)
+
+    return ""
 
 
 def _resolve_working_directory(input_data: dict) -> str | None:

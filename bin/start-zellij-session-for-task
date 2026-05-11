@@ -137,8 +137,9 @@ exec codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quot
 
 build_bootstrap_script() {
   local project_root="$1"
-  local initial_prompt="$2"
-  local use_codex_app_notify="$3"
+  local session_name="$2"
+  local initial_prompt="$3"
+  local use_codex_app_notify="$4"
   cat <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -147,6 +148,16 @@ if [ -f "\$BOTFILES_ROOT/.botenv" ]; then
   # shellcheck disable=SC1090
   source "\$BOTFILES_ROOT/.botenv"
 fi
+export ZELLIJ_SESSION_NAME=$(printf '%q' "$session_name")
+export CODEX_APP_NOTIFY_SESSION_KEY="\$ZELLIJ_SESSION_NAME"
+case "\${CODEX_APP_NOTIFY_PROXY_SCOPE:-session}" in
+  session|"")
+    unset CODEX_APP_NOTIFY_PROXY_PORT
+    unset CODEX_APP_NOTIFY_STATE_DIR
+    unset CODEX_APP_NOTIFY_BASE_STATE_DIR
+    unset CODEX_APP_NOTIFY_PROXY_STATE_DIR
+    ;;
+esac
 rm -f -- "\$0" >/dev/null 2>&1 || true
 $(build_cd_command "$project_root")
 $(build_codex_command "$initial_prompt" "$use_codex_app_notify")
@@ -411,7 +422,7 @@ else
 fi
 
 initial_prompt="\$start-new-task $description"
-bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$initial_prompt" "$codex_app_notify")"
+bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$session_name" "$initial_prompt" "$codex_app_notify")"
 launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script" "$python_cmd")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 

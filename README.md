@@ -302,13 +302,24 @@ For prompts created by Codex's `request_user_input` tool, use the App Server
 notification path:
 
 ```text
-Codex TUI -> local notification proxy -> loopback Codex App Server
+Codex TUI -> session-scoped local notification proxy -> loopback Codex App Server
 ```
 
 The proxy forwards WebSocket frames unchanged, detects
 `item/tool/requestUserInput`, sends `Codex Needs Input` through the existing
 WhatsApp/Gmail channels, dedupes by `threadId + turnId + itemId + requestId`,
 and clears pending state on `serverRequest/resolved`.
+
+By default, each zellij session gets its own notification proxy port and state
+directory derived from `ZELLIJ_SESSION_NAME`. This keeps zellij session/link
+metadata tied to the originating terminal session instead of whichever shared
+proxy process happened to start first. Session scope recomputes proxy port/state
+from the session key even if those variables were inherited from a parent shell.
+The App Server stays a single global listener; only proxy pid/log/event/state
+files are session-scoped. Under session scope, inherited `CODEX_APP_NOTIFY_STATE_DIR`
+values that already point into `sessions/<name>` are normalized back to the
+global base before proxy state is recomputed.
+Set `CODEX_APP_NOTIFY_PROXY_SCOPE=global` to opt back into one shared proxy.
 
 Direct terminal aliases:
 
@@ -355,12 +366,14 @@ start-zellij-session-for-task-raw ZON-170
 ```
 
 Optional defaults live in `secrets/local/codex-app-server.rc`; the template is
-`secrets/templates/codex-app-server.rc.example`. The built-in defaults bind both
-listeners to `127.0.0.1`:
+`secrets/templates/codex-app-server.rc.example`. The built-in defaults bind
+listeners to `127.0.0.1`; the App Server keeps a stable default port, while the
+notification proxy port is session-scoped unless you opt into global/shared
+scope:
 
 ```bash
 export CODEX_APP_SERVER_PORT=17370
-export CODEX_APP_NOTIFY_PROXY_PORT=17371
+export CODEX_APP_NOTIFY_PROXY_SCOPE=session
 export CODEX_APP_NOTIFY_DEFAULT=true
 export CODEX_APP_NOTIFY_DRY_RUN=false
 ```

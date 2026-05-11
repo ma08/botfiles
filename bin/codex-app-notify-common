@@ -7,6 +7,23 @@ codex_app_resolve_botfiles_root() {
   cd "$script_dir/.." && pwd
 }
 
+codex_app_normalize_base_state_dir() {
+  local state_dir="${1:-}"
+  if [ -z "$state_dir" ]; then
+    printf '%s\n' "$HOME/.cache/botfiles/codex-app-server-notify"
+    return 0
+  fi
+
+  case "$state_dir" in
+    */sessions/*)
+      printf '%s\n' "${state_dir%%/sessions/*}"
+      ;;
+    *)
+      printf '%s\n' "$state_dir"
+      ;;
+  esac
+}
+
 codex_app_load_env() {
   BOTFILES_ROOT="$(codex_app_resolve_botfiles_root)"
   export BOTFILES_ROOT
@@ -21,17 +38,87 @@ codex_app_load_env() {
   : "${CODEX_APP_NOTIFY_PROXY_PORT:=17371}"
   : "${CODEX_APP_NOTIFY_UPSTREAM:=ws://127.0.0.1:${CODEX_APP_SERVER_PORT}}"
   : "${CODEX_APP_NOTIFY_STATE_DIR:=$HOME/.cache/botfiles/codex-app-server-notify}"
+  : "${CODEX_APP_NOTIFY_BASE_STATE_DIR:=$(codex_app_normalize_base_state_dir "$CODEX_APP_NOTIFY_STATE_DIR")}"
+  CODEX_APP_NOTIFY_BASE_STATE_DIR="$(codex_app_normalize_base_state_dir "$CODEX_APP_NOTIFY_BASE_STATE_DIR")"
+  CODEX_APP_NOTIFY_STATE_DIR="$CODEX_APP_NOTIFY_BASE_STATE_DIR"
+  : "${CODEX_APP_NOTIFY_PROXY_STATE_DIR:=$CODEX_APP_NOTIFY_STATE_DIR}"
   : "${CODEX_APP_NOTIFY_DRY_RUN:=false}"
+
+  codex_app_apply_proxy_scope
 
   export CODEX_APP_SERVER_PORT
   export CODEX_APP_NOTIFY_PROXY_PORT
   export CODEX_APP_NOTIFY_UPSTREAM
   export CODEX_APP_NOTIFY_STATE_DIR
+  export CODEX_APP_NOTIFY_BASE_STATE_DIR
+  export CODEX_APP_NOTIFY_PROXY_STATE_DIR
   export CODEX_APP_NOTIFY_DRY_RUN
 }
 
+codex_app_safe_scope_key() {
+  local raw="${1:-}"
+  local safe
+  safe="$(printf '%s' "$raw" | tr -cs 'A-Za-z0-9_.-' '-' | sed 's/^-//; s/-$//' | cut -c1-80)"
+  if [ -n "$safe" ]; then
+    printf '%s\n' "$safe"
+  else
+    printf 'unknown\n'
+  fi
+}
+
+codex_app_hash_port() {
+  local key="$1"
+  local base="${CODEX_APP_NOTIFY_PROXY_PORT_BASE:-17371}"
+  local span="${CODEX_APP_NOTIFY_PROXY_PORT_SPAN:-1000}"
+  local checksum
+
+  checksum="$(printf '%s' "$key" | cksum | awk '{print $1}')"
+  if ! [[ "$base" =~ ^[0-9]+$ ]] || ! [[ "$span" =~ ^[0-9]+$ ]] || [ "$span" -le 0 ]; then
+    printf '%s\n' "$CODEX_APP_NOTIFY_PROXY_PORT"
+    return 0
+  fi
+
+  printf '%s\n' "$((base + (checksum % span)))"
+}
+
+codex_app_apply_proxy_scope() {
+  local scope="${CODEX_APP_NOTIFY_PROXY_SCOPE:-session}"
+
+  case "$scope" in
+    session|"")
+      CODEX_APP_NOTIFY_PROXY_STATE_DIR="$CODEX_APP_NOTIFY_BASE_STATE_DIR"
+      ;;
+    global|shared)
+      return 0
+      ;;
+    *)
+      printf 'codex-app-notify-common: unknown CODEX_APP_NOTIFY_PROXY_SCOPE=%s\n' "$scope" >&2
+      return 1
+      ;;
+  esac
+
+  local scope_key="${CODEX_APP_NOTIFY_SESSION_KEY:-${ZELLIJ_SESSION_NAME:-}}"
+  if [ -z "$scope_key" ]; then
+    return 0
+  fi
+
+  local safe_key
+  safe_key="$(codex_app_safe_scope_key "$scope_key")"
+
+  CODEX_APP_NOTIFY_PROXY_PORT="$(codex_app_hash_port "$scope_key")"
+  CODEX_APP_NOTIFY_PROXY_STATE_DIR="$CODEX_APP_NOTIFY_BASE_STATE_DIR/sessions/$safe_key"
+}
+
 codex_app_state_path() {
-  printf '%s/%s\n' "$CODEX_APP_NOTIFY_STATE_DIR" "$1"
+  codex_app_proxy_state_path "$1"
+}
+
+codex_app_server_state_path() {
+  printf '%s/%s\n' "$CODEX_APP_NOTIFY_BASE_STATE_DIR" "$1"
+}
+
+codex_app_proxy_state_path() {
+  printf '%s/%s\n' "$CODEX_APP_NOTIFY_PROXY_STATE_DIR" "$1"
 }
 
 codex_app_pid_alive() {

@@ -107,6 +107,7 @@ class RequestUserInputEvent:
 class ThreadContext:
     cwd_by_thread: dict[str, str] = field(default_factory=dict)
     pending_start_cwd_by_request_id: dict[str, str] = field(default_factory=dict)
+    owned_thread_ids: set[str] = field(default_factory=set)
 
     def note_client_request(self, payload: dict[str, Any]) -> None:
         method = payload.get("method")
@@ -117,6 +118,11 @@ class ThreadContext:
         if method in {"thread/start", "thread/resume", "thread/fork"}:
             cwd = _string_value(params.get("cwd"))
             request_id = _string_value(payload.get("id"))
+            thread_id = _string_value(params.get("threadId"))
+            if thread_id:
+                self.owned_thread_ids.add(thread_id)
+                if cwd:
+                    self.cwd_by_thread[thread_id] = cwd
             if cwd and request_id:
                 self.pending_start_cwd_by_request_id[request_id] = cwd
             return
@@ -124,8 +130,10 @@ class ThreadContext:
         if method == "turn/start":
             thread_id = _string_value(params.get("threadId"))
             cwd = _string_value(params.get("cwd"))
-            if thread_id and cwd:
-                self.cwd_by_thread[thread_id] = cwd
+            if thread_id:
+                self.owned_thread_ids.add(thread_id)
+                if cwd:
+                    self.cwd_by_thread[thread_id] = cwd
 
     def note_server_payload(self, payload: dict[str, Any]) -> None:
         method = payload.get("method")
@@ -140,17 +148,31 @@ class ThreadContext:
                 cwd = _string_value(thread.get("cwd"))
                 if thread_id and cwd:
                     self.cwd_by_thread[thread_id] = cwd
+                    if self.pending_start_cwd_by_request_id:
+                        self.owned_thread_ids.add(thread_id)
+                        self.pending_start_cwd_by_request_id.pop(
+                            next(iter(self.pending_start_cwd_by_request_id)),
+                            None,
+                        )
                     return
 
             thread_id = _string_value(params.get("threadId"))
             cwd = _string_value(params.get("cwd"))
             if thread_id and cwd:
                 self.cwd_by_thread[thread_id] = cwd
+                if self.pending_start_cwd_by_request_id:
+                    self.owned_thread_ids.add(thread_id)
+                    self.pending_start_cwd_by_request_id.pop(
+                        next(iter(self.pending_start_cwd_by_request_id)),
+                        None,
+                    )
                 return
 
             request_id = _string_value(payload.get("id"))
             if request_id and thread_id and request_id in self.pending_start_cwd_by_request_id:
                 self.cwd_by_thread[thread_id] = self.pending_start_cwd_by_request_id[request_id]
+                self.owned_thread_ids.add(thread_id)
+                self.pending_start_cwd_by_request_id.pop(request_id, None)
 
         if method == "thread/status/changed":
             thread = params.get("thread")
@@ -162,6 +184,9 @@ class ThreadContext:
 
     def cwd_for_thread(self, thread_id: str) -> str:
         return self.cwd_by_thread.get(thread_id, "")
+
+    def owns_thread(self, thread_id: str) -> bool:
+        return thread_id in self.owned_thread_ids
 
     def thread_ids(self) -> list[str]:
         return sorted(self.cwd_by_thread)
@@ -509,6 +534,21 @@ async def handle_server_payload(
 
     event = parse_request_user_input(payload, context=context)
     if event:
+        if not context.owns_thread(event.thread_id):
+            await logger.write(
+                {
+                    "event": "request_user_input_ignored",
+                    "reason": "unowned_thread",
+                    "request_id": event.request_id,
+                    "thread_id": event.thread_id,
+                    "turn_id": event.turn_id,
+                    "item_id": event.item_id,
+                    "cwd": event.cwd,
+                    **first_question_summary(event),
+                }
+            )
+            return
+
         duplicate = await state.mark_request_seen(event)
         await logger.write(
             {

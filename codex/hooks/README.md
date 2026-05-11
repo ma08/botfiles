@@ -11,7 +11,7 @@ default for detached zellij task launches.
 Architecture:
 
 ```text
-Codex TUI -> local notification proxy -> loopback Codex App Server
+Codex TUI -> session-scoped local notification proxy -> loopback Codex App Server
 ```
 
 The proxy forwards WebSocket frames unchanged. It detects
@@ -19,6 +19,17 @@ The proxy forwards WebSocket frames unchanged. It detects
 WhatsApp/Gmail notification channels, dedupes with
 `threadId + turnId + itemId + requestId`, and clears pending state on
 `serverRequest/resolved`.
+
+By default, each zellij session gets its own notification proxy port and state
+directory derived from `ZELLIJ_SESSION_NAME`. This keeps zellij session/link
+metadata tied to the originating terminal session instead of whichever shared
+proxy process happened to start first. Session scope recomputes proxy port/state
+from the session key even if those variables were inherited from a parent shell.
+The App Server stays a single global listener; only proxy pid/log/event/state
+files are session-scoped. Under session scope, inherited `CODEX_APP_NOTIFY_STATE_DIR`
+values that already point into `sessions/<name>` are normalized back to the
+global base before proxy state is recomputed.
+Set `CODEX_APP_NOTIFY_PROXY_SCOPE=global` to opt back into one shared proxy.
 
 Management commands:
 
@@ -58,9 +69,9 @@ start-zellij-session-for-task --no-codex-app-notify ZON-170
 State and logs default to:
 
 ```text
-~/.cache/botfiles/codex-app-server-notify/state.json
-~/.cache/botfiles/codex-app-server-notify/events.jsonl
-~/.cache/botfiles/codex-app-server-notify/notify-proxy.log
+~/.cache/botfiles/codex-app-server-notify/sessions/<zellij-session>/state.json
+~/.cache/botfiles/codex-app-server-notify/sessions/<zellij-session>/events.jsonl
+~/.cache/botfiles/codex-app-server-notify/sessions/<zellij-session>/notify-proxy.log
 ~/.cache/botfiles/codex-app-server-notify/app-server.log
 ```
 
