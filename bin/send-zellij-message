@@ -51,7 +51,8 @@ def fail(message: str) -> int:
 
 
 def should_send_codex_confirm_enter(message_text: str, client_commands: list[str]) -> bool:
-    if "\n" not in message_text or len(message_text) < CODEX_SECONDARY_ENTER_THRESHOLD_CHARS:
+    needs_confirm = "\n" in message_text or len(message_text) >= CODEX_SECONDARY_ENTER_THRESHOLD_CHARS
+    if not needs_confirm:
         return False
     for running_command in client_commands:
         if "codex" in (running_command or "").lower():
@@ -193,9 +194,9 @@ def main() -> int:
                 f"{(stderr or '').strip() or 'unknown error'}"
             )
 
-        # Large multiline prompts can remain staged in Codex after the first
+        # Long or multiline prompts can remain staged in Codex after the first
         # Enter. A delayed confirm Enter submits that specific case without
-        # affecting short or single-line messages.
+        # affecting short single-line messages.
         if payload["secondary_submit_enter"]:
             time.sleep(CODEX_SECONDARY_ENTER_DELAY_SECONDS)
             code, _, stderr = run_local_command(

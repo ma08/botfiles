@@ -35,7 +35,7 @@ Useful flags:
 - Add `--execute` only after the resolved session/tab target looks correct.
 - Use `--submit enter` only when you intentionally want the target session to
   receive Enter after the text write.
-- Large multiline Codex prompts may require a second confirm Enter; the helper
+- Long or multiline Codex prompts may require a second confirm Enter; the helper
   now adds that delayed confirm automatically when it detects that case.
 - Stop on ambiguous tab selection, cross-machine targets, or missing tracked
   session data unless the user is intentionally doing local debug work with an

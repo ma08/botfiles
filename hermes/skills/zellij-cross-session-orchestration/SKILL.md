@@ -104,7 +104,7 @@ Behavior to preserve:
 - run preview first and inspect the resolved target
 - add `--execute` only once the target looks correct
 - use `--submit enter` only when intentional
-- large multiline Codex payloads may need an extra delayed confirm Enter; the helper handles this automatically
+- long or multiline Codex payloads may need an extra delayed confirm Enter; the helper handles this automatically
 - refuse ambiguous tab selection or cross-machine targets unless the user intentionally does local debug work with explicit `--zellij-session`
 - use this only for bounded prompt delivery, status pings, or resumable instructions; it is not a remote-control channel
 

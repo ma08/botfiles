@@ -35,7 +35,7 @@ Claude `history.jsonl` fallback filtered by session id when available.
 - dry-run is the default
 - `--execute` is required to perform a write
 - `--submit enter` is explicit and best-effort
-- for Codex sessions, large multiline payloads get a delayed confirm Enter
+- for Codex sessions, long or multiline payloads get a delayed confirm Enter
   after the first Enter because a single immediate Enter can leave the prompt
   staged in the composer instead of submitting it
 - message text is length-limited and control-character checked
