@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Audit and sync local Codex skills against the OpenAI curated skills repo.
+Audit and sync local Codex skills against an upstream skills repo.
 
 Examples:
   python scripts/sync_upstream_skills.py status
   python scripts/sync_upstream_skills.py sync
   python scripts/sync_upstream_skills.py sync --skills screenshot --apply
   python scripts/sync_upstream_skills.py sync --skills transcribe --force-protected --apply
+  python scripts/sync_upstream_skills.py --policy upstream_oracle_policy.json sync --skills oracle --apply
 """
 
 from __future__ import annotations
@@ -316,7 +317,7 @@ def _mirror_changes_to_claude(repo_root: Path, changed_names: list[str]) -> str:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Audit and sync local codex skills against openai/skills curated skills."
+        description="Audit and sync local codex skills against an upstream skills repository."
     )
     parser.add_argument(
         "--repo-root",

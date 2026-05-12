@@ -1,0 +1,7 @@
+{
+  "repo": "steipete/oracle",
+  "ref": "main",
+  "path": "skills",
+  "protected_skills": [],
+  "mirror_to_claude": true
+}

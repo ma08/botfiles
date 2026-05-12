@@ -1,11 +1,11 @@
 ---
 name: sync-codex-claude-skills
-description: Compare, audit drift, and sync skills between botfiles-style visible skill trees (`claude/skills`, `codex/skills`) or hidden project-local skill trees (`.claude/skills`, `.codex/skills`), and sync local Codex skills against the OpenAI curated skills repo with protected local forks. Use when the user asks to keep skills aligned across Claude and Codex, compare local skills to `openai/skills`, sync all or selected skills, or identify where drift exists.
+description: Compare, audit drift, and sync skills between botfiles-style visible skill trees (`claude/skills`, `codex/skills`) or hidden project-local skill trees (`.claude/skills`, `.codex/skills`), and sync local Codex skills against upstream skill repositories such as OpenAI curated skills or the Oracle skill with protected local forks. Use when the user asks to keep skills aligned across Claude and Codex, compare local skills to upstream, sync all or selected skills, or identify where drift exists.
 ---
 
 # Sync Codex Claude Skills
 
-Compare skill directories across Claude and Codex, and compare local Codex skills against the upstream OpenAI curated skills catalog. Use dry-run first, then apply only the changes you intend.
+Compare skill directories across Claude and Codex, and compare local Codex skills against upstream skill repositories. Use dry-run first, then apply only the changes you intend.
 
 ## Script
 
@@ -27,7 +27,7 @@ The script auto-discovers repo root from the current directory. It supports both
 python scripts/sync_skills.py --repo-root ~/pro/botfiles ...
 ```
 
-The upstream sync script uses `upstream_sync_policy.json` in this skill directory by default.
+The upstream sync script uses `upstream_sync_policy.json` in this skill directory by default. Pass `--policy` for other upstreams, such as the Oracle skill.
 
 ## Layout Convention
 
@@ -148,6 +148,39 @@ Without `--force-protected`, a protected drifted skill is reported as `skip-prot
 - Status output includes the detected repo layout (`visible` or `hidden`)
 - Upstream defaults come from `upstream_sync_policy.json`
 - Protected skills are for intentional local forks or local-only workflows that should not be overwritten by upstream drift checks
+
+## Workflow C: Oracle Upstream -> Codex -> Claude
+
+The Oracle skill is upstream-derived from `steipete/oracle:skills/oracle`. Keep local runtime defaults in `AGENTS.md` / `CLAUDE.md` and botfiles shell wrappers; use this sync path to refresh the skill text itself.
+
+### 1. Check Oracle drift
+
+```bash
+python scripts/sync_upstream_skills.py \
+  --repo-root ~/pro/botfiles \
+  --policy upstream_oracle_policy.json \
+  status
+```
+
+### 2. Dry-run Oracle refresh
+
+```bash
+python scripts/sync_upstream_skills.py \
+  --repo-root ~/pro/botfiles \
+  --policy upstream_oracle_policy.json \
+  sync --skills oracle
+```
+
+### 3. Apply Oracle refresh
+
+```bash
+python scripts/sync_upstream_skills.py \
+  --repo-root ~/pro/botfiles \
+  --policy upstream_oracle_policy.json \
+  sync --skills oracle --apply
+```
+
+This refreshes `codex/skills/oracle` from upstream and mirrors the changed Oracle skill into `claude/skills/oracle`.
 
 ## Post-Sync Checks
 
