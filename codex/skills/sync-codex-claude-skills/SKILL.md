@@ -149,9 +149,9 @@ Without `--force-protected`, a protected drifted skill is reported as `skip-prot
 - Upstream defaults come from `upstream_sync_policy.json`
 - Protected skills are for intentional local forks or local-only workflows that should not be overwritten by upstream drift checks
 
-## Workflow C: Oracle Upstream -> Codex -> Claude
+## Workflow C: Oracle Upstream Drift Check
 
-The Oracle skill is upstream-derived from `steipete/oracle:skills/oracle`. Keep local runtime defaults in `AGENTS.md` / `CLAUDE.md` and botfiles shell wrappers; use this sync path to refresh the skill text itself.
+The Oracle skill is derived from `steipete/oracle:skills/oracle`, but it is a protected local workflow fork because it carries local GPT-5.5 Pro browser defaults and fallback policy. Use this workflow to check drift against upstream. Do not overwrite the local Oracle skill unless you are intentionally refreshing from upstream and then reapplying the local policy.
 
 ### 1. Check Oracle drift
 
@@ -177,10 +177,10 @@ python scripts/sync_upstream_skills.py \
 python scripts/sync_upstream_skills.py \
   --repo-root ~/pro/botfiles \
   --policy upstream_oracle_policy.json \
-  sync --skills oracle --apply
+  sync --skills oracle --force-protected --apply
 ```
 
-This refreshes `codex/skills/oracle` from upstream and mirrors the changed Oracle skill into `claude/skills/oracle`.
+This replaces `codex/skills/oracle` from upstream and mirrors the changed Oracle skill into `claude/skills/oracle`. Afterward, reapply the local GPT-5.5 Pro browser defaults, validate both skill copies, and re-check the Oracle awaiter agents and global instructions for drift.
 
 ## Post-Sync Checks
 
