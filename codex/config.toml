@@ -1,6 +1,5 @@
 # Rollback option:
 # model = "gpt-5.2-codex"
-model = "gpt-5.4"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 web_search = "live"
@@ -15,7 +14,7 @@ notify = [
   "codex-notify",
 ]
 file_opener = "cursor"
-profile = "azure"
+profile = "chatgpt"
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
@@ -35,6 +34,10 @@ sandbox_mode = "workspace-write"
 js_repl = false
 guardian_approval = true
 prevent_idle_sleep = false
+terminal_resize_reflow = true
+memories = false
+external_migration = false
+goals = true
 
 [profiles.openai_api]
 model = "gpt-5.4"
