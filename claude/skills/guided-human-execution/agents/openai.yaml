@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guided Human Execution"
+  short_description: "Step-by-step human-in-the-loop execution"
+  default_prompt: "Use $guided-human-execution to walk me through this one step at a time, doing safe checks yourself and asking me to confirm each human action."
