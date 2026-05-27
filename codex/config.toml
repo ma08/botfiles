@@ -1,6 +1,5 @@
 # Rollback option:
 # model = "gpt-5.2-codex"
-model_provider = "openai"
 model_reasoning_effort = "xhigh"
 web_search = "live"
 personality = "pragmatic"
@@ -16,6 +15,7 @@ notify = [
 file_opener = "cursor"
 profile = "chatgpt"
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
+model = "gpt-5.5"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
 [profiles.azure]
@@ -57,7 +57,6 @@ tui_app_server = false
 prevent_idle_sleep = false
 
 [profiles.chatgpt]
-model = "gpt-5.5"
 model_provider = "openai"
 model_reasoning_effort = "xhigh"
 forced_login_method = "chatgpt"
@@ -154,6 +153,9 @@ trust_level = "trusted"
 [projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-157"]
 trust_level = "trusted"
 
+[projects."/Users/sourya4/pro/omnishot"]
+trust_level = "trusted"
+
 [projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-101"]
 trust_level = "trusted"
 
@@ -233,15 +235,18 @@ enabled = true
 [plugins."presentations@openai-primary-runtime"]
 enabled = true
 
+[plugins."browser@openai-bundled"]
+enabled = true
+
 [plugins."hugging-face@openai-curated"]
 enabled = true
 
 [marketplaces.openai-bundled]
-last_updated = "2026-05-06T13:18:08Z"
+last_updated = "2026-05-17T11:19:14Z"
 source_type = "local"
 source = "/Users/sourya4/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [marketplaces.openai-primary-runtime]
-last_updated = "2026-05-07T06:23:27Z"
+last_updated = "2026-05-17T12:14:13Z"
 source_type = "local"
 source = "/Users/sourya4/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
