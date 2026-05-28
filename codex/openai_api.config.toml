@@ -1,0 +1,18 @@
+# Layered on top of config.toml when codex is invoked with `--profile openai_api`.
+# Migrated from the legacy `[profiles.openai_api]` block on 2026-05-26 after
+# codex-cli 0.134.0 dropped support for nested profile tables.
+model = "gpt-5.4"
+model_provider = "openai"
+model_reasoning_effort = "xhigh"
+forced_login_method = "api"
+plan_mode_reasoning_effort = "xhigh"
+approvals_reviewer = "guardian_subagent"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[features]
+js_repl = false
+apps = false
+guardian_approval = true
+tui_app_server = false
+prevent_idle_sleep = false

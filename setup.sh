@@ -156,6 +156,18 @@ backup_existing() {
         mv "$CODEX_DIR/config.toml" "$CODEX_DIR/config.toml.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    # Per-profile config files introduced in codex-cli 0.134.0 (replaces the
+    # legacy nested `[profiles.*]` tables and top-level `profile = "..."`
+    # selector). Each profile lives in `<name>.config.toml` next to config.toml.
+    for profile_name in chatgpt azure openai_api v0; do
+        profile_path="$CODEX_DIR/${profile_name}.config.toml"
+        if [ -f "$profile_path" ] && [ ! -L "$profile_path" ]; then
+            echo "  Backing up codex ${profile_name}.config.toml"
+            mv "$profile_path" "$profile_path.bak.$(date +%Y%m%d%H%M%S)"
+        fi
+    done
+    unset profile_name profile_path
+
     if [ -e "$CODEX_DIR/skills" ] && [ ! -L "$CODEX_DIR/skills" ]; then
         echo "  Backing up codex skills"
         mv "$CODEX_DIR/skills" "$CODEX_DIR/skills.bak.$(date +%Y%m%d%H%M%S)"
@@ -230,6 +242,10 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
     [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
+    for profile_name in chatgpt azure openai_api v0; do
+        [ -L "$CODEX_DIR/${profile_name}.config.toml" ] && rm "$CODEX_DIR/${profile_name}.config.toml"
+    done
+    unset profile_name
     [ -L "$CODEX_DIR/skills" ] && rm "$CODEX_DIR/skills"
     [ -L "$CODEX_DIR/AGENTS.md" ] && rm "$CODEX_DIR/AGENTS.md"
     [ -L "$HOME/.config/zellij/config.kdl" ] && rm "$HOME/.config/zellij/config.kdl"
@@ -256,6 +272,13 @@ create_symlinks() {
 
     ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
     echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
+
+    # Per-profile configs (codex-cli 0.134.0+).
+    for profile_name in chatgpt azure openai_api v0; do
+        ln -sf "$SCRIPT_DIR/codex/${profile_name}.config.toml" "$CODEX_DIR/${profile_name}.config.toml"
+        echo "  codex ${profile_name}.config.toml -> $SCRIPT_DIR/codex/${profile_name}.config.toml"
+    done
+    unset profile_name
 
     safe_symlink "$SCRIPT_DIR/codex/agents" "$CODEX_DIR/agents" "codex agents/"
 

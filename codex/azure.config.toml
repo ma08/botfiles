@@ -1,0 +1,22 @@
+# Layered on top of config.toml when codex is invoked with `--profile azure`.
+# Migrated from the legacy `[profiles.azure]` block on 2026-05-26 after
+# codex-cli 0.134.0 dropped support for nested profile tables.
+# Rollback options:
+# model = "gpt-5.4"
+# model = "gpt-5.3-codex"
+# model = "gpt-5.2-codex"
+model = "gpt-5.5"
+model_provider = "azure"
+model_reasoning_effort = "xhigh"
+approvals_reviewer = "user"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[features]
+js_repl = false
+guardian_approval = true
+prevent_idle_sleep = false
+terminal_resize_reflow = true
+memories = false
+external_migration = false
+goals = true

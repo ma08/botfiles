@@ -1,0 +1,9 @@
+# Layered on top of config.toml when codex is invoked with `--profile chatgpt`.
+# Migrated from the legacy `[profiles.chatgpt]` block on 2026-05-26 after
+# codex-cli 0.134.0 dropped support for both nested `[profiles.*]` tables
+# and the top-level `profile = "..."` selector. New scheme: each profile
+# lives in its own `$CODEX_HOME/<name>.config.toml` file.
+model_provider = "openai"
+model_reasoning_effort = "xhigh"
+forced_login_method = "chatgpt"
+plan_mode_reasoning_effort = "xhigh"

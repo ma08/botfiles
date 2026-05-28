@@ -21,8 +21,47 @@ unset _botrc_source
 unset _botrc_dir
 
 # --- Codex CLI profile shortcuts -------------------------------------------
-unalias codex-azure codex-openai codex-chatgpt \
+# codex-cli 0.134.0 dropped the legacy top-level `profile = "..."` selector,
+# so bare `codex`/`codexy` no longer pick up a default profile from
+# config.toml. We restore the prior behavior here by injecting
+# `--profile chatgpt` when the user runs an interactive session without an
+# explicit profile and without invoking a subcommand (login/doctor/update/
+# mcp/plugin/etc., where --profile is invalid or meaningless).
+unalias codex codex-azure codex-openai codex-chatgpt \
   codexy codexy-azure codexy-openai codexy-chatgpt 2>/dev/null || true
+
+# Subcommands that must NOT have `--profile` injected (top-level commands
+# that don't honor the flag). Keep in sync with `codex --help`.
+_BOTRC_CODEX_SUBCOMMANDS="exec e review login logout mcp plugin mcp-server app-server remote-control app completion update doctor sandbox debug apply a resume fork cloud exec-server features help"
+
+# Decide whether the first non-flag arg is a subcommand. Returns 0 (true)
+# when we should skip injecting `--profile`.
+_botrc_codex_is_subcommand_invocation() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      -*) ;;  # skip flags; first non-flag arg is the candidate
+      *)
+        case " $_BOTRC_CODEX_SUBCOMMANDS " in
+          *" $arg "*) return 0 ;;
+        esac
+        return 1
+        ;;
+    esac
+  done
+  return 1
+}
+
+# True if `--profile` / `-p` is already present in the arg list.
+_botrc_codex_has_profile_flag() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --profile|--profile=*|-p) return 0 ;;
+    esac
+  done
+  return 1
+}
 
 _botrc_codex_default() {
   case "${CODEX_APP_NOTIFY_DEFAULT:-true}" in
@@ -35,12 +74,29 @@ _botrc_codex_default() {
   esac
 }
 
+# Bare `codex` shadow: defaults to chatgpt profile for interactive sessions,
+# but stays out of the way for subcommands and explicit-profile invocations.
+codex() {
+  if _botrc_codex_has_profile_flag "$@" || _botrc_codex_is_subcommand_invocation "$@"; then
+    command codex "$@"
+  else
+    command codex --profile chatgpt "$@"
+  fi
+}
+
 codex-azure() { _botrc_codex_default --profile azure "$@"; }
 codex-openai() { _botrc_codex_default --profile openai_api "$@"; }
 codex-chatgpt() { _botrc_codex_default --profile chatgpt "$@"; }
 
 # --- Codex yolo aliases (parallel to ccy for Claude) ----------------------
-codexy() { _botrc_codex_default --yolo "$@"; }
+# Bare `codexy` mirrors `codex` and defaults to chatgpt unless overridden.
+codexy() {
+  if _botrc_codex_has_profile_flag "$@" || _botrc_codex_is_subcommand_invocation "$@"; then
+    _botrc_codex_default --yolo "$@"
+  else
+    _botrc_codex_default --yolo --profile chatgpt "$@"
+  fi
+}
 codexy-azure() { _botrc_codex_default --yolo --profile azure "$@"; }
 codexy-openai() { _botrc_codex_default --yolo --profile openai_api "$@"; }
 codexy-chatgpt() { _botrc_codex_default --yolo --profile chatgpt "$@"; }

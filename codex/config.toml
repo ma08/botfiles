@@ -13,58 +13,13 @@ notify = [
   "codex-notify",
 ]
 file_opener = "cursor"
-profile = "chatgpt"
+# Profiles live in sibling `<name>.config.toml` files (chatgpt, azure,
+# openai_api, v0) — codex-cli 0.134.0 dropped support for the legacy
+# top-level `profile = "..."` selector and nested `[profiles.*]` tables.
+# Activate one with `--profile <name>` (see ~/pro/botfiles/.botrc wrappers).
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
 model = "gpt-5.5"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
-
-[profiles.azure]
-# Rollback options:
-# model = "gpt-5.4"
-# model = "gpt-5.3-codex"
-# model = "gpt-5.2-codex"
-model = "gpt-5.5"
-model_provider = "azure"
-model_reasoning_effort = "xhigh"
-approvals_reviewer = "user"
-approval_policy = "on-request"
-sandbox_mode = "workspace-write"
-
-[profiles.azure.features]
-js_repl = false
-guardian_approval = true
-prevent_idle_sleep = false
-terminal_resize_reflow = true
-memories = false
-external_migration = false
-goals = true
-
-[profiles.openai_api]
-model = "gpt-5.4"
-model_provider = "openai"
-model_reasoning_effort = "xhigh"
-forced_login_method = "api"
-plan_mode_reasoning_effort = "xhigh"
-approvals_reviewer = "guardian_subagent"
-approval_policy = "on-request"
-sandbox_mode = "workspace-write"
-
-[profiles.openai_api.features]
-js_repl = false
-apps = false
-guardian_approval = true
-tui_app_server = false
-prevent_idle_sleep = false
-
-[profiles.chatgpt]
-model_provider = "openai"
-model_reasoning_effort = "xhigh"
-forced_login_method = "chatgpt"
-plan_mode_reasoning_effort = "xhigh"
-
-[profiles.v0]
-model = "v0-1.5-md"
-model_provider = "v0"
 
 [projects."/Users/sourya4/pro/ladduu_agent_stack"]
 trust_level = "trusted"
