@@ -118,6 +118,7 @@ Model guidance:
 Use the bundled script for deterministic runs and durable artifacts.
 For best first-pass reliability, use an explicit long timeout and retry budget.
 Keep raw Gemini outputs under `task-progress-artifacts/scratchpad/gemini/`; reserve top-level task artifacts for the synthesized outputs you want humans to review quickly.
+The runner defaults to the high-quality Deep Research Max agent when supported and sends the documented Deep Research `agent_config` (`type=deep-research`, `thinking_summaries=auto`, `collaborative_planning=false`) unless `--no-agent-config` is passed.
 
 ```bash
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
@@ -170,6 +171,10 @@ Agent guidance:
 - Use `--agent deep-research-preview-04-2026` when speed/cost matters more than maximum comprehensiveness.
 - Use `--api-revision` only when Google publishes a newer Interactions API revision or you need legacy compatibility.
 - Script reads `GEMINI_API_KEY` from environment, explicit `--env-file`, nearest `.env`, or `~/pro/botfiles/secrets/local/deep-research.rc` (falls back to `GOOGLE_API_KEY`).
+- Submit actions save a header-free `gemini-submit-request-*.json` payload alongside the API response so agent/config drift can be audited without exposing API keys.
+- Failed, cancelled, or expired interactions write `gemini-terminal-summary-*.md` instead of `gemini-report-*.md`. A `gemini-report-*.md` file means the interaction reached `completed`.
+- Completed interactions write final `model_output` text only; thought summaries and stored prompts are excluded from `gemini-report-*.md`.
+- If an older artifact has a report that only repeats the original prompt, treat it as a pre-fix runner artifact and inspect the matching `gemini-check-*.json` terminal status.
 
 ## Exa Execution
 

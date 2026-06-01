@@ -199,6 +199,32 @@ def collect_text_and_urls(
             collect_text_and_urls(item, texts, urls, include_any_text=include_any_text)
 
 
+def model_generated_steps(steps: Any) -> list[Any]:
+    """Return non-user steps for progress diagnostics."""
+    if not isinstance(steps, list):
+        return []
+    return [
+        step
+        for step in steps
+        if not (
+            isinstance(step, dict)
+            and str(step.get("type", "")).lower() == "user_input"
+        )
+    ]
+
+
+def final_output_steps(steps: Any) -> list[Any]:
+    """Return final answer steps suitable for report extraction."""
+    if not isinstance(steps, list):
+        return []
+    return [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and str(step.get("type", "")).lower() in {"model_output", "assistant_output"}
+    ]
+
+
 def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
     texts: list[str] = []
     urls: list[str] = []
@@ -209,7 +235,9 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
 
     steps = payload.get("steps")
     if isinstance(steps, list):
-        collect_text_and_urls(steps, texts, urls, include_any_text=True)
+        collect_text_and_urls(
+            final_output_steps(steps), texts, urls, include_any_text=True
+        )
 
     outputs = payload.get("outputs")
     if isinstance(outputs, list):
@@ -219,7 +247,8 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
         collect_text_and_urls(payload.get("response", {}), texts, urls, include_any_text=True)
 
     if not urls and (isinstance(steps, list) or isinstance(outputs, list)):
-        blob = json.dumps(steps or outputs, ensure_ascii=False)
+        url_source = final_output_steps(steps) if isinstance(steps, list) else outputs
+        blob = json.dumps(url_source, ensure_ascii=False)
         urls.extend(re.findall(r"https?://[^\s\"'<>]+", blob))
 
     deduped_texts: list[str] = []
@@ -242,6 +271,34 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
     return merged_text, deduped_urls
 
 
+def has_model_generated_output(payload: dict[str, Any]) -> bool:
+    text, urls = extract_text_and_urls(payload)
+    if text.strip() or urls:
+        return True
+    steps = model_generated_steps(payload.get("steps"))
+    return bool(payload.get("outputs") or payload.get("response") or steps)
+
+
+def deep_research_agent_config(
+    *,
+    enabled: bool,
+    thinking_summaries: str,
+    visualization: str,
+    collaborative_planning: bool,
+) -> dict[str, Any] | None:
+    if not enabled:
+        return None
+
+    config: dict[str, Any] = {
+        "type": "deep-research",
+        "thinking_summaries": thinking_summaries,
+        "collaborative_planning": collaborative_planning,
+    }
+    if visualization:
+        config["visualization"] = visualization
+    return config
+
+
 def submit_job(
     api_key: str,
     prompt: str,
@@ -250,6 +307,7 @@ def submit_job(
     background: bool,
     store: bool,
     api_revision: str,
+    agent_config: dict[str, Any] | None,
 ) -> str:
     payload = {
         "input": prompt,
@@ -257,8 +315,11 @@ def submit_job(
         "background": background,
         "store": store,
     }
-    response = post_interaction(api_key, payload, api_revision)
+    if agent_config:
+        payload["agent_config"] = agent_config
     ts = iso_now()
+    save_json(outdir / f"gemini-submit-request-{agent}-{ts}.json", payload)
+    response = post_interaction(api_key, payload, api_revision)
     snapshot = outdir / f"gemini-submit-{agent}-{ts}.json"
 
     try:
@@ -315,7 +376,7 @@ def payload_progress_fingerprint(payload: dict[str, Any]) -> str:
 
 
 def classify_incomplete_payload(status: str, payload: dict[str, Any]) -> str:
-    has_output = bool(payload.get("output_text") or payload.get("steps") or payload.get("outputs"))
+    has_output = has_model_generated_output(payload)
     if status == "in_progress" and not has_output:
         return "provider_stalled_or_long_running_no_output"
     if status == "unknown":
@@ -358,6 +419,47 @@ def write_timeout_summary(
         "```",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_terminal_summary(
+    outdir: Path,
+    interaction_id: str,
+    status: str,
+    payload: dict[str, Any],
+) -> None:
+    safe_id = interaction_id.replace("/", "_")
+    path = outdir / f"gemini-terminal-summary-{safe_id}.md"
+    keys = ", ".join(sorted(str(key) for key in payload.keys())) or "(none)"
+    error = payload.get("error")
+    error_text = json.dumps(error, ensure_ascii=False, indent=2) if error else "null"
+    text, urls = extract_text_and_urls(payload)
+    lines = [
+        "# Gemini Terminal Summary",
+        "",
+        f"- Interaction ID: `{interaction_id}`",
+        f"- Status: `{status}`",
+        f"- Payload keys: {keys}",
+        f"- Model/agent output extracted: {'yes' if text.strip() else 'no'}",
+        f"- Source URLs extracted from model/agent output: {len(urls)}",
+        "",
+        "## Error",
+        "",
+        "```json",
+        error_text,
+        "```",
+        "",
+        "No `gemini-report-*.md` was written because the interaction did not complete.",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_terminal_outputs(
+    outdir: Path, interaction_id: str, status: str, payload: dict[str, Any]
+) -> None:
+    if status == "completed":
+        write_extracted_outputs(outdir, interaction_id, payload)
+    else:
+        write_terminal_summary(outdir, interaction_id, status, payload)
 
 
 def poll_until_terminal(
@@ -428,12 +530,43 @@ def parse_args() -> argparse.Namespace:
         default="submit_and_check",
     )
     parser.add_argument("--prompt", default="", help="Prompt text")
-    parser.add_argument("--prompt-file", type=Path, help="Path to prompt markdown/text file")
-    parser.add_argument("--interaction-id", default="", help="Existing interaction id to check")
+    parser.add_argument(
+        "--prompt-file", type=Path, help="Path to prompt markdown/text file"
+    )
+    parser.add_argument(
+        "--interaction-id", default="", help="Existing interaction id to check"
+    )
     parser.add_argument(
         "--agent",
         default=DEFAULT_AGENT,
         help="Gemini interaction agent id",
+    )
+    parser.add_argument(
+        "--no-agent-config",
+        dest="agent_config",
+        action="store_false",
+        help="Do not send Deep Research agent_config",
+    )
+    parser.set_defaults(agent_config=True)
+    parser.add_argument(
+        "--thinking-summaries",
+        default="auto",
+        choices=["auto", "none"],
+        help="Deep Research thinking_summaries agent_config value",
+    )
+    parser.add_argument(
+        "--visualization",
+        default="",
+        choices=["", "auto"],
+        help="Optional Deep Research visualization agent_config value",
+    )
+    parser.add_argument(
+        "--collaborative-planning",
+        action="store_true",
+        help=(
+            "Enable Deep Research collaborative planning instead of direct "
+            "report generation"
+        ),
     )
     parser.add_argument(
         "--api-revision",
@@ -462,7 +595,10 @@ def parse_args() -> argparse.Namespace:
         "--max-timeout-retries",
         type=int,
         default=1,
-        help="When submit_and_check times out, resubmit this many times before giving up",
+        help=(
+            "When submit_and_check times out, resubmit this many times before "
+            "giving up"
+        ),
     )
     parser.add_argument(
         "--env-file",
@@ -531,6 +667,12 @@ def main() -> int:
             background=bool(args.background),
             store=bool(args.store),
             api_revision=str(args.api_revision or ""),
+            agent_config=deep_research_agent_config(
+                enabled=bool(args.agent_config),
+                thinking_summaries=str(args.thinking_summaries),
+                visualization=str(args.visualization),
+                collaborative_planning=bool(args.collaborative_planning),
+            ),
         )
         print(
             f"submitted interaction_id={interaction_id} agent={args.agent}",
@@ -554,7 +696,7 @@ def main() -> int:
         )
         print(f"interaction_id={interaction_id} status={status}", flush=True)
         if status in TERMINAL_STATUSES:
-            write_extracted_outputs(outdir, interaction_id, payload)
+            write_terminal_outputs(outdir, interaction_id, status, payload)
             return 0 if status == "completed" else 2
         return 0
 
@@ -577,7 +719,7 @@ def main() -> int:
         )
 
         if status in TERMINAL_STATUSES:
-            write_extracted_outputs(outdir, interaction_id, payload)
+            write_terminal_outputs(outdir, interaction_id, status, payload)
             print(f"terminal_status={status}", flush=True)
             return 0 if status == "completed" else 2
 
