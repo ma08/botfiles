@@ -42,7 +42,7 @@ from typing import Any
 from dotenv import load_dotenv
 from exa_py import Exa
 
-DEFAULT_MODEL = "exa-research"
+DEFAULT_MODEL = "exa-research-pro"
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "canceled", "expired"}
 
 

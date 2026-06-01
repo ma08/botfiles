@@ -21,6 +21,8 @@ Inputs:
     ~/pro/botfiles/secrets/local/codex-azure.rc
 - Optional direct OpenAI route via OPENAI_API_KEY only when explicitly enabled with
   --allow-direct-openai or OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1
+- Reasoning effort defaults to high via OPENAI_DEEP_RESEARCH_REASONING_EFFORT
+  or --reasoning-effort
 - Prompt text from --prompt or --prompt-file
 
 Outputs (under --outdir):
@@ -29,6 +31,7 @@ Outputs (under --outdir):
 - openai-provider-used.txt
 - openai-response-id.txt
 - openai-model-used.txt
+- openai-reasoning-effort-used.txt
 - openai-report-<response_id>.md
 - openai-sources-<response_id>.md
 """
@@ -53,6 +56,8 @@ OPENAI_DEFAULT_MODELS = ["o3-deep-research", "o4-mini-deep-research"]
 AZURE_DEFAULT_DEPLOYMENTS = ["o3-deep-research"]
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
+REASONING_EFFORTS = ("low", "medium", "high")
+DEFAULT_REASONING_EFFORT = "high"
 
 
 def iso_now() -> str:
@@ -114,6 +119,18 @@ def normalize_azure_base_url(value: str) -> str:
 
 def env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in TRUE_VALUES
+
+
+def resolve_reasoning_effort(value: str) -> str:
+    effort = value.strip().lower()
+    if not effort:
+        return DEFAULT_REASONING_EFFORT
+    if effort not in REASONING_EFFORTS:
+        allowed = ", ".join(REASONING_EFFORTS)
+        raise RuntimeError(
+            f"Unsupported reasoning effort '{value}'. Use one of: {allowed}"
+        )
+    return effort
 
 
 def load_api_config(
@@ -248,6 +265,7 @@ def submit_job(
     outdir: Path,
     include_code_interpreter: bool,
     max_tool_calls: int,
+    reasoning_effort: str,
 ) -> tuple[str, str]:
     last_error = ""
 
@@ -260,6 +278,7 @@ def submit_job(
             "model": model,
             "background": True,
             "input": prompt,
+            "reasoning": {"effort": reasoning_effort, "summary": "auto"},
             "tools": tools,
         }
         if max_tool_calls > 0:
@@ -284,6 +303,9 @@ def submit_job(
             )
             (outdir / "openai-model-used.txt").write_text(
                 f"{model}\n", encoding="utf-8"
+            )
+            (outdir / "openai-reasoning-effort-used.txt").write_text(
+                f"{reasoning_effort}\n", encoding="utf-8"
             )
             return response_id, model
 
@@ -378,6 +400,18 @@ def parse_args() -> argparse.Namespace:
         help="Optional cap on deep-research tool calls; <=0 leaves provider default",
     )
     parser.add_argument(
+        "--reasoning-effort",
+        default=os.getenv(
+            "OPENAI_DEEP_RESEARCH_REASONING_EFFORT", DEFAULT_REASONING_EFFORT
+        ),
+        choices=REASONING_EFFORTS,
+        help=(
+            "Reasoning effort for OpenAI/Azure Responses requests. Defaults to "
+            "high, the highest supported setting on the default o3/o4 "
+            "deep-research routes."
+        ),
+    )
+    parser.add_argument(
         "--allow-direct-openai",
         action="store_true",
         help=(
@@ -413,6 +447,7 @@ def main() -> int:
     )
     if args.max_tool_calls < 0:
         raise RuntimeError("--max-tool-calls must be >= 0")
+    reasoning_effort = resolve_reasoning_effort(str(args.reasoning_effort or ""))
 
     response_id = str(args.response_id or "").strip()
     if args.action in {"submit", "submit_and_check"}:
@@ -425,6 +460,7 @@ def main() -> int:
             outdir=outdir,
             include_code_interpreter=bool(args.include_code_interpreter),
             max_tool_calls=int(args.max_tool_calls),
+            reasoning_effort=reasoning_effort,
         )
         print(f"submitted response_id={response_id} model={model}")
         if args.action == "submit":

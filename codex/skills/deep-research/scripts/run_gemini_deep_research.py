@@ -43,7 +43,7 @@ import requests
 from dotenv import load_dotenv
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-DEFAULT_AGENT = "deep-research-preview-04-2026"
+DEFAULT_AGENT = "deep-research-max-preview-04-2026"
 DEFAULT_API_REVISION = "2026-05-20"
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
 

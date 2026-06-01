@@ -48,6 +48,12 @@ Optimize for shortest end-to-end time without reducing research quality.
 - Exa track: run `scripts/run_exa_research.py` (prefer `submit_and_check`).
 - Persist all track artifacts as they complete.
 
+Default quality posture:
+- OpenAI/Azure requests default to `--reasoning-effort high`, the highest supported setting for the default o3/o4 deep-research routes.
+- Gemini defaults to `deep-research-max-preview-04-2026` for maximum comprehensiveness.
+- Exa defaults to `exa-research-pro` for highest reasoning capability.
+- Use lower/faster options explicitly only for smoke tests, latency-sensitive work, or cost-sensitive checks.
+
 4. Triangulate and resolve conflicts
 - Cross-check overlapping claims between OpenAI, Gemini, and Exa outputs.
 - Prefer higher-trust sources when claims conflict.
@@ -104,6 +110,7 @@ Model guidance:
 - Azure fallback order comes from `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or defaults to `o3-deep-research`.
 - Direct OpenAI opt-in fallback order is `o3-deep-research,o4-mini-deep-research`.
 - Override with `--models` when needed.
+- Reasoning effort defaults to `high`; override with `--reasoning-effort` or `OPENAI_DEEP_RESEARCH_REASONING_EFFORT` only when you intentionally want lower cost/latency.
 - Use `--max-tool-calls <n>` for low-cost smoke tests or latency-bounded checks.
 
 ## Gemini Execution
@@ -159,8 +166,8 @@ Recovery playbook:
 3. Resubmit only when needed (or let `submit_and_check` retries handle it automatically).
 
 Agent guidance:
-- Default agent is `deep-research-preview-04-2026` using Interactions API revision `2026-05-20`.
-- Use `--agent deep-research-max-preview-04-2026` when maximum comprehensiveness matters more than speed.
+- Default agent is `deep-research-max-preview-04-2026` using Interactions API revision `2026-05-20`.
+- Use `--agent deep-research-preview-04-2026` when speed/cost matters more than maximum comprehensiveness.
 - Use `--api-revision` only when Google publishes a newer Interactions API revision or you need legacy compatibility.
 - Script reads `GEMINI_API_KEY` from environment, explicit `--env-file`, nearest `.env`, or `~/pro/botfiles/secrets/local/deep-research.rc` (falls back to `GOOGLE_API_KEY`).
 
@@ -176,8 +183,8 @@ uv run ~/.codex/skills/deep-research/scripts/run_exa_research.py \
 ```
 
 Model guidance:
-- `exa-research` is the default and recommended for most tasks.
-- `exa-research-pro` is for high-stakes or complex investigations.
+- `exa-research-pro` is the default for highest quality and strongest reasoning.
+- `exa-research` is acceptable when speed/cost matters more than maximum depth.
 - `exa-research-fast` is acceptable for low-cost smoke tests.
 
 The script reads `EXA_API_KEY` from environment, explicit `--env-file`, nearest `.env`, or `~/pro/botfiles/secrets/local/deep-research.rc`.
