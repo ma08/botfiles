@@ -357,6 +357,10 @@ check_secrets() {
         "OpenAI API for Codex" \
         "$SCRIPT_DIR/secrets/local/codex-openai.rc" \
         "$SCRIPT_DIR/secrets/templates/codex-openai.rc.example"
+    check_optional_secret_file \
+        "Gemini/Exa direct providers for deep-research" \
+        "$SCRIPT_DIR/secrets/local/deep-research.rc" \
+        "$SCRIPT_DIR/secrets/templates/deep-research.rc.example"
     check_secret_file \
         "Azure resource for OpenCode" \
         "$SCRIPT_DIR/secrets/local/opencode-azure.rc" \

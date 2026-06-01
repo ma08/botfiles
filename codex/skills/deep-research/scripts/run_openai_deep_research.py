@@ -13,11 +13,14 @@ Purpose:
 - Persist raw snapshots and extracted report artifacts.
 
 Inputs:
-- OPENAI_API_KEY (environment or .env near cwd)
-- Optional Azure deep-research route via:
+- Azure deep-research route via:
   - AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT or AZURE_OPENAI_DEEP_RESEARCH_BASE_URL
   - AZURE_OPENAI_DEEP_RESEARCH_API_KEY (falls back to AZURE_OPENAI_API_KEY)
   - AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS (comma-separated Azure deployment names)
+  - Loaded from environment, explicit --env-file, nearest .env, or
+    ~/pro/botfiles/secrets/local/codex-azure.rc
+- Optional direct OpenAI route via OPENAI_API_KEY only when explicitly enabled with
+  --allow-direct-openai or OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1
 - Prompt text from --prompt or --prompt-file
 
 Outputs (under --outdir):
@@ -49,6 +52,7 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_DEFAULT_MODELS = ["o3-deep-research", "o4-mini-deep-research"]
 AZURE_DEFAULT_DEPLOYMENTS = ["o3-deep-research"]
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
+TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 
 
 def iso_now() -> str:
@@ -64,6 +68,37 @@ def find_env_candidates(start: Path) -> list[Path]:
     return candidates
 
 
+def botfiles_secret_candidates(names: list[str]) -> list[Path]:
+    roots: list[Path] = []
+    botfiles_root = os.getenv("BOTFILES_ROOT", "").strip()
+    if botfiles_root:
+        roots.append(Path(botfiles_root).expanduser())
+    roots.append(Path.home() / "pro/botfiles")
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for name in names:
+            candidate = (root / "secrets/local" / name).resolve()
+            if candidate not in seen and candidate.exists():
+                candidates.append(candidate)
+                seen.add(candidate)
+    return candidates
+
+
+def load_env_sources(env_file: Path | None, botfiles_secret_names: list[str]) -> None:
+    if env_file and env_file.exists():
+        load_dotenv(env_file)
+        return
+
+    for candidate in find_env_candidates(Path.cwd().resolve()):
+        load_dotenv(candidate)
+        break
+
+    for candidate in botfiles_secret_candidates(botfiles_secret_names):
+        load_dotenv(candidate)
+
+
 def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -77,13 +112,17 @@ def normalize_azure_base_url(value: str) -> str:
     return f"{base}/openai/v1"
 
 
-def load_api_config(env_file: Path | None = None) -> dict[str, Any]:
-    if env_file and env_file.exists():
-        load_dotenv(env_file)
-    else:
-        for candidate in find_env_candidates(Path.cwd().resolve()):
-            load_dotenv(candidate)
-            break
+def env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in TRUE_VALUES
+
+
+def load_api_config(
+    env_file: Path | None = None, *, allow_direct_openai: bool = False
+) -> dict[str, Any]:
+    load_env_sources(
+        env_file,
+        ["codex-azure.rc", "codex-openai.rc", "deep-research.rc"],
+    )
 
     azure_base = normalize_azure_base_url(
         os.getenv("AZURE_OPENAI_DEEP_RESEARCH_BASE_URL", "")
@@ -108,10 +147,23 @@ def load_api_config(env_file: Path | None = None) -> dict[str, Any]:
             "default_models": azure_models or AZURE_DEFAULT_DEPLOYMENTS,
         }
 
+    direct_openai_allowed = allow_direct_openai or env_flag(
+        "OPENAI_DEEP_RESEARCH_ALLOW_DIRECT"
+    )
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if api_key and not direct_openai_allowed:
+        raise RuntimeError(
+            "Direct OpenAI deep-research is disabled by default to avoid accidental "
+            "direct billing. Configure AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT for the "
+            "Azure route, or pass --allow-direct-openai / set "
+            "OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1 to opt in."
+        )
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY not found and no Azure deep-research endpoint was configured."
+            "No Azure deep-research endpoint was configured and direct OpenAI is not "
+            "available. Set AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT in the environment "
+            "or ~/pro/botfiles/secrets/local/codex-azure.rc, or explicitly opt in "
+            "to direct OpenAI with --allow-direct-openai and OPENAI_API_KEY."
         )
     return {
         "provider": "openai",
@@ -195,6 +247,7 @@ def submit_job(
     models: list[str],
     outdir: Path,
     include_code_interpreter: bool,
+    max_tool_calls: int,
 ) -> tuple[str, str]:
     last_error = ""
 
@@ -209,6 +262,8 @@ def submit_job(
             "input": prompt,
             "tools": tools,
         }
+        if max_tool_calls > 0:
+            payload["max_tool_calls"] = max_tool_calls
         response = post_response(api_config, payload)
 
         ts = iso_now()
@@ -309,12 +364,26 @@ def parse_args() -> argparse.Namespace:
         "--env-file",
         type=Path,
         default=None,
-        help="Optional explicit .env path",
+        help="Optional explicit .env or botfiles .rc path",
     )
     parser.add_argument(
         "--include-code-interpreter",
         action="store_true",
         help="Also enable code_interpreter tool on submission",
+    )
+    parser.add_argument(
+        "--max-tool-calls",
+        type=int,
+        default=0,
+        help="Optional cap on deep-research tool calls; <=0 leaves provider default",
+    )
+    parser.add_argument(
+        "--allow-direct-openai",
+        action="store_true",
+        help=(
+            "Allow fallback to direct OpenAI billing when no Azure deep-research "
+            "endpoint is configured"
+        ),
     )
     return parser.parse_args()
 
@@ -339,7 +408,11 @@ def main() -> int:
     outdir = args.outdir.resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    api_config = load_api_config(args.env_file)
+    api_config = load_api_config(
+        args.env_file, allow_direct_openai=bool(args.allow_direct_openai)
+    )
+    if args.max_tool_calls < 0:
+        raise RuntimeError("--max-tool-calls must be >= 0")
 
     response_id = str(args.response_id or "").strip()
     if args.action in {"submit", "submit_and_check"}:
@@ -351,6 +424,7 @@ def main() -> int:
             models=models,
             outdir=outdir,
             include_code_interpreter=bool(args.include_code_interpreter),
+            max_tool_calls=int(args.max_tool_calls),
         )
         print(f"submitted response_id={response_id} model={model}")
         if args.action == "submit":
