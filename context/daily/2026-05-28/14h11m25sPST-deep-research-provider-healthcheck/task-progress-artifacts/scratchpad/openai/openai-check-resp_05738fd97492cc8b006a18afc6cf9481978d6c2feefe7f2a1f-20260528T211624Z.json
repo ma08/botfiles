@@ -1,0 +1,220 @@
+{
+  "id": "resp_05738fd97492cc8b006a18afc6cf9481978d6c2feefe7f2a1f",
+  "object": "response",
+  "created_at": 1780002758,
+  "status": "completed",
+  "background": true,
+  "completed_at": 1780002980,
+  "content_filters": [
+    {
+      "blocked": false,
+      "source_type": "prompt",
+      "content_filter_raw": [],
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      },
+      "content_filter_offsets": {
+        "start_offset": 0,
+        "end_offset": 5385,
+        "check_offset": 0
+      }
+    },
+    {
+      "blocked": false,
+      "source_type": "completion",
+      "content_filter_raw": [],
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "low"
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      },
+      "content_filter_offsets": {
+        "start_offset": 0,
+        "end_offset": 128463,
+        "check_offset": 0
+      }
+    }
+  ],
+  "error": null,
+  "frequency_penalty": 0.0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": null,
+  "max_tool_calls": 1,
+  "model": "o3-deep-research",
+  "moderation": null,
+  "output": [
+    {
+      "id": "rs_05738fd97492cc8b006a18afc91c7481979cd51a9deeacb9be",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18afd10db08197bcaf0a86d9a2c5c2",
+      "type": "web_search_call",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "current date or year official"
+      }
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18afd1f60881978a56742d7a150aa4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18afd30728819790e226c73dcfc02b",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18afd377b081979e9c81d85dba1270",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18afe516a081978d680f7e1b91cedf",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18afe58fd0819794e98e3d3d1a03b2",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18b009498c8197a9af84ca8857015d",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18b009dd80819785f2fe44aed72710",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18b00d62988197abe19b6ba6d3c14e",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18b00df53c8197a71858eed13aa74e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18b01041648197a3bb4090e4fd5551",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18b010da4481978c15d55476b2346d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ws_05738fd97492cc8b006a18b027c4fc8197ac190e829001e8af",
+      "type": "web_search_call",
+      "status": "searching"
+    },
+    {
+      "id": "rs_05738fd97492cc8b006a18b0285f50819797c28ad6e65ecffd",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "msg_05738fd97492cc8b006a18b0a354a88197b8e36faf5166d450",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [
+            {
+              "type": "url_citation",
+              "end_index": 445,
+              "start_index": 299,
+              "title": "Today's Date and Time - Current Date, Time & More",
+              "url": "https://todaydateandtime.com/#:~:text=Find%20out%20today%27s%20date%2C%20current,complete%20date%20and%20time%20resource"
+            }
+          ],
+          "logprobs": [],
+          "text": "- I confirm that I have successfully performed a current web-backed research query.  \n- Using the integrated browser, I searched for the current date and year in real time.  \n- A live timekeeping website shows that **today’s date is Thursday, May 28, 2026**, confirming the current year is **2026** ([todaydateandtime.com](https://todaydateandtime.com/#:~:text=Find%20out%20today%27s%20date%2C%20current,complete%20date%20and%20time%20resource)).  \n- **Source:** [Today’s Date and Time – Current Date, Time & More](https://todaydateandtime.com/) – an up-to-date online resource displaying the present date and year."
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": "in_memory",
+  "reasoning": {
+    "effort": "medium",
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "web_search_preview",
+      "search_context_size": "medium",
+      "user_location": null
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 16461,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 16266,
+    "output_tokens_details": {
+      "reasoning_tokens": 16266
+    },
+    "total_tokens": 32727
+  },
+  "user": null,
+  "metadata": {}
+}

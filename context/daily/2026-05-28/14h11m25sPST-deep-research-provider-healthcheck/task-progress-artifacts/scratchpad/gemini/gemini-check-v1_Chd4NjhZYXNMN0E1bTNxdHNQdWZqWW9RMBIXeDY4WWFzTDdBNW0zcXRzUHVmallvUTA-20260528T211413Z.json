@@ -1,0 +1,74 @@
+{
+  "id": "v1_Chd4NjhZYXNMN0E1bTNxdHNQdWZqWW9RMBIXeDY4WWFzTDdBNW0zcXRzUHVmallvUTA",
+  "status": "completed",
+  "usage": {
+    "total_tokens": 113297,
+    "total_input_tokens": 68953,
+    "input_tokens_by_modality": [
+      {
+        "modality": "text",
+        "tokens": 68953
+      }
+    ],
+    "total_cached_tokens": 16384,
+    "total_output_tokens": 2069,
+    "output_tokens_by_modality": [
+      {
+        "modality": "text",
+        "tokens": 2069
+      }
+    ],
+    "total_tool_use_tokens": 33153,
+    "total_thought_tokens": 9122
+  },
+  "created": "2026-05-28T21:12:39Z",
+  "updated": "2026-05-28T21:12:39Z",
+  "steps": [
+    {
+      "type": "user_input",
+      "content": [
+        {
+          "text": "# Deep Research Provider Health Check Prompt\n\nThis is a provider health-check smoke test, not a full research task.\n\nPlease answer in 3-5 bullets:\n\n- Confirm that you can run a current web-backed research pass.\n- Find one current source about the date or current year.\n- Include the source URL.\n- Keep the answer short.\n\n",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "content": [
+        {
+          "text": "# Deep Research Provider Health Check\n\n* System diagnostics confirm the successful execution of a current, web-backed research pass, validating the capability to retrieve and synthesize real-time, up-to-date data [cite: 1].\n* The system accurately identifies the current date and year as Thursday, May 28, 2026, actively processing live overnight developments such as United Nations climate updates and Middle Eastern geopolitical shifts [cite: 1, 2].\n* A representative current source establishing today's date and the 2026 timeline is GoLocalProv, accessible at the following URL: https://www.golocalprov.com/news/5-big-news-stories-overnight-thursday-may-28-2026 [cite: 1].\n\n**Sources:**\n1. [golocalprov.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9wjDIvy95I6QbFHs-_vDX_lZ8_ztgt0JMgXD9Y2juKtAiIGqcb27H9H24cYBaP6YJn1Un1nEtjvxhhA5sQbxV9i_3h1RR-pk7Feq1BAeKBzTIutVbOthwLyxyYnqzAQlokk5zTmgoLbNkEtVnaYjB_xGgIyxsFOO1N4eKh5eX--garI25XR4=)\n2. [youtube.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHcVXd8gVlNczFEvD7KbC0InA9zu_eAHEsXgCz3vo-b1EQTk6EbaZYhn-znru4Dtv88hoYk9mYVz00g-w9ejdGVUbC7l_Iigufu5Kb5Pxqp59rwkZYDkikt_wEA5DIyDCE=)\n",
+          "annotations": [
+            {
+              "start_index": 213,
+              "end_index": 222,
+              "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9wjDIvy95I6QbFHs-_vDX_lZ8_ztgt0JMgXD9Y2juKtAiIGqcb27H9H24cYBaP6YJn1Un1nEtjvxhhA5sQbxV9i_3h1RR-pk7Feq1BAeKBzTIutVbOthwLyxyYnqzAQlokk5zTmgoLbNkEtVnaYjB_xGgIyxsFOO1N4eKh5eX--garI25XR4=",
+              "type": "url_citation"
+            },
+            {
+              "start_index": 438,
+              "end_index": 450,
+              "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9wjDIvy95I6QbFHs-_vDX_lZ8_ztgt0JMgXD9Y2juKtAiIGqcb27H9H24cYBaP6YJn1Un1nEtjvxhhA5sQbxV9i_3h1RR-pk7Feq1BAeKBzTIutVbOthwLyxyYnqzAQlokk5zTmgoLbNkEtVnaYjB_xGgIyxsFOO1N4eKh5eX--garI25XR4=",
+              "type": "url_citation"
+            },
+            {
+              "start_index": 438,
+              "end_index": 450,
+              "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHcVXd8gVlNczFEvD7KbC0InA9zu_eAHEsXgCz3vo-b1EQTk6EbaZYhn-znru4Dtv88hoYk9mYVz00g-w9ejdGVUbC7l_Iigufu5Kb5Pxqp59rwkZYDkikt_wEA5DIyDCE=",
+              "type": "url_citation"
+            },
+            {
+              "start_index": 666,
+              "end_index": 675,
+              "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9wjDIvy95I6QbFHs-_vDX_lZ8_ztgt0JMgXD9Y2juKtAiIGqcb27H9H24cYBaP6YJn1Un1nEtjvxhhA5sQbxV9i_3h1RR-pk7Feq1BAeKBzTIutVbOthwLyxyYnqzAQlokk5zTmgoLbNkEtVnaYjB_xGgIyxsFOO1N4eKh5eX--garI25XR4=",
+              "type": "url_citation"
+            }
+          ],
+          "type": "text"
+        }
+      ],
+      "type": "model_output"
+    }
+  ],
+  "object": "interaction",
+  "agent": "deep-research-preview-04-2026"
+}

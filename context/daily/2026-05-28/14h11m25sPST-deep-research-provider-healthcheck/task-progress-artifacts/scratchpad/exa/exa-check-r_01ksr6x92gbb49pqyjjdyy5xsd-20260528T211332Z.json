@@ -1,0 +1,20 @@
+{
+  "research_id": "r_01ksr6x92gbb49pqyjjdyy5xsd",
+  "created_at": 1780002759761.0,
+  "model": "exa-research",
+  "instructions": "# Deep Research Provider Health Check Prompt\n\nThis is a provider health-check smoke test, not a full research task.\n\nPlease answer in 3-5 bullets:\n\n- Confirm that you can run a current web-backed research pass.\n- Find one current source about the date or current year.\n- Include the source URL.\n- Keep the answer short.\n\n",
+  "output_schema": null,
+  "status": "completed",
+  "finished_at": 1780002759761.0,
+  "events": null,
+  "output": {
+    "content": "- Confirmed: I can run a current web-backed research pass — example evidence found below [Cottage Grove Journal](https://www.cottagegrovejournal.news/stories/may-28-2026,191823).\n- Found a current source that explicitly states the date May 28, 2026 (today) [May 28, 2026 - Cottage Grove Journal](https://www.cottagegrovejournal.news/stories/may-28-2026,191823).\n- Source URL: [https://www.cottagegrovejournal.news/stories/may-28-2026,191823](https://www.cottagegrovejournal.news/stories/may-28-2026,191823) (article published May 28, 2026) [Cottage Grove Journal](https://www.cottagegrovejournal.news/stories/may-28-2026,191823).\n- High confidence; multiple local sources were checked during the pass (e.g., Hastings Journal listing for May 28, 2026) [Hastings Journal](https://www.hastingsjournal.news/stories/may-28-2026,191825).",
+    "parsed": null
+  },
+  "cost_dollars": {
+    "total": 0.016671250000000002,
+    "num_pages": 1.24625,
+    "num_searches": 1.0,
+    "reasoning_tokens": 1088.0
+  }
+}

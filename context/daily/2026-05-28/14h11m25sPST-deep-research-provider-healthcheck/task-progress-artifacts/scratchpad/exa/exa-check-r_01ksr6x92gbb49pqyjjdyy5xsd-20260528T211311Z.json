@@ -1,0 +1,9 @@
+{
+  "research_id": "r_01ksr6x92gbb49pqyjjdyy5xsd",
+  "created_at": 1780002759761.0,
+  "model": "exa-research",
+  "instructions": "# Deep Research Provider Health Check Prompt\n\nThis is a provider health-check smoke test, not a full research task.\n\nPlease answer in 3-5 bullets:\n\n- Confirm that you can run a current web-backed research pass.\n- Find one current source about the date or current year.\n- Include the source URL.\n- Keep the answer short.\n\n",
+  "output_schema": null,
+  "status": "running",
+  "events": null
+}

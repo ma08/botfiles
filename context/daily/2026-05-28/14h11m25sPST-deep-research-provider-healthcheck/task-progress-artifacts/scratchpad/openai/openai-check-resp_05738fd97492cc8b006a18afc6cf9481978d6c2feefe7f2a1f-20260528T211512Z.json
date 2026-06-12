@@ -1,0 +1,51 @@
+{
+  "id": "resp_05738fd97492cc8b006a18afc6cf9481978d6c2feefe7f2a1f",
+  "object": "response",
+  "created_at": 1780002758,
+  "status": "in_progress",
+  "background": true,
+  "completed_at": null,
+  "content_filters": null,
+  "error": null,
+  "frequency_penalty": 0.0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": null,
+  "max_tool_calls": 1,
+  "model": "o3-deep-research",
+  "moderation": null,
+  "output": [],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": "in_memory",
+  "reasoning": {
+    "effort": "medium",
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "auto",
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "web_search_preview",
+      "search_context_size": "medium",
+      "user_location": null
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": null,
+  "user": null,
+  "metadata": {}
+}

@@ -1,0 +1,8 @@
+submitted research_id=r_01ksr6x92gbb49pqyjjdyy5xsd model=exa-research
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=running elapsed_seconds=0
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=running elapsed_seconds=10
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=running elapsed_seconds=20
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=running elapsed_seconds=30
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=running elapsed_seconds=40
+research_id=r_01ksr6x92gbb49pqyjjdyy5xsd status=completed elapsed_seconds=51
+terminal_status=completed

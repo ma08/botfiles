@@ -1,0 +1,4 @@
+# Sources extracted from Gemini interaction
+
+1. https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG9wjDIvy95I6QbFHs-_vDX_lZ8_ztgt0JMgXD9Y2juKtAiIGqcb27H9H24cYBaP6YJn1Un1nEtjvxhhA5sQbxV9i_3h1RR-pk7Feq1BAeKBzTIutVbOthwLyxyYnqzAQlokk5zTmgoLbNkEtVnaYjB_xGgIyxsFOO1N4eKh5eX--garI25XR4=
+2. https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHcVXd8gVlNczFEvD7KbC0InA9zu_eAHEsXgCz3vo-b1EQTk6EbaZYhn-znru4Dtv88hoYk9mYVz00g-w9ejdGVUbC7l_Iigufu5Kb5Pxqp59rwkZYDkikt_wEA5DIyDCE=

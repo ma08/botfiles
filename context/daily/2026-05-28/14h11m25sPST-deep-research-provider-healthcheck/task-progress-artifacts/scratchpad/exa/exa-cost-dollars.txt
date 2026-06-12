@@ -1,0 +1,1 @@
+{"total": 0.016671250000000002, "num_pages": 1.24625, "num_searches": 1.0, "reasoning_tokens": 1088.0}

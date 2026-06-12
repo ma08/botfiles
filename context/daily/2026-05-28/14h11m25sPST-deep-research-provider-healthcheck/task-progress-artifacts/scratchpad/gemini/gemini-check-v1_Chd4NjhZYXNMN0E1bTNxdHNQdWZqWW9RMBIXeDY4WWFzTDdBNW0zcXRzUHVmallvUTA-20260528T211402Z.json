@@ -1,0 +1,19 @@
+{
+  "id": "v1_Chd4NjhZYXNMN0E1bTNxdHNQdWZqWW9RMBIXeDY4WWFzTDdBNW0zcXRzUHVmallvUTA",
+  "status": "in_progress",
+  "created": "2026-05-28T21:12:39Z",
+  "updated": "2026-05-28T21:12:39Z",
+  "steps": [
+    {
+      "type": "user_input",
+      "content": [
+        {
+          "text": "# Deep Research Provider Health Check Prompt\n\nThis is a provider health-check smoke test, not a full research task.\n\nPlease answer in 3-5 bullets:\n\n- Confirm that you can run a current web-backed research pass.\n- Find one current source about the date or current year.\n- Include the source URL.\n- Keep the answer short.\n\n",
+          "type": "text"
+        }
+      ]
+    }
+  ],
+  "object": "interaction",
+  "agent": "deep-research-preview-04-2026"
+}
