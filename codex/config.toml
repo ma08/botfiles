@@ -1,3 +1,4 @@
+cli_auth_credentials_store = "file"
 # Rollback option:
 # model = "gpt-5.2-codex"
 model_reasoning_effort = "xhigh"
@@ -19,7 +20,12 @@ file_opener = "cursor"
 # Activate one with `--profile <name>` (see ~/pro/botfiles/.botrc wrappers).
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
 model = "gpt-5.5"
+service_tier = "fast"
+approval_policy = "never"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
+
+[tui.keymap.global]
+toggle_vim_mode = "alt-v"
 
 [projects."/Users/sourya4/pro/ladduu_agent_stack"]
 trust_level = "trusted"
@@ -114,6 +120,9 @@ trust_level = "trusted"
 [projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-101"]
 trust_level = "trusted"
 
+[projects."/home/azureuser/code/custom-symphony-bootstrap-workspaces/ZON-199"]
+trust_level = "trusted"
+
 [notice]
 "hide_gpt-5.1-codex-max_migration_prompt" = true
 hide_rate_limit_model_nudge = true
@@ -154,6 +163,16 @@ url = "https://developers.openai.com/mcp"
 [mcp_servers.linear]
 url = "https://mcp.linear.app/mcp"
 
+[mcp_servers.crustdata]
+command = "uvx"
+args = ["crustdata-mcp"]
+
+[mcp_servers.crustdata.env]
+# note to self: secret saved in ~/pro/botfiles/codex/config.toml.secrets.bak
+# TODO: figure out a way to use it from env than config file
+CRUSTDATA_TOKEN = ""
+
+
 [features]
 goals = true
 steer = true
@@ -165,6 +184,7 @@ guardian_approval = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
+terminal_resize_reflow = true
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4
