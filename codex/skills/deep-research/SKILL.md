@@ -49,10 +49,10 @@ Optimize for shortest end-to-end time without reducing research quality.
 - Persist all track artifacts as they complete.
 
 Default quality posture:
-- OpenAI/Azure requests default to `--reasoning-effort high`, the highest supported setting for the default o3/o4 deep-research routes.
+- OpenAI/Azure requests default to `--reasoning-effort medium`, which is the proven supported setting for the default `o3-deep-research` route in this environment.
 - Gemini defaults to `deep-research-max-preview-04-2026` for maximum comprehensiveness.
 - Exa defaults to `exa-research-pro` for highest reasoning capability.
-- Use lower/faster options explicitly only for smoke tests, latency-sensitive work, or cost-sensitive checks.
+- Use `high` only when you have verified the selected model/deployment supports it; otherwise prefer the default `medium`.
 
 4. Triangulate and resolve conflicts
 - Cross-check overlapping claims between OpenAI, Gemini, and Exa outputs.
@@ -110,7 +110,7 @@ Model guidance:
 - Azure fallback order comes from `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or defaults to `o3-deep-research`.
 - Direct OpenAI opt-in fallback order is `o3-deep-research,o4-mini-deep-research`.
 - Override with `--models` when needed.
-- Reasoning effort defaults to `high`; override with `--reasoning-effort` or `OPENAI_DEEP_RESEARCH_REASONING_EFFORT` only when you intentionally want lower cost/latency.
+- Reasoning effort defaults to `medium`, the proven supported setting for the default `o3-deep-research` route. Override with `--reasoning-effort high` only after verifying the selected model/deployment supports it.
 - Use `--max-tool-calls <n>` for low-cost smoke tests or latency-bounded checks.
 
 ## Gemini Execution

@@ -21,7 +21,7 @@ Inputs:
     ~/pro/botfiles/secrets/local/codex-azure.rc
 - Optional direct OpenAI route via OPENAI_API_KEY only when explicitly enabled with
   --allow-direct-openai or OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1
-- Reasoning effort defaults to high via OPENAI_DEEP_RESEARCH_REASONING_EFFORT
+- Reasoning effort defaults to medium via OPENAI_DEEP_RESEARCH_REASONING_EFFORT
   or --reasoning-effort
 - Prompt text from --prompt or --prompt-file
 
@@ -57,7 +57,7 @@ AZURE_DEFAULT_DEPLOYMENTS = ["o3-deep-research"]
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
 REASONING_EFFORTS = ("low", "medium", "high")
-DEFAULT_REASONING_EFFORT = "high"
+DEFAULT_REASONING_EFFORT = "medium"
 
 
 def iso_now() -> str:
@@ -407,8 +407,8 @@ def parse_args() -> argparse.Namespace:
         choices=REASONING_EFFORTS,
         help=(
             "Reasoning effort for OpenAI/Azure Responses requests. Defaults to "
-            "high, the highest supported setting on the default o3/o4 "
-            "deep-research routes."
+            "medium, which is the proven supported setting for the default "
+            "o3-deep-research route."
         ),
     )
     parser.add_argument(

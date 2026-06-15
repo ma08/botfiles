@@ -35,7 +35,7 @@ Credential loading:
 - The bundled runners also check the relevant botfiles secret files directly when the shell environment was not preloaded, while allowing `--env-file <path>` and nearest `.env` fallback.
 
 Default quality posture:
-- OpenAI/Azure uses `reasoning.effort=high` by default. This is the highest supported setting for the default o3/o4 deep-research routes; use `--reasoning-effort` only when intentionally lowering cost/latency.
+- OpenAI/Azure uses `reasoning.effort=medium` by default. This is the proven supported setting for the default `o3-deep-research` route in this environment.
 - Gemini uses `deep-research-max-preview-04-2026` by default for maximum comprehensiveness.
 - Exa uses `exa-research-pro` by default for strongest reasoning.
 - For cheap provider health checks, explicitly lower these settings with `--max-tool-calls`, `--agent deep-research-preview-04-2026`, or `--model exa-research-fast`.
@@ -52,7 +52,7 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
 If `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the same command uses Azure Responses automatically. In Azure mode, keep `--models` aligned with Azure deployment names and prefer setting `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` when you want a durable default.
 Direct OpenAI billing is disabled by default; use `--allow-direct-openai` or `OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1` only when direct OpenAI spend is intentional.
 Use `--max-tool-calls <n>` for low-cost smoke tests or latency-bounded checks.
-Use `--reasoning-effort medium` or `low` only when reducing cost/latency is more important than maximum quality.
+Use `--reasoning-effort high` only after verifying the selected model/deployment supports it; otherwise keep the proven default `medium`. Use `low` only when reducing cost/latency is more important than quality.
 
 Exa lane:
 
