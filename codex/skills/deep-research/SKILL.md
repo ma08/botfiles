@@ -8,7 +8,7 @@ description: Run end-to-end deep research using OpenAI Responses API deep-resear
 Produce decision-grade research outputs with multi-engine evidence gathering:
 - OpenAI deep research via bundled script (`scripts/run_openai_deep_research.py`)
 - Gemini deep research via bundled script (`scripts/run_gemini_deep_research.py`)
-- Exa deep research via MCP tools (`mcp__exa__deep_researcher_start` + `mcp__exa__deep_researcher_check`)
+- Exa Research API via bundled script (`scripts/run_exa_research.py`)
 
 Default output is always a comprehensive Markdown report. If the user asks for additional formats, provide them after the Markdown report.
 
@@ -45,8 +45,14 @@ Optimize for shortest end-to-end time without reducing research quality.
 3. Launch research engines in parallel
 - OpenAI track: run `scripts/run_openai_deep_research.py` (prefer `submit_and_check`).
 - Gemini track: run `scripts/run_gemini_deep_research.py` (prefer `submit_and_check`).
-- Exa track: call `mcp__exa__deep_researcher_start`, then poll to completion.
+- Exa track: run `scripts/run_exa_research.py` (prefer `submit_and_check`).
 - Persist all track artifacts as they complete.
+
+Default quality posture:
+- OpenAI/Azure requests default to `--reasoning-effort medium`, which is the proven supported setting for the default `o3-deep-research` route in this environment.
+- Gemini defaults to `deep-research-max-preview-04-2026` for maximum comprehensiveness.
+- Exa defaults to `exa-research-pro` for highest reasoning capability.
+- Use `high` only when you have verified the selected model/deployment supports it; otherwise prefer the default `medium`.
 
 4. Triangulate and resolve conflicts
 - Cross-check overlapping claims between OpenAI, Gemini, and Exa outputs.
@@ -56,6 +62,15 @@ Optimize for shortest end-to-end time without reducing research quality.
 5. Synthesize and deliver
 - Produce the comprehensive Markdown report first.
 - If requested, append alternate output(s) after the Markdown report.
+
+## Credential Loading
+
+Prefer durable botfiles secrets over scraping project-local env files:
+- Azure OpenAI deep-research: `~/pro/botfiles/secrets/local/codex-azure.rc`
+- Gemini and Exa direct providers: `~/pro/botfiles/secrets/local/deep-research.rc`
+- Direct OpenAI fallback: `~/pro/botfiles/secrets/local/codex-openai.rc`, plus explicit direct opt-in
+
+`.botenv` sources those files for normal agent shells. The bundled runners also load the relevant botfiles secret files directly when the environment was not preloaded, while still allowing an explicit `--env-file <path>` override and nearest `.env` fallback.
 
 ## OpenAI Execution
 
@@ -70,9 +85,10 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
 ```
 
 Azure routing:
-- When `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the same runner automatically uses Azure Responses instead of direct OpenAI billing.
+- When `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the runner uses Azure Responses.
 - Set `AZURE_OPENAI_DEEP_RESEARCH_API_KEY` when the deep-research deployment lives on a different Azure OpenAI resource than `AZURE_OPENAI_API_KEY`; otherwise the script falls back to `AZURE_OPENAI_API_KEY`.
 - In Azure mode, `--models` values must be Azure deployment names. If omitted, the runner uses `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or falls back to `o3-deep-research`.
+- Direct OpenAI billing is disabled by default. Use it only with explicit opt-in via `--allow-direct-openai` or `OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1` plus `OPENAI_API_KEY`.
 
 Useful variants:
 
@@ -91,15 +107,18 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
 ```
 
 Model guidance:
-- Direct OpenAI fallback order is `o3-deep-research,o4-mini-deep-research`.
 - Azure fallback order comes from `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` or defaults to `o3-deep-research`.
+- Direct OpenAI opt-in fallback order is `o3-deep-research,o4-mini-deep-research`.
 - Override with `--models` when needed.
+- Reasoning effort defaults to `medium`, the proven supported setting for the default `o3-deep-research` route. Override with `--reasoning-effort high` only after verifying the selected model/deployment supports it.
+- Use `--max-tool-calls <n>` for low-cost smoke tests or latency-bounded checks.
 
 ## Gemini Execution
 
 Use the bundled script for deterministic runs and durable artifacts.
 For best first-pass reliability, use an explicit long timeout and retry budget.
 Keep raw Gemini outputs under `task-progress-artifacts/scratchpad/gemini/`; reserve top-level task artifacts for the synthesized outputs you want humans to review quickly.
+The runner defaults to the high-quality Deep Research Max agent when supported and sends the documented Deep Research `agent_config` (`type=deep-research`, `thinking_summaries=auto`, `collaborative_planning=false`) unless `--no-agent-config` is passed.
 
 ```bash
 uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py \
@@ -148,21 +167,33 @@ Recovery playbook:
 3. Resubmit only when needed (or let `submit_and_check` retries handle it automatically).
 
 Agent guidance:
-- Default agent is `deep-research-pro-preview-12-2025` (current highest-capability Gemini Deep Research agent).
-- Use `--agent` only when a newer, more capable deep-research agent is available.
-- Script reads `GEMINI_API_KEY` from environment or nearest `.env` (falls back to `GOOGLE_API_KEY`).
+- Default agent is `deep-research-max-preview-04-2026` using Interactions API revision `2026-05-20`.
+- Use `--agent deep-research-preview-04-2026` when speed/cost matters more than maximum comprehensiveness.
+- Use `--api-revision` only when Google publishes a newer Interactions API revision or you need legacy compatibility.
+- Script reads `GEMINI_API_KEY` from environment, explicit `--env-file`, nearest `.env`, or `~/pro/botfiles/secrets/local/deep-research.rc` (falls back to `GOOGLE_API_KEY`).
+- Submit actions save a header-free `gemini-submit-request-*.json` payload alongside the API response so agent/config drift can be audited without exposing API keys.
+- Failed, cancelled, or expired interactions write `gemini-terminal-summary-*.md` instead of `gemini-report-*.md`. A `gemini-report-*.md` file means the interaction reached `completed`.
+- Completed interactions write final `model_output` text only; thought summaries and stored prompts are excluded from `gemini-report-*.md`.
+- If an older artifact has a report that only repeats the original prompt, treat it as a pre-fix runner artifact and inspect the matching `gemini-check-*.json` terminal status.
 
 ## Exa Execution
 
-Use Exa deep researcher for an additional independent pass.
+Use the bundled Exa Research API runner for an additional independent pass.
 
-1. Start research with `mcp__exa__deep_researcher_start`.
-- `model=exa-research` for most tasks.
-- `model=exa-research-pro` for high-stakes or complex investigations.
+```bash
+uv run ~/.codex/skills/deep-research/scripts/run_exa_research.py \
+  --action submit_and_check \
+  --prompt-file <path/to/research-prompt.md> \
+  --outdir <path/to/task-progress-artifacts/scratchpad/exa>
+```
 
-2. Poll with `mcp__exa__deep_researcher_check`.
-- Reuse the same `researchId`.
-- Continue polling until status is `completed`.
+Model guidance:
+- `exa-research-pro` is the default for highest quality and strongest reasoning.
+- `exa-research` is acceptable when speed/cost matters more than maximum depth.
+- `exa-research-fast` is acceptable for low-cost smoke tests.
+
+The script reads `EXA_API_KEY` from environment, explicit `--env-file`, nearest `.env`, or `~/pro/botfiles/secrets/local/deep-research.rc`.
+If `EXA_API_KEY` is unavailable but Exa MCP tools are available in the current agent session, the deprecated MCP deep researcher tools may be used as a temporary degraded fallback; record that in task artifacts.
 
 3. Persist the returned report in task artifacts.
    - Default raw Exa outputs to `task-progress-artifacts/scratchpad/exa/`.
@@ -196,3 +227,4 @@ Keep citation IDs consistent across formats.
 - `references/source-quality.md` - source trust tiers, conflict resolution, confidence rules
 - `scripts/run_openai_deep_research.py` - reusable OpenAI deep research runner
 - `scripts/run_gemini_deep_research.py` - reusable Gemini deep research runner
+- `scripts/run_exa_research.py` - reusable Exa Research API runner

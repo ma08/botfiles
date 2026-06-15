@@ -27,6 +27,19 @@ Create a prompt file in top-level task artifacts with:
 Keep raw engine outputs under `task-progress-artifacts/scratchpad/<engine>/` and reserve top-level `task-progress-artifacts/` for the final synthesized report, memo, comparison table, and other human-reviewable outputs.
 
 ## Step 3: Launch OpenAI, Gemini, and Exa in parallel
+Credential loading:
+- Normal botfiles shells inherit deep-research secrets through `~/pro/botfiles/.botenv`.
+- Azure OpenAI settings live in `~/pro/botfiles/secrets/local/codex-azure.rc`.
+- Gemini and Exa direct provider keys live in `~/pro/botfiles/secrets/local/deep-research.rc`.
+- Direct OpenAI credentials live in `~/pro/botfiles/secrets/local/codex-openai.rc`, and direct OpenAI deep-research still requires explicit opt-in.
+- The bundled runners also check the relevant botfiles secret files directly when the shell environment was not preloaded, while allowing `--env-file <path>` and nearest `.env` fallback.
+
+Default quality posture:
+- OpenAI/Azure uses `reasoning.effort=medium` by default. This is the proven supported setting for the default `o3-deep-research` route in this environment.
+- Gemini uses `deep-research-max-preview-04-2026` by default for maximum comprehensiveness.
+- Exa uses `exa-research-pro` by default for strongest reasoning.
+- For cheap provider health checks, explicitly lower these settings with `--max-tool-calls`, `--agent deep-research-preview-04-2026`, or `--model exa-research-fast`.
+
 OpenAI lane:
 
 ```bash
@@ -37,11 +50,20 @@ uv run ~/.codex/skills/deep-research/scripts/run_openai_deep_research.py \
 ```
 
 If `AZURE_OPENAI_DEEP_RESEARCH_ENDPOINT` or `AZURE_OPENAI_DEEP_RESEARCH_BASE_URL` is set, the same command uses Azure Responses automatically. In Azure mode, keep `--models` aligned with Azure deployment names and prefer setting `AZURE_OPENAI_DEEP_RESEARCH_DEPLOYMENTS` when you want a durable default.
+Direct OpenAI billing is disabled by default; use `--allow-direct-openai` or `OPENAI_DEEP_RESEARCH_ALLOW_DIRECT=1` only when direct OpenAI spend is intentional.
+Use `--max-tool-calls <n>` for low-cost smoke tests or latency-bounded checks.
+Use `--reasoning-effort high` only after verifying the selected model/deployment supports it; otherwise keep the proven default `medium`. Use `low` only when reducing cost/latency is more important than quality.
 
 Exa lane:
-- Start with `mcp__exa__deep_researcher_start`.
-- Poll with `mcp__exa__deep_researcher_check` until completed.
-- Persist raw Exa report output in `task-progress-artifacts/scratchpad/exa/`, then promote only the synthesized final deliverable to top-level task artifacts.
+
+```bash
+uv run ~/.codex/skills/deep-research/scripts/run_exa_research.py \
+  --action submit_and_check \
+  --prompt-file <prompt.md> \
+  --outdir <task-progress-artifacts/scratchpad/exa>
+```
+
+If `EXA_API_KEY` is unavailable but Exa MCP tools are available, use the MCP deep researcher only as a degraded fallback and document that the direct Exa Research API route still needs credentials.
 
 Gemini lane:
 
@@ -68,6 +90,8 @@ Notes:
 - `--timeout-minutes <= 0` means no timeout.
 - `submit_and_check` retries a timed-out submission once by default (`--max-timeout-retries 1`).
 - Do not pass `--foreground` for deep-research agents (Gemini requires `background=true`).
+- Default Gemini agent is `deep-research-max-preview-04-2026` with API revision `2026-05-20`.
+- Use `--agent deep-research-preview-04-2026` for cheaper/faster checks.
 - Resume any in-flight interaction with `--action check --interaction-id <id>`.
 
 Expected OpenAI outputs:
@@ -79,6 +103,11 @@ Expected Gemini outputs:
 - Raw submit/check JSON snapshots under `task-progress-artifacts/scratchpad/gemini/`
 - `gemini-report-<interaction_id>.md` under `task-progress-artifacts/scratchpad/gemini/`
 - `gemini-sources-<interaction_id>.md` under `task-progress-artifacts/scratchpad/gemini/`
+
+Expected Exa outputs:
+- Raw submit/check JSON snapshots under `task-progress-artifacts/scratchpad/exa/`
+- `exa-report-<research_id>.md` under `task-progress-artifacts/scratchpad/exa/`
+- `exa-sources-<research_id>.md` under `task-progress-artifacts/scratchpad/exa/`
 
 ## Step 4: Reconcile
 - Build a claim matrix with columns: claim, OpenAI evidence, Gemini evidence, Exa evidence, source quality, confidence.

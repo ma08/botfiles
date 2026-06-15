@@ -13,7 +13,8 @@ Purpose:
 - Persist raw snapshots and extracted report artifacts.
 
 Inputs:
-- GEMINI_API_KEY (or GOOGLE_API_KEY) in environment or .env near cwd
+- GEMINI_API_KEY (or GOOGLE_API_KEY) in environment, explicit --env-file,
+  nearest .env, or ~/pro/botfiles/secrets/local/deep-research.rc
 - Prompt text from --prompt or --prompt-file
 
 Outputs (under --outdir):
@@ -33,6 +34,7 @@ import os
 import re
 import sys
 import time
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,7 +43,8 @@ import requests
 from dotenv import load_dotenv
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-DEFAULT_AGENT = "deep-research-pro-preview-12-2025"
+DEFAULT_AGENT = "deep-research-max-preview-04-2026"
+DEFAULT_API_REVISION = "2026-05-20"
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "expired"}
 
 
@@ -58,38 +61,78 @@ def find_env_candidates(start: Path) -> list[Path]:
     return candidates
 
 
-def load_api_key(env_file: Path | None = None) -> str:
+def botfiles_secret_candidates(names: list[str]) -> list[Path]:
+    roots: list[Path] = []
+    botfiles_root = os.getenv("BOTFILES_ROOT", "").strip()
+    if botfiles_root:
+        roots.append(Path(botfiles_root).expanduser())
+    roots.append(Path.home() / "pro/botfiles")
+
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for name in names:
+            candidate = (root / "secrets/local" / name).resolve()
+            if candidate not in seen and candidate.exists():
+                candidates.append(candidate)
+                seen.add(candidate)
+    return candidates
+
+
+def load_env_sources(env_file: Path | None, botfiles_secret_names: list[str]) -> None:
     if env_file and env_file.exists():
         load_dotenv(env_file)
-    else:
-        for candidate in find_env_candidates(Path.cwd().resolve()):
-            load_dotenv(candidate)
-            break
+        return
+
+    for candidate in find_env_candidates(Path.cwd().resolve()):
+        load_dotenv(candidate)
+        break
+
+    for candidate in botfiles_secret_candidates(botfiles_secret_names):
+        load_dotenv(candidate)
+
+
+def load_api_key(env_file: Path | None = None) -> str:
+    load_env_sources(env_file, ["deep-research.rc"])
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         api_key = os.getenv("GOOGLE_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not found in environment or .env")
+        raise RuntimeError(
+            "GEMINI_API_KEY not found in environment, explicit --env-file, nearest "
+            ".env, or ~/pro/botfiles/secrets/local/deep-research.rc"
+        )
     return api_key
 
 
-def post_interaction(api_key: str, payload: dict[str, Any]) -> requests.Response:
+def build_headers(api_key: str, api_revision: str) -> dict[str, str]:
+    headers = {
+        "x-goog-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    if api_revision:
+        headers["Api-Revision"] = api_revision
+    return headers
+
+
+def post_interaction(
+    api_key: str, payload: dict[str, Any], api_revision: str
+) -> requests.Response:
     return requests.post(
         f"{API_BASE}/interactions",
-        headers={
-            "x-goog-api-key": api_key,
-            "Content-Type": "application/json",
-        },
+        headers=build_headers(api_key, api_revision),
         data=json.dumps(payload),
         timeout=180,
     )
 
 
-def get_interaction(api_key: str, interaction_id: str) -> requests.Response:
+def get_interaction(
+    api_key: str, interaction_id: str, api_revision: str
+) -> requests.Response:
     return requests.get(
         f"{API_BASE}/interactions/{interaction_id}",
-        headers={"x-goog-api-key": api_key},
+        headers=build_headers(api_key, api_revision),
         timeout=180,
     )
 
@@ -156,9 +199,45 @@ def collect_text_and_urls(
             collect_text_and_urls(item, texts, urls, include_any_text=include_any_text)
 
 
+def model_generated_steps(steps: Any) -> list[Any]:
+    """Return non-user steps for progress diagnostics."""
+    if not isinstance(steps, list):
+        return []
+    return [
+        step
+        for step in steps
+        if not (
+            isinstance(step, dict)
+            and str(step.get("type", "")).lower() == "user_input"
+        )
+    ]
+
+
+def final_output_steps(steps: Any) -> list[Any]:
+    """Return final answer steps suitable for report extraction."""
+    if not isinstance(steps, list):
+        return []
+    return [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and str(step.get("type", "")).lower() in {"model_output", "assistant_output"}
+    ]
+
+
 def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
     texts: list[str] = []
     urls: list[str] = []
+
+    output_text = payload.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        texts.append(output_text.strip())
+
+    steps = payload.get("steps")
+    if isinstance(steps, list):
+        collect_text_and_urls(
+            final_output_steps(steps), texts, urls, include_any_text=True
+        )
 
     outputs = payload.get("outputs")
     if isinstance(outputs, list):
@@ -167,8 +246,9 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
     if not texts:
         collect_text_and_urls(payload.get("response", {}), texts, urls, include_any_text=True)
 
-    if not urls and isinstance(outputs, list):
-        blob = json.dumps(outputs, ensure_ascii=False)
+    if not urls and (isinstance(steps, list) or isinstance(outputs, list)):
+        url_source = final_output_steps(steps) if isinstance(steps, list) else outputs
+        blob = json.dumps(url_source, ensure_ascii=False)
         urls.extend(re.findall(r"https?://[^\s\"'<>]+", blob))
 
     deduped_texts: list[str] = []
@@ -191,6 +271,34 @@ def extract_text_and_urls(payload: dict[str, Any]) -> tuple[str, list[str]]:
     return merged_text, deduped_urls
 
 
+def has_model_generated_output(payload: dict[str, Any]) -> bool:
+    text, urls = extract_text_and_urls(payload)
+    if text.strip() or urls:
+        return True
+    steps = model_generated_steps(payload.get("steps"))
+    return bool(payload.get("outputs") or payload.get("response") or steps)
+
+
+def deep_research_agent_config(
+    *,
+    enabled: bool,
+    thinking_summaries: str,
+    visualization: str,
+    collaborative_planning: bool,
+) -> dict[str, Any] | None:
+    if not enabled:
+        return None
+
+    config: dict[str, Any] = {
+        "type": "deep-research",
+        "thinking_summaries": thinking_summaries,
+        "collaborative_planning": collaborative_planning,
+    }
+    if visualization:
+        config["visualization"] = visualization
+    return config
+
+
 def submit_job(
     api_key: str,
     prompt: str,
@@ -198,6 +306,8 @@ def submit_job(
     outdir: Path,
     background: bool,
     store: bool,
+    api_revision: str,
+    agent_config: dict[str, Any] | None,
 ) -> str:
     payload = {
         "input": prompt,
@@ -205,8 +315,11 @@ def submit_job(
         "background": background,
         "store": store,
     }
-    response = post_interaction(api_key, payload)
+    if agent_config:
+        payload["agent_config"] = agent_config
     ts = iso_now()
+    save_json(outdir / f"gemini-submit-request-{agent}-{ts}.json", payload)
+    response = post_interaction(api_key, payload, api_revision)
     snapshot = outdir / f"gemini-submit-{agent}-{ts}.json"
 
     try:
@@ -233,9 +346,9 @@ def submit_job(
 
 
 def check_job(
-    api_key: str, interaction_id: str, outdir: Path
+    api_key: str, interaction_id: str, outdir: Path, api_revision: str
 ) -> tuple[str, dict[str, Any]]:
-    response = get_interaction(api_key, interaction_id)
+    response = get_interaction(api_key, interaction_id, api_revision)
     response.raise_for_status()
     data = response.json()
     ts = iso_now()
@@ -249,6 +362,106 @@ def check_job(
     return status, data
 
 
+def payload_progress_fingerprint(payload: dict[str, Any]) -> str:
+    progress_shape = {
+        "status": payload.get("status") or payload.get("state"),
+        "error": payload.get("error"),
+        "output_text": payload.get("output_text"),
+        "steps": payload.get("steps"),
+        "outputs": payload.get("outputs"),
+        "response": payload.get("response"),
+    }
+    blob = json.dumps(progress_shape, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def classify_incomplete_payload(status: str, payload: dict[str, Any]) -> str:
+    has_output = has_model_generated_output(payload)
+    if status == "in_progress" and not has_output:
+        return "provider_stalled_or_long_running_no_output"
+    if status == "unknown":
+        return "unknown_status_payload"
+    return "non_terminal"
+
+
+def write_timeout_summary(
+    outdir: Path,
+    interaction_id: str,
+    status: str,
+    payload: dict[str, Any],
+    *,
+    elapsed_seconds: int,
+    attempt: int,
+    stable_polls: int,
+) -> None:
+    safe_id = interaction_id.replace("/", "_")
+    path = outdir / f"gemini-timeout-summary-{safe_id}.md"
+    classification = classify_incomplete_payload(status, payload)
+    keys = ", ".join(sorted(str(key) for key in payload.keys())) or "(none)"
+    lines = [
+        "# Gemini Timeout Summary",
+        "",
+        f"- Interaction ID: `{interaction_id}`",
+        f"- Status: `{status}`",
+        f"- Classification: `{classification}`",
+        f"- Attempt: {attempt}",
+        f"- Elapsed seconds: {elapsed_seconds}",
+        f"- Stable progress polls: {stable_polls}",
+        f"- Payload keys: {keys}",
+        "",
+        "Resume polling with:",
+        "",
+        "```bash",
+        (
+            "uv run ~/.codex/skills/deep-research/scripts/run_gemini_deep_research.py "
+            f"--action check --interaction-id {interaction_id} --outdir {outdir}"
+        ),
+        "```",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_terminal_summary(
+    outdir: Path,
+    interaction_id: str,
+    status: str,
+    payload: dict[str, Any],
+) -> None:
+    safe_id = interaction_id.replace("/", "_")
+    path = outdir / f"gemini-terminal-summary-{safe_id}.md"
+    keys = ", ".join(sorted(str(key) for key in payload.keys())) or "(none)"
+    error = payload.get("error")
+    error_text = json.dumps(error, ensure_ascii=False, indent=2) if error else "null"
+    text, urls = extract_text_and_urls(payload)
+    lines = [
+        "# Gemini Terminal Summary",
+        "",
+        f"- Interaction ID: `{interaction_id}`",
+        f"- Status: `{status}`",
+        f"- Payload keys: {keys}",
+        f"- Model/agent output extracted: {'yes' if text.strip() else 'no'}",
+        f"- Source URLs extracted from model/agent output: {len(urls)}",
+        "",
+        "## Error",
+        "",
+        "```json",
+        error_text,
+        "```",
+        "",
+        "No `gemini-report-*.md` was written because the interaction did not complete.",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_terminal_outputs(
+    outdir: Path, interaction_id: str, status: str, payload: dict[str, Any]
+) -> None:
+    if status == "completed":
+        write_extracted_outputs(outdir, interaction_id, payload)
+    else:
+        write_terminal_summary(outdir, interaction_id, status, payload)
+
+
 def poll_until_terminal(
     api_key: str,
     interaction_id: str,
@@ -256,23 +469,33 @@ def poll_until_terminal(
     *,
     poll_seconds: int,
     timeout_minutes: int,
-) -> tuple[str, dict[str, Any], bool]:
+    api_revision: str,
+) -> tuple[str, dict[str, Any], bool, int, int]:
     start = time.time()
     timeout_seconds = None if timeout_minutes <= 0 else timeout_minutes * 60
+    last_fingerprint = ""
+    stable_polls = 0
 
     while True:
-        status, payload = check_job(api_key, interaction_id, outdir)
+        status, payload = check_job(api_key, interaction_id, outdir, api_revision)
         elapsed_seconds = int(time.time() - start)
+        fingerprint = payload_progress_fingerprint(payload)
+        if fingerprint == last_fingerprint:
+            stable_polls += 1
+        else:
+            stable_polls = 0
+            last_fingerprint = fingerprint
         print(
-            f"interaction_id={interaction_id} status={status} elapsed_seconds={elapsed_seconds}",
+            f"interaction_id={interaction_id} status={status} "
+            f"elapsed_seconds={elapsed_seconds} stable_polls={stable_polls}",
             flush=True,
         )
 
         if status in TERMINAL_STATUSES:
-            return status, payload, False
+            return status, payload, False, elapsed_seconds, stable_polls
 
         if timeout_seconds is not None and elapsed_seconds > timeout_seconds:
-            return status, payload, True
+            return status, payload, True, elapsed_seconds, stable_polls
 
         time.sleep(poll_seconds)
 
@@ -307,12 +530,48 @@ def parse_args() -> argparse.Namespace:
         default="submit_and_check",
     )
     parser.add_argument("--prompt", default="", help="Prompt text")
-    parser.add_argument("--prompt-file", type=Path, help="Path to prompt markdown/text file")
-    parser.add_argument("--interaction-id", default="", help="Existing interaction id to check")
+    parser.add_argument(
+        "--prompt-file", type=Path, help="Path to prompt markdown/text file"
+    )
+    parser.add_argument(
+        "--interaction-id", default="", help="Existing interaction id to check"
+    )
     parser.add_argument(
         "--agent",
         default=DEFAULT_AGENT,
         help="Gemini interaction agent id",
+    )
+    parser.add_argument(
+        "--no-agent-config",
+        dest="agent_config",
+        action="store_false",
+        help="Do not send Deep Research agent_config",
+    )
+    parser.set_defaults(agent_config=True)
+    parser.add_argument(
+        "--thinking-summaries",
+        default="auto",
+        choices=["auto", "none"],
+        help="Deep Research thinking_summaries agent_config value",
+    )
+    parser.add_argument(
+        "--visualization",
+        default="",
+        choices=["", "auto"],
+        help="Optional Deep Research visualization agent_config value",
+    )
+    parser.add_argument(
+        "--collaborative-planning",
+        action="store_true",
+        help=(
+            "Enable Deep Research collaborative planning instead of direct "
+            "report generation"
+        ),
+    )
+    parser.add_argument(
+        "--api-revision",
+        default=os.getenv("GEMINI_INTERACTIONS_API_REVISION", DEFAULT_API_REVISION),
+        help="Gemini Interactions API revision header (empty string disables header)",
     )
     parser.add_argument(
         "--outdir",
@@ -336,13 +595,16 @@ def parse_args() -> argparse.Namespace:
         "--max-timeout-retries",
         type=int,
         default=1,
-        help="When submit_and_check times out, resubmit this many times before giving up",
+        help=(
+            "When submit_and_check times out, resubmit this many times before "
+            "giving up"
+        ),
     )
     parser.add_argument(
         "--env-file",
         type=Path,
         default=None,
-        help="Optional explicit .env path",
+        help="Optional explicit .env or botfiles .rc path",
     )
     parser.add_argument(
         "--foreground",
@@ -404,6 +666,13 @@ def main() -> int:
             outdir=outdir,
             background=bool(args.background),
             store=bool(args.store),
+            api_revision=str(args.api_revision or ""),
+            agent_config=deep_research_agent_config(
+                enabled=bool(args.agent_config),
+                thinking_summaries=str(args.thinking_summaries),
+                visualization=str(args.visualization),
+                collaborative_planning=bool(args.collaborative_planning),
+            ),
         )
         print(
             f"submitted interaction_id={interaction_id} agent={args.agent}",
@@ -422,10 +691,12 @@ def main() -> int:
         )
 
     if args.action == "check":
-        status, payload = check_job(api_key, interaction_id, outdir)
+        status, payload = check_job(
+            api_key, interaction_id, outdir, str(args.api_revision or "")
+        )
         print(f"interaction_id={interaction_id} status={status}", flush=True)
         if status in TERMINAL_STATUSES:
-            write_extracted_outputs(outdir, interaction_id, payload)
+            write_terminal_outputs(outdir, interaction_id, status, payload)
             return 0 if status == "completed" else 2
         return 0
 
@@ -438,16 +709,17 @@ def main() -> int:
     attempt = 1
 
     while True:
-        status, payload, timed_out = poll_until_terminal(
+        status, payload, timed_out, elapsed_seconds, stable_polls = poll_until_terminal(
             api_key,
             interaction_id,
             outdir,
             poll_seconds=args.poll_seconds,
             timeout_minutes=args.timeout_minutes,
+            api_revision=str(args.api_revision or ""),
         )
 
         if status in TERMINAL_STATUSES:
-            write_extracted_outputs(outdir, interaction_id, payload)
+            write_terminal_outputs(outdir, interaction_id, status, payload)
             print(f"terminal_status={status}", flush=True)
             return 0 if status == "completed" else 2
 
@@ -469,6 +741,15 @@ def main() -> int:
         )
 
         if retries_remaining <= 0:
+            write_timeout_summary(
+                outdir,
+                interaction_id,
+                status,
+                payload,
+                elapsed_seconds=elapsed_seconds,
+                attempt=attempt,
+                stable_polls=stable_polls,
+            )
             print(
                 "no timeout retries remaining; keep polling later with:\n"
                 "  --action check --interaction-id <id>",
@@ -486,6 +767,7 @@ def main() -> int:
             outdir=outdir,
             background=bool(args.background),
             store=bool(args.store),
+            api_revision=str(args.api_revision or ""),
         )
         print(
             f"resubmitted interaction_id={interaction_id} "

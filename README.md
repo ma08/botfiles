@@ -202,6 +202,7 @@ Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream
    cp secrets/templates/linear.rc.example secrets/local/linear.rc
    cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
    cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
+   cp secrets/templates/deep-research.rc.example secrets/local/deep-research.rc
    cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.rc
    cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
    # Edit secrets/local/*.rc with your values
@@ -431,6 +432,7 @@ cp ~/pro/botfiles/secrets/templates/claude-bedrock.rc.example ~/pro/botfiles/sec
 cp ~/pro/botfiles/secrets/templates/claude-vertex.rc.example ~/pro/botfiles/secrets/local/claude-vertex.rc
 cp ~/pro/botfiles/secrets/templates/codex-azure.rc.example ~/pro/botfiles/secrets/local/codex-azure.rc
 cp ~/pro/botfiles/secrets/templates/codex-openai.rc.example ~/pro/botfiles/secrets/local/codex-openai.rc
+cp ~/pro/botfiles/secrets/templates/deep-research.rc.example ~/pro/botfiles/secrets/local/deep-research.rc
 cp ~/pro/botfiles/secrets/templates/codex-app-server.rc.example ~/pro/botfiles/secrets/local/codex-app-server.rc
 cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
 cp ~/pro/botfiles/secrets/templates/machine.rc.example ~/pro/botfiles/secrets/local/machine.rc
@@ -691,6 +693,15 @@ cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
 This file is ignored by git and sourced via `.botenv`.
 It now carries the shared Azure key for the Codex Azure profile plus the default Oracle Azure route and optional Azure deep-research endpoint/key/deployment settings.
 
+For non-Azure deep-research providers, create `secrets/local/deep-research.rc` from the template:
+
+```bash
+cp secrets/templates/deep-research.rc.example secrets/local/deep-research.rc
+```
+
+This optional file is for `GEMINI_API_KEY` and `EXA_API_KEY`. Direct OpenAI deep-research billing is disabled by default in the bundled runner; prefer Azure OpenAI and opt in to direct OpenAI only when direct spend is intentional.
+`.botenv` sources this file, and the deep-research runners also check it directly when their shell environment was not preloaded.
+
 ## Skills
 
 Skills extend Claude Code and Codex with specialized capabilities.
@@ -868,6 +879,7 @@ cp secrets/templates/claude-hooks.rc.example    secrets/local/claude-hooks.rc
 cp secrets/templates/codex-azure.rc.example     secrets/local/codex-azure.rc
 cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.rc
 cp secrets/templates/codex-openai.rc.example    secrets/local/codex-openai.rc
+cp secrets/templates/deep-research.rc.example   secrets/local/deep-research.rc
 cp secrets/templates/claude-vertex.rc.example   secrets/local/claude-vertex.rc
 cp secrets/templates/opencode-azure.rc.example  secrets/local/opencode-azure.rc
 ```
