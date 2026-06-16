@@ -93,6 +93,9 @@ these as separate toggles when the user's request did not already specify them:
 - commit or push task context artifacts to a default branch such as
   `personal_os/main`
 - create bookkeeping commits in a task-tracking repo such as `personal_os`
+- switch a repo checkout from the task branch/worktree back to the updated
+  default branch when local state is dirty, ambiguous, or contains unmerged
+  local commits
 - close a dedicated zellij session
 
 If the user explicitly asked for a full merge-and-close flow, that counts as
@@ -109,6 +112,13 @@ actual closeout paths. Include options like:
 Only offer the combined commit-and-close option for changes you can scope
 clearly. If unrelated or ambiguous dirty files are mixed in, show the scoped file
 set and ask before staging anything.
+
+For post-merge branch cleanup, prefer `request_user_input` when available if a
+checkout has dirty tracked changes, untracked files that may conflict, unmerged
+local commits, or multiple plausible default branches. Offer explicit choices to
+switch to the updated default branch now, preserve the branch and skip switching,
+or pause for manual cleanup. If `request_user_input` is unavailable, ask the same
+approval question concisely in chat.
 
 ## Step 4: Execute closeout in a safe order
 
@@ -146,8 +156,12 @@ set and ask before staging anything.
    - Move Linear or GitHub trackers to their terminal state only after the
      merge or explicit local-only closure is complete
 5. Clean local state last.
-   - Switch remaining checkouts back to the updated default branch when
-     appropriate
+   - Switch relevant repo checkouts back to the updated default branch when
+     safe. Fetch first, switch to the default branch, and fast-forward from the
+     upstream default branch so the checkout ends on latest `main`/default.
+   - If the switch is blocked by dirty changes, untracked conflicts, unmerged
+     local commits, multiple worktrees, or any ambiguity, prompt the user to
+     approve or skip the branch switch instead of guessing.
    - Delete merged local branches
    - Remove task-specific worktrees only when they are clean and no longer
      needed

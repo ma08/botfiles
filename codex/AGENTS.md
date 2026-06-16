@@ -104,7 +104,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 
 - Use the `save-task-status` skill proactively at milestones, before context switches, and before ending a session
 - Use `get-task-details` to retrieve current status path plus linked issue, machine, coding-agent session id, and zellij context
-- Use the `finish-task` skill when the user wants the standard wrap-up flow for a tracked task: gate on actual closeout readiness, sync status/tracker notes, handle any required downstream heads-up, and clean branches/worktrees only after confirmation
+- Use the `finish-task` skill when the user wants the standard wrap-up flow for a tracked task: gate on actual closeout readiness, sync status/tracker notes, handle any required downstream heads-up, and clean branches/worktrees only after confirmation. As part of finish-task cleanup, switch relevant repo checkouts back to the updated default branch (usually `main`) when safe; if local state makes that ambiguous, prompt the user to approve or skip the branch switch.
 - Use the `continue-task` skill when taking over an interrupted tracked task from a previous session; resolve the existing task home first, sync that `status.md` to the current session, and use transcript tail only as fallback before resuming work
 - Use the `start-new-task` skill to continue past scaffolding when enough information is already available: gather tracker/local context, ask targeted interactive questions only for critical planning gaps, and present a written first-pass plan for approval instead of stopping at a generic “continue into planning?” prompt
 - Save task state in date/task folders (default: `context/daily/YYYY-MM-DD/<task-slug>/`)
