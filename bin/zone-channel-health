@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/zone-channel-common"
+
+zone_channel_ensure_dirs
+
+used="$(zone_channel_usage_bytes)"
+cap="$ZONE_CHANNEL_STORAGE_CAP_BYTES"
+
+echo "root=$ZONE_CHANNEL_ROOT"
+echo "usage=$(zone_channel_human_bytes "$used")"
+echo "cap=$(zone_channel_human_bytes "$cap")"
+echo "write_enabled=$ZONE_CHANNEL_WRITE_ENABLED"
+echo "wacli_store=$ZONE_CHANNEL_WACLI_STORE"
+echo "imessage_db=$ZONE_CHANNEL_IMESSAGE_DB"
+echo "linkedin_store=$ZONE_CHANNEL_LINKEDIN_STORE"
+echo "linkedin_chrome_profile=$ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE"
+echo
+
+if command -v wacli >/dev/null 2>&1; then
+  wacli --version
+  WACLI_STORE_DIR="$ZONE_CHANNEL_WACLI_STORE" wacli doctor || true
+else
+  echo "wacli=missing"
+fi
+
+echo
+if [[ -x "$ZONE_CHANNEL_IMSG_BIN" ]]; then
+  zone_channel_imsg_env "$ZONE_CHANNEL_IMSG_BIN" --version
+else
+  echo "imsg=missing: $ZONE_CHANNEL_IMSG_BIN"
+fi
+
+if [[ -f "$ZONE_CHANNEL_IMESSAGE_DB" ]]; then
+  echo "imessage_db_present=true"
+  sqlite3 "$ZONE_CHANNEL_IMESSAGE_DB" 'pragma quick_check;' || true
+else
+  echo "imessage_db_present=false"
+fi
+
+echo
+if [[ -x "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" ]] || command -v "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" >/dev/null 2>&1; then
+  "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" --version || true
+else
+  echo "linkedin_chrome=missing: $ZONE_CHANNEL_LINKEDIN_CHROME_BIN"
+fi
+
+if zone_channel_linkedin_playwright_present; then
+  echo "linkedin_playwright=installed"
+else
+  echo "linkedin_playwright=missing"
+fi

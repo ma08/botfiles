@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+
+# Shared helpers for local channel-ingest wrappers.
+# Source this file from wrapper scripts; do not execute it directly.
+
+zone_channel_config="${ZONE_CHANNEL_CONFIG:-$HOME/pro/lab/zone-channel-ingest/config/channel-ingest.env}"
+if [[ -f "$zone_channel_config" ]]; then
+  # shellcheck disable=SC1090
+  . "$zone_channel_config"
+fi
+
+: "${ZONE_CHANNEL_ROOT:=$HOME/pro/lab/zone-channel-ingest}"
+: "${ZONE_CHANNEL_WRITE_ENABLED:=0}"
+: "${ZONE_CHANNEL_STORAGE_CAP_BYTES:=107374182400}"
+: "${ZONE_CHANNEL_IMESSAGE_LABEL:=imessage-sourya-mac}"
+: "${ZONE_CHANNEL_WHATSAPP_LABEL:=whatsapp-sourya}"
+: "${ZONE_CHANNEL_LINKEDIN_LABEL:=linkedin-sourya}"
+: "${ZONE_CHANNEL_IMESSAGE_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_IMESSAGE_LABEL}"
+: "${ZONE_CHANNEL_IMESSAGE_DB:=$ZONE_CHANNEL_IMESSAGE_STORE/current/chat.db}"
+: "${ZONE_CHANNEL_IMESSAGE_ATTACHMENTS:=$ZONE_CHANNEL_IMESSAGE_STORE/attachments}"
+: "${ZONE_CHANNEL_IMESSAGE_SNAPSHOTS:=$ZONE_CHANNEL_IMESSAGE_STORE/snapshots}"
+: "${ZONE_CHANNEL_WACLI_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_WHATSAPP_LABEL}"
+: "${ZONE_CHANNEL_SAMPLE_DIR:=$ZONE_CHANNEL_ROOT/samples}"
+: "${ZONE_CHANNEL_LINKEDIN_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_LINKEDIN_LABEL}"
+: "${ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE:=$ZONE_CHANNEL_LINKEDIN_STORE/chrome-profile}"
+: "${ZONE_CHANNEL_LINKEDIN_CACHE:=$ZONE_CHANNEL_LINKEDIN_STORE/cache}"
+: "${ZONE_CHANNEL_LINKEDIN_THREADS:=$ZONE_CHANNEL_LINKEDIN_CACHE/threads}"
+: "${ZONE_CHANNEL_LINKEDIN_SCREENSHOTS:=$ZONE_CHANNEL_LINKEDIN_STORE/screenshots}"
+: "${ZONE_CHANNEL_LINKEDIN_SAMPLE_DIR:=$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_LINKEDIN_LABEL}"
+: "${ZONE_CHANNEL_LINKEDIN_TOOL_DIR:=$ZONE_CHANNEL_ROOT/tools/linkedin-playwright}"
+: "${ZONE_CHANNEL_LINKEDIN_EXTRACTOR:=$HOME/pro/botfiles/bin/zone-li-extract.cjs}"
+: "${ZONE_CHANNEL_LINKEDIN_CHROME_BIN:=/usr/bin/google-chrome}"
+: "${ZONE_CHANNEL_LINKEDIN_PLAYWRIGHT_VERSION:=1.60.0}"
+: "${ZONE_CHANNEL_LINKEDIN_LOCK:=$ZONE_CHANNEL_LINKEDIN_STORE/browser.lock}"
+: "${ZONE_CHANNEL_IMSG_BIN:=$ZONE_CHANNEL_ROOT/tools/imsg/0.11.0/imsg}"
+: "${ZONE_CHANNEL_SWIFT_RUNTIME_DIR:=/home/linuxbrew/.linuxbrew/opt/swift/libexec/lib/swift/linux}"
+: "${ZONE_CHANNEL_LOG_DIR:=$ZONE_CHANNEL_ROOT/logs}"
+: "${ZONE_CHANNEL_SCRATCH_DIR:=$ZONE_CHANNEL_ROOT/scratch}"
+: "${ZONE_CHANNEL_QUERY_AUDIT_LOG:=$ZONE_CHANNEL_LOG_DIR/query-audit.ndjson}"
+: "${ZONE_CHANNEL_SYNC_AUDIT_LOG:=$ZONE_CHANNEL_LOG_DIR/sync-audit.ndjson}"
+: "${ZONE_CHANNEL_VALIDATION_SUMMARY:=$ZONE_CHANNEL_LOG_DIR/validation-summary.md}"
+: "${ZONE_CHANNEL_MAC_HOST:=sourya-mac}"
+: "${ZONE_CHANNEL_WACLI_MAX_DB_SIZE:=80GB}"
+
+zone_channel_ensure_dirs() {
+  install -d -m 700 \
+    "$ZONE_CHANNEL_ROOT" \
+    "$ZONE_CHANNEL_LOG_DIR" \
+    "$ZONE_CHANNEL_SCRATCH_DIR" \
+    "$ZONE_CHANNEL_SAMPLE_DIR" \
+    "$ZONE_CHANNEL_WACLI_STORE" \
+    "$ZONE_CHANNEL_LINKEDIN_STORE" \
+    "$ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE" \
+    "$ZONE_CHANNEL_LINKEDIN_CACHE" \
+    "$ZONE_CHANNEL_LINKEDIN_THREADS" \
+    "$ZONE_CHANNEL_LINKEDIN_SCREENSHOTS" \
+    "$ZONE_CHANNEL_LINKEDIN_SAMPLE_DIR" \
+    "$ZONE_CHANNEL_LINKEDIN_TOOL_DIR" \
+    "$ZONE_CHANNEL_IMESSAGE_STORE/current" \
+    "$ZONE_CHANNEL_IMESSAGE_ATTACHMENTS" \
+    "$ZONE_CHANNEL_IMESSAGE_SNAPSHOTS"
+}
+
+zone_channel_require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Missing required command: $cmd" >&2
+    return 127
+  fi
+}
+
+zone_channel_now() {
+  date -Iseconds
+}
+
+zone_channel_slug_now() {
+  date -u '+%Y%m%dT%H%M%SZ'
+}
+
+zone_channel_audit() {
+  local log_kind="$1"
+  local channel="$2"
+  shift 2
+  zone_channel_ensure_dirs
+  local args_json
+  args_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  jq -nc \
+    --arg ts "$(zone_channel_now)" \
+    --arg kind "$log_kind" \
+    --arg channel "$channel" \
+    --arg cwd "$PWD" \
+    --arg command "$(basename "$0")" \
+    --argjson args "$args_json" \
+    '{ts:$ts, kind:$kind, channel:$channel, command:$command, cwd:$cwd, args:$args}' \
+    >> "$ZONE_CHANNEL_QUERY_AUDIT_LOG"
+  chmod 600 "$ZONE_CHANNEL_QUERY_AUDIT_LOG"
+}
+
+zone_channel_sync_audit() {
+  local channel="$1"
+  local status="$2"
+  shift 2
+  zone_channel_ensure_dirs
+  local args_json
+  args_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  jq -nc \
+    --arg ts "$(zone_channel_now)" \
+    --arg channel "$channel" \
+    --arg status "$status" \
+    --arg command "$(basename "$0")" \
+    --argjson args "$args_json" \
+    '{ts:$ts, kind:"sync", channel:$channel, command:$command, status:$status, args:$args}' \
+    >> "$ZONE_CHANNEL_SYNC_AUDIT_LOG"
+  chmod 600 "$ZONE_CHANNEL_SYNC_AUDIT_LOG"
+}
+
+zone_channel_usage_bytes() {
+  du -sb "$ZONE_CHANNEL_ROOT" 2>/dev/null | awk '{print $1}'
+}
+
+zone_channel_human_bytes() {
+  numfmt --to=iec-i --suffix=B "$1" 2>/dev/null || printf '%s bytes\n' "$1"
+}
+
+zone_channel_check_cap() {
+  zone_channel_ensure_dirs
+  local used
+  used="$(zone_channel_usage_bytes)"
+  if [[ "$used" =~ ^[0-9]+$ ]] && (( used >= ZONE_CHANNEL_STORAGE_CAP_BYTES )); then
+    echo "Channel state is at $(zone_channel_human_bytes "$used"), cap is $(zone_channel_human_bytes "$ZONE_CHANNEL_STORAGE_CAP_BYTES")." >&2
+    echo "Refusing to continue broad sync/copy until storage is reviewed." >&2
+    return 75
+  fi
+}
+
+zone_channel_imsg_env() {
+  env LD_LIBRARY_PATH="$ZONE_CHANNEL_SWIFT_RUNTIME_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$@"
+}
+
+zone_channel_linkedin_playwright_present() {
+  [[ -d "$ZONE_CHANNEL_LINKEDIN_TOOL_DIR/node_modules/playwright" ]]
+}
+
+zone_channel_linkedin_lock() {
+  zone_channel_ensure_dirs
+  zone_channel_require_cmd flock
+  exec 9>"$ZONE_CHANNEL_LINKEDIN_LOCK"
+  chmod 600 "$ZONE_CHANNEL_LINKEDIN_LOCK" 2>/dev/null || true
+  if ! flock -n 9; then
+    echo "LinkedIn browser profile is already in use: $ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE" >&2
+    echo "Close the other zone-li-login/read/health process and retry." >&2
+    return 75
+  fi
+}
+
+zone_channel_linkedin_ensure_playwright() {
+  zone_channel_ensure_dirs
+  zone_channel_require_cmd node
+  zone_channel_require_cmd npm
+
+  if ! zone_channel_linkedin_playwright_present; then
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+      npm install \
+        --prefix "$ZONE_CHANNEL_LINKEDIN_TOOL_DIR" \
+        --no-audit \
+        --no-fund \
+        "playwright@$ZONE_CHANNEL_LINKEDIN_PLAYWRIGHT_VERSION"
+    chmod -R go-rwx "$ZONE_CHANNEL_LINKEDIN_TOOL_DIR"
+  fi
+}
+
+zone_channel_linkedin_node() {
+  env \
+    ZONE_CHANNEL_LINKEDIN_TOOL_DIR="$ZONE_CHANNEL_LINKEDIN_TOOL_DIR" \
+    ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE="$ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE" \
+    ZONE_CHANNEL_LINKEDIN_CHROME_BIN="$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" \
+    node "$@"
+}

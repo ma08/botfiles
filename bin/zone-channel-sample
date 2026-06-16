@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/zone-channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  zone-channel-sample whatsapp [wacli messages export args...]
+  zone-channel-sample imessage chats [imsg args...]
+  zone-channel-sample imessage history --chat-id ID [imsg args...]
+  zone-channel-sample imessage search --query TEXT [imsg args...]
+
+Writes full validation samples under private ~/pro/lab/zone-channel-ingest/samples.
+EOF
+}
+
+if [[ "$#" -lt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+channel="$1"
+shift
+stamp="$(zone_channel_slug_now)"
+zone_channel_ensure_dirs
+
+case "$channel" in
+  whatsapp)
+    out="$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_WHATSAPP_LABEL/whatsapp-sample-$stamp.json"
+    if [[ "$#" -eq 0 ]]; then
+      set -- messages export --limit 100 --output "$out"
+    else
+      set -- "$@" --output "$out"
+    fi
+    zone_channel_audit "sample" "whatsapp" "$@"
+    WACLI_STORE_DIR="$ZONE_CHANNEL_WACLI_STORE" \
+      wacli --store "$ZONE_CHANNEL_WACLI_STORE" --read-only --json "$@"
+    chmod 600 "$out"
+    echo "$out"
+    ;;
+  imessage)
+    if [[ "$#" -lt 1 ]]; then
+      usage >&2
+      exit 2
+    fi
+    cmd="$1"
+    shift
+    out="$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_IMESSAGE_LABEL/imessage-$cmd-sample-$stamp.jsonl"
+    zone_channel_audit "sample" "imessage" "$cmd" "$@"
+    zone-imsg-read "$cmd" "$@" > "$out"
+    chmod 600 "$out"
+    echo "$out"
+    ;;
+  *)
+    echo "Unknown channel: $channel" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

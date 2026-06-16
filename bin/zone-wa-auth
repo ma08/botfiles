@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/zone-channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  zone-wa-auth --phone PHONE [extra wacli auth args...]
+
+Pairs the private whatsapp-sourya wacli store on this VM. This is a writable
+auth operation, but it does not expose send commands to agents.
+EOF
+}
+
+if [[ "${1:-}" != "--phone" || -z "${2:-}" ]]; then
+  usage >&2
+  exit 2
+fi
+
+zone_channel_ensure_dirs
+zone_channel_require_cmd wacli
+
+phone="$2"
+shift 2
+zone_channel_sync_audit "whatsapp" "auth-start" "--phone" "REDACTED" "$@"
+
+WACLI_STORE_DIR="$ZONE_CHANNEL_WACLI_STORE" \
+  wacli --store "$ZONE_CHANNEL_WACLI_STORE" auth --phone "$phone" "$@"
+
+zone_channel_sync_audit "whatsapp" "auth-finished" "--phone" "REDACTED" "$@"
