@@ -30,7 +30,7 @@ zone_channel_ensure_dirs
 
 case "$channel" in
   whatsapp)
-    out="$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_WHATSAPP_LABEL/whatsapp-sample-$stamp.json"
+    out="$ZONE_CHANNEL_WHATSAPP_SAMPLE_DIR/whatsapp-sample-$stamp.json"
     if [[ "$#" -eq 0 ]]; then
       set -- messages export --limit 100 --output "$out"
     else
@@ -49,7 +49,7 @@ case "$channel" in
     fi
     cmd="$1"
     shift
-    out="$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_IMESSAGE_LABEL/imessage-$cmd-sample-$stamp.jsonl"
+    out="$ZONE_CHANNEL_IMESSAGE_SAMPLE_DIR/imessage-$cmd-sample-$stamp.jsonl"
     zone_channel_audit "sample" "imessage" "$cmd" "$@"
     channel-imessage-read "$cmd" "$@" > "$out"
     chmod 600 "$out"

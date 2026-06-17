@@ -21,6 +21,8 @@ fi
 : "${ZONE_CHANNEL_IMESSAGE_SNAPSHOTS:=$ZONE_CHANNEL_IMESSAGE_STORE/snapshots}"
 : "${ZONE_CHANNEL_WACLI_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_WHATSAPP_LABEL}"
 : "${ZONE_CHANNEL_SAMPLE_DIR:=$ZONE_CHANNEL_ROOT/samples}"
+: "${ZONE_CHANNEL_IMESSAGE_SAMPLE_DIR:=$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_IMESSAGE_LABEL}"
+: "${ZONE_CHANNEL_WHATSAPP_SAMPLE_DIR:=$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_WHATSAPP_LABEL}"
 : "${ZONE_CHANNEL_LINKEDIN_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_LINKEDIN_LABEL}"
 : "${ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE:=$ZONE_CHANNEL_LINKEDIN_STORE/chrome-profile}"
 : "${ZONE_CHANNEL_LINKEDIN_CACHE:=$ZONE_CHANNEL_LINKEDIN_STORE/cache}"
@@ -48,6 +50,8 @@ zone_channel_ensure_dirs() {
     "$ZONE_CHANNEL_LOG_DIR" \
     "$ZONE_CHANNEL_SCRATCH_DIR" \
     "$ZONE_CHANNEL_SAMPLE_DIR" \
+    "$ZONE_CHANNEL_IMESSAGE_SAMPLE_DIR" \
+    "$ZONE_CHANNEL_WHATSAPP_SAMPLE_DIR" \
     "$ZONE_CHANNEL_WACLI_STORE" \
     "$ZONE_CHANNEL_LINKEDIN_STORE" \
     "$ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE" \
@@ -82,6 +86,7 @@ zone_channel_audit() {
   local channel="$2"
   shift 2
   zone_channel_ensure_dirs
+  zone_channel_require_cmd jq
   local args_json
   args_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
   jq -nc \
@@ -101,6 +106,7 @@ zone_channel_sync_audit() {
   local status="$2"
   shift 2
   zone_channel_ensure_dirs
+  zone_channel_require_cmd jq
   local args_json
   args_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
   jq -nc \
