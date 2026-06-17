@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  channel-imessage-read chats --limit 20 --json
+  channel-imessage-read history --chat-id ID --limit 50 --json
+  channel-imessage-read search --query "text" --limit 20 --json
+
+Runs Linux read-only imsg against the copied VM chat.db.
+EOF
+}
+
+if [[ "$#" -eq 0 ]]; then
+  usage >&2
+  exit 2
+fi
+
+cmd="$1"
+shift
+
+case "$cmd" in
+  chats|group|history|search|account|whois|nickname) ;;
+  --version|-h|--help)
+    zone_channel_imsg_env "$ZONE_CHANNEL_IMSG_BIN" "$cmd" "$@"
+    exit $?
+    ;;
+  *)
+    echo "Unsupported or mutating imsg command for Linux read-only wrapper: $cmd" >&2
+    exit 2
+    ;;
+esac
+
+if [[ ! -f "$ZONE_CHANNEL_IMESSAGE_DB" ]]; then
+  echo "Missing copied iMessage database: $ZONE_CHANNEL_IMESSAGE_DB" >&2
+  echo "Run channel-imessage-pull first." >&2
+  exit 66
+fi
+
+zone_channel_ensure_dirs
+zone_channel_audit "query" "imessage" "$cmd" "$@"
+zone_channel_imsg_env "$ZONE_CHANNEL_IMSG_BIN" "$cmd" --db "$ZONE_CHANNEL_IMESSAGE_DB" "$@"

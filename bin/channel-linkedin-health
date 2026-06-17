@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  channel-linkedin-health [--skip-browser]
+
+Checks LinkedIn browser-access prerequisites and, unless --skip-browser is set,
+attempts a read-only LinkedIn session check with the dedicated Chrome profile.
+EOF
+}
+
+skip_browser=0
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+elif [[ "${1:-}" == "--skip-browser" ]]; then
+  skip_browser=1
+fi
+
+zone_channel_ensure_dirs
+
+echo "linkedin_store=$ZONE_CHANNEL_LINKEDIN_STORE"
+echo "linkedin_chrome_profile=$ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE"
+echo "linkedin_cache=$ZONE_CHANNEL_LINKEDIN_CACHE"
+echo "linkedin_samples=$ZONE_CHANNEL_LINKEDIN_SAMPLE_DIR"
+echo "chrome_bin=$ZONE_CHANNEL_LINKEDIN_CHROME_BIN"
+echo "playwright_version=$ZONE_CHANNEL_LINKEDIN_PLAYWRIGHT_VERSION"
+
+if command -v "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" >/dev/null 2>&1 || [[ -x "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" ]]; then
+  "$ZONE_CHANNEL_LINKEDIN_CHROME_BIN" --version || true
+else
+  echo "chrome=missing"
+fi
+
+if command -v node >/dev/null 2>&1; then
+  echo "node=$(node -v)"
+else
+  echo "node=missing"
+fi
+
+if command -v npm >/dev/null 2>&1; then
+  echo "npm=$(npm -v)"
+else
+  echo "npm=missing"
+fi
+
+zone_channel_linkedin_ensure_playwright
+echo "playwright=installed"
+
+if [[ "$skip_browser" -eq 1 ]]; then
+  exit 0
+fi
+
+zone_channel_audit "health" "linkedin" "$@"
+zone_channel_linkedin_lock
+zone_channel_linkedin_node "$ZONE_CHANNEL_LINKEDIN_EXTRACTOR" health --quiet

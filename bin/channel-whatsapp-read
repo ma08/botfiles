@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  channel-whatsapp-read messages search "query" --limit 20
+  channel-whatsapp-read messages list --limit 20
+  channel-whatsapp-read chats list
+
+Runs wacli against the private whatsapp-sourya store. Read-only mode is forced
+unless ZONE_CHANNEL_WRITE_ENABLED=1 is explicitly set.
+EOF
+}
+
+if [[ "$#" -eq 0 ]]; then
+  usage >&2
+  exit 2
+fi
+
+zone_channel_ensure_dirs
+zone_channel_require_cmd wacli
+zone_channel_audit "query" "whatsapp" "$@"
+
+args=(--store "$ZONE_CHANNEL_WACLI_STORE" --json)
+if [[ "$ZONE_CHANNEL_WRITE_ENABLED" != "1" ]]; then
+  args+=(--read-only)
+fi
+
+WACLI_STORE_DIR="$ZONE_CHANNEL_WACLI_STORE" \
+  wacli "${args[@]}" "$@"

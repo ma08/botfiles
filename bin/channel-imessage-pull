@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$script_dir/channel-common"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  channel-imessage-pull [--with-attachments]
+
+Pulls a consistent iMessage chat.db snapshot from sourya-mac into the private
+VM store. Attachment copying is optional because it can be large.
+EOF
+}
+
+with_attachments=0
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --with-attachments) with_attachments=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+zone_channel_ensure_dirs
+zone_channel_require_cmd ssh
+zone_channel_require_cmd tar
+zone_channel_require_cmd sqlite3
+zone_channel_check_cap
+
+host="$ZONE_CHANNEL_MAC_HOST"
+stamp="$(zone_channel_slug_now)"
+snapshot_dir="$ZONE_CHANNEL_IMESSAGE_SNAPSHOTS/$stamp"
+archive="$ZONE_CHANNEL_SCRATCH_DIR/imessage-$stamp.tar.gz"
+
+install -d -m 700 "$snapshot_dir"
+zone_channel_sync_audit "imessage" "snapshot-start" "$host"
+
+ssh "$host" 'bash -s' > "$archive" <<'REMOTE'
+set -euo pipefail
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/channel-imessage-snapshot.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+sqlite3 "$HOME/Library/Messages/chat.db" ".backup '$tmp/chat.db'"
+sqlite3 "$tmp/chat.db" 'pragma quick_check;' >&2
+tar -C "$tmp" -czf - chat.db
+REMOTE
+
+tar -xzf "$archive" -C "$snapshot_dir"
+sqlite3 "$snapshot_dir/chat.db" 'pragma quick_check;'
+install -m 600 "$snapshot_dir/chat.db" "$ZONE_CHANNEL_IMESSAGE_DB.tmp"
+mv "$ZONE_CHANNEL_IMESSAGE_DB.tmp" "$ZONE_CHANNEL_IMESSAGE_DB"
+chmod 600 "$ZONE_CHANNEL_IMESSAGE_DB"
+
+if [[ "$with_attachments" -eq 1 ]]; then
+  zone_channel_check_cap
+  zone_channel_sync_audit "imessage" "attachments-start" "$host"
+  rsync -a --delete --stats "$host:Library/Messages/Attachments/" "$ZONE_CHANNEL_IMESSAGE_ATTACHMENTS/"
+  chmod -R go-rwx "$ZONE_CHANNEL_IMESSAGE_ATTACHMENTS"
+  zone_channel_check_cap
+  zone_channel_sync_audit "imessage" "attachments-finished" "$host"
+fi
+
+rm -f "$archive"
+zone_channel_sync_audit "imessage" "snapshot-finished" "$host"
+echo "$ZONE_CHANNEL_IMESSAGE_DB"
