@@ -1,0 +1,7 @@
+interface:
+  display_name: "Mac Disk Cleanup"
+  short_description: "Safely reclaim macOS disk space"
+  default_prompt: "Use $mac-disk-cleanup to audit my Mac storage and propose approval-gated cleanup batches."
+
+policy:
+  allow_implicit_invocation: true

@@ -68,5 +68,7 @@
   "$comment": "cleanupPeriodDays docs: https://code.claude.com/docs/en/settings ; schema: https://www.schemastore.org/claude-code-settings.json ; caveat: https://code.claude.com/docs/en/data-usage",
   "feedbackSurveyState": {
     "lastShownTime": 1754085632943
-  }
+  },
+  "verbose": true,
+  "preferredNotifChannel": "terminal_bell"
 }
