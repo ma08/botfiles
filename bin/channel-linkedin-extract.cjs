@@ -16,13 +16,13 @@ function loadPlaywright() {
 
 function usage() {
   console.error(`Usage:
-  zone-li-extract.cjs health [--quiet] [--headed]
-  zone-li-extract.cjs recent [--limit 20] [--open-limit 10] [--max-messages 50] [--output FILE] [--quiet] [--headed]
-  zone-li-extract.cjs thread --thread-url URL [--max-messages 50] [--output FILE] [--quiet] [--headed]
-  zone-li-extract.cjs thread --profile-url URL [--max-messages 50] [--output FILE] [--quiet] [--headed]
-  zone-li-extract.cjs thread --name NAME [--max-messages 50] [--output FILE] [--quiet] [--headed]
-  zone-li-extract.cjs profile --thread-url URL [--experience-limit 3] [--output FILE] [--quiet] [--headed]
-  zone-li-extract.cjs profile --profile-url URL [--experience-limit 3] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs health [--quiet] [--headed]
+  channel-linkedin-extract.cjs recent [--limit 20] [--open-limit 10] [--max-messages 50] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs thread --thread-url URL [--max-messages 50] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs thread --profile-url URL [--max-messages 50] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs thread --name NAME [--max-messages 50] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs profile --thread-url URL [--experience-limit 3] [--output FILE] [--quiet] [--headed]
+  channel-linkedin-extract.cjs profile --profile-url URL [--experience-limit 3] [--output FILE] [--quiet] [--headed]
 `);
 }
 
@@ -583,7 +583,7 @@ async function runRecent(opts) {
         headless: !opts.headed,
         ...login,
         conversations: [],
-        notes: ["Run zone-li-login from a VM GUI session, complete LinkedIn login, then retry."],
+        notes: ["Run channel-linkedin-login from a VM GUI session, complete LinkedIn login, then retry."],
       };
     }
 
@@ -672,7 +672,7 @@ async function runThread(opts) {
         headless: !opts.headed,
         ...login,
         conversations: [],
-        notes: ["Run zone-li-login from a VM GUI session, complete LinkedIn login, then retry."],
+        notes: ["Run channel-linkedin-login from a VM GUI session, complete LinkedIn login, then retry."],
       };
     }
 
@@ -823,7 +823,7 @@ async function runProfile(opts) {
         headless: !opts.headed,
         ...login,
         profile: null,
-        notes: ["Run zone-li-login from a VM GUI session, complete LinkedIn login, then retry."],
+        notes: ["Run channel-linkedin-login from a VM GUI session, complete LinkedIn login, then retry."],
       };
     }
 

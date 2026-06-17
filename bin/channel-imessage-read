@@ -4,14 +4,14 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-imsg-read chats --limit 20 --json
-  zone-imsg-read history --chat-id ID --limit 50 --json
-  zone-imsg-read search --query "text" --limit 20 --json
+  channel-imessage-read chats --limit 20 --json
+  channel-imessage-read history --chat-id ID --limit 50 --json
+  channel-imessage-read search --query "text" --limit 20 --json
 
 Runs Linux read-only imsg against the copied VM chat.db.
 EOF
@@ -39,7 +39,7 @@ esac
 
 if [[ ! -f "$ZONE_CHANNEL_IMESSAGE_DB" ]]; then
   echo "Missing copied iMessage database: $ZONE_CHANNEL_IMESSAGE_DB" >&2
-  echo "Run zone-imsg-pull first." >&2
+  echo "Run channel-imessage-pull first." >&2
   exit 66
 fi
 

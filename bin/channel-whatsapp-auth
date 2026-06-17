@@ -4,12 +4,12 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-wa-auth --phone PHONE [extra wacli auth args...]
+  channel-whatsapp-auth --phone PHONE [extra wacli auth args...]
 
 Pairs the private whatsapp-sourya wacli store on this VM. This is a writable
 auth operation, but it does not expose send commands to agents.

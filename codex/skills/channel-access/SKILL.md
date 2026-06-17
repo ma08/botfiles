@@ -6,10 +6,10 @@ metadata:
     category: "productivity"
     requires:
       bins:
-        - zone-channel-health
-        - zone-wa-read
-        - zone-imsg-read
-        - zone-li-read
+        - channel-health
+        - channel-whatsapp-read
+        - channel-imessage-read
+        - channel-linkedin-read
 ---
 
 # Channel Access
@@ -61,7 +61,7 @@ Config:
 Start with:
 
 ```bash
-zone-channel-health
+channel-health
 ```
 
 This reports installed versions, private store paths, disk usage/cap, WhatsApp
@@ -71,7 +71,7 @@ state paths.
 For LinkedIn-specific checks:
 
 ```bash
-zone-li-health
+channel-linkedin-health
 ```
 
 ## WhatsApp
@@ -79,23 +79,23 @@ zone-li-health
 Read-only examples:
 
 ```bash
-zone-wa-read auth status
-zone-wa-read chats list --limit 20
-zone-wa-read messages list --limit 20
-zone-wa-read messages search "query" --limit 20
-zone-wa-read messages context --chat JID --id MSG_ID --before 5 --after 5
+channel-whatsapp-read auth status
+channel-whatsapp-read chats list --limit 20
+channel-whatsapp-read messages list --limit 20
+channel-whatsapp-read messages search "query" --limit 20
+channel-whatsapp-read messages context --chat JID --id MSG_ID --before 5 --after 5
 ```
 
 On-demand sync:
 
 ```bash
-zone-wa-sync
+channel-whatsapp-sync
 ```
 
 Pairing is an interactive human step:
 
 ```bash
-zone-wa-auth --phone "+15551234567"
+channel-whatsapp-auth --phone "+15551234567"
 ```
 
 Do not run pairing or sync with broad history/backfill options unless the task
@@ -106,22 +106,22 @@ requires it and the storage cap has been checked.
 Pull a copied database from `sourya-mac`:
 
 ```bash
-zone-imsg-pull
+channel-imessage-pull
 ```
 
 Copy attachments too only when the task needs media and storage has been
 reviewed:
 
 ```bash
-zone-imsg-pull --with-attachments
+channel-imessage-pull --with-attachments
 ```
 
 Read-only examples against the copied Linux database:
 
 ```bash
-zone-imsg-read chats --limit 20 --json
-zone-imsg-read search --query "query" --limit 20 --json
-zone-imsg-read history --chat-id ID --limit 50 --json
+channel-imessage-read chats --limit 20 --json
+channel-imessage-read search --query "query" --limit 20 --json
+channel-imessage-read history --chat-id ID --limit 50 --json
 ```
 
 Linux `imsg` is read-only for a copied macOS `chat.db`; it is not a live
@@ -135,19 +135,19 @@ automation. It is read-only by construction in v1.
 Human login from a VM GUI/remote desktop terminal:
 
 ```bash
-zone-li-login
+channel-linkedin-login
 ```
 
 Read-only examples:
 
 ```bash
-zone-li-health
-zone-li-read recent --limit 20 --open-limit 10 --max-messages 50
-zone-li-read thread --thread-url "https://www.linkedin.com/messaging/thread/..." --max-messages 50
-zone-li-read thread --profile-url "https://www.linkedin.com/in/example/" --max-messages 50
-zone-li-read thread --name "Person Name" --max-messages 50
-zone-li-read profile --thread-url "https://www.linkedin.com/messaging/thread/..." --experience-limit 3
-zone-li-read profile --profile-url "https://www.linkedin.com/in/example/" --experience-limit 3
+channel-linkedin-health
+channel-linkedin-read recent --limit 20 --open-limit 10 --max-messages 50
+channel-linkedin-read thread --thread-url "https://www.linkedin.com/messaging/thread/..." --max-messages 50
+channel-linkedin-read thread --profile-url "https://www.linkedin.com/in/example/" --max-messages 50
+channel-linkedin-read thread --name "Person Name" --max-messages 50
+channel-linkedin-read profile --thread-url "https://www.linkedin.com/messaging/thread/..." --experience-limit 3
+channel-linkedin-read profile --profile-url "https://www.linkedin.com/in/example/" --experience-limit 3
 ```
 
 Rules:
@@ -169,13 +169,13 @@ Rules:
 Write full samples privately:
 
 ```bash
-zone-channel-sample whatsapp
-zone-channel-sample imessage chats --limit 20 --json
-zone-channel-sample imessage history --chat-id ID --limit 50 --json
-zone-li-sample recent --limit 5 --open-limit 2 --max-messages 20
-zone-li-sample thread --thread-url "https://www.linkedin.com/messaging/thread/..." --max-messages 50
-zone-li-sample thread --profile-url "https://www.linkedin.com/in/example/" --max-messages 50
-zone-li-sample profile --thread-url "https://www.linkedin.com/messaging/thread/..." --experience-limit 3
+channel-sample whatsapp
+channel-sample imessage chats --limit 20 --json
+channel-sample imessage history --chat-id ID --limit 50 --json
+channel-linkedin-sample recent --limit 5 --open-limit 2 --max-messages 20
+channel-linkedin-sample thread --thread-url "https://www.linkedin.com/messaging/thread/..." --max-messages 50
+channel-linkedin-sample thread --profile-url "https://www.linkedin.com/in/example/" --max-messages 50
+channel-linkedin-sample profile --thread-url "https://www.linkedin.com/messaging/thread/..." --experience-limit 3
 ```
 
 After creating a sample, summarize only metadata in task artifacts unless the
@@ -183,15 +183,15 @@ user explicitly asks to promote content.
 
 ## Troubleshooting
 
-- If `zone-imsg-pull` fails, check SSH access to `sourya-mac`, remote
+- If `channel-imessage-pull` fails, check SSH access to `sourya-mac`, remote
   `sqlite3`, and macOS Full Disk Access/TCC behavior. Do not install a Mac-side
   LaunchAgent without explicit user approval.
-- If `zone-imsg-read` fails with Swift libraries missing, verify
+- If `channel-imessage-read` fails with Swift libraries missing, verify
   `ZONE_CHANNEL_SWIFT_RUNTIME_DIR` in the private config.
-- If `wacli` commands fail on locks or auth, use `zone-channel-health` and
-  `zone-wa-read auth status` before retrying.
-- If `zone-li-health` reports `login_required_or_not_verified`, run
-  `zone-li-login` from a VM GUI/remote desktop terminal and complete LinkedIn
+- If `wacli` commands fail on locks or auth, use `channel-health` and
+  `channel-whatsapp-read auth status` before retrying.
+- If `channel-linkedin-health` reports `login_required_or_not_verified`, run
+  `channel-linkedin-login` from a VM GUI/remote desktop terminal and complete LinkedIn
   login manually.
 - If LinkedIn selectors fail, keep the raw failure private and update the
   Playwright extractor rather than broadening scans or using private APIs

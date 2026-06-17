@@ -4,12 +4,12 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-li-health [--skip-browser]
+  channel-linkedin-health [--skip-browser]
 
 Checks LinkedIn browser-access prerequisites and, unless --skip-browser is set,
 attempts a read-only LinkedIn session check with the dedicated Chrome profile.

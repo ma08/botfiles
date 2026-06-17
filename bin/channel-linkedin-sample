@@ -4,16 +4,16 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-li-sample recent [zone-li-read recent args...]
-  zone-li-sample thread --thread-url URL [zone-li-read thread args...]
-  zone-li-sample thread --profile-url URL [zone-li-read thread args...]
-  zone-li-sample profile --thread-url URL [zone-li-read profile args...]
-  zone-li-sample profile --profile-url URL [zone-li-read profile args...]
+  channel-linkedin-sample recent [channel-linkedin-read recent args...]
+  channel-linkedin-sample thread --thread-url URL [channel-linkedin-read thread args...]
+  channel-linkedin-sample thread --profile-url URL [channel-linkedin-read thread args...]
+  channel-linkedin-sample profile --thread-url URL [channel-linkedin-read profile args...]
+  channel-linkedin-sample profile --profile-url URL [channel-linkedin-read profile args...]
 
 Writes full LinkedIn validation samples under private
 ~/pro/lab/zone-channel-ingest/samples/linkedin-sourya/.

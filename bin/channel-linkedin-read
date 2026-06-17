@@ -4,21 +4,21 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-li-read recent [--limit 20] [--open-limit 10] [--max-messages 50]
-  zone-li-read thread --thread-url URL [--max-messages 50]
-  zone-li-read thread --profile-url URL [--max-messages 50]
-  zone-li-read thread --name NAME [--max-messages 50]
-  zone-li-read profile --thread-url URL [--experience-limit 3]
-  zone-li-read profile --profile-url URL [--experience-limit 3]
+  channel-linkedin-read recent [--limit 20] [--open-limit 10] [--max-messages 50]
+  channel-linkedin-read thread --thread-url URL [--max-messages 50]
+  channel-linkedin-read thread --profile-url URL [--max-messages 50]
+  channel-linkedin-read thread --name NAME [--max-messages 50]
+  channel-linkedin-read profile --thread-url URL [--experience-limit 3]
+  channel-linkedin-read profile --profile-url URL [--experience-limit 3]
 
 Runs bounded, read-only LinkedIn message discovery through the dedicated VM
 Chrome profile. No send/connect/react/archive/delete actions are implemented.
-Raw output is printed to stdout; save full samples with zone-li-sample.
+Raw output is printed to stdout; save full samples with channel-linkedin-sample.
 EOF
 }
 

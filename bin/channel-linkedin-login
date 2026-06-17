@@ -4,12 +4,12 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-li-login [linkedin-url]
+  channel-linkedin-login [linkedin-url]
 
 Opens LinkedIn in a dedicated VM Chrome profile for human login. Credentials are
 entered by the human in the browser, never by this wrapper.
@@ -22,7 +22,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 fi
 
 if [[ -z "${DISPLAY:-}" ]]; then
-  echo "DISPLAY is not set. Open a VM GUI/remote desktop terminal and rerun zone-li-login." >&2
+  echo "DISPLAY is not set. Open a VM GUI/remote desktop terminal and rerun channel-linkedin-login." >&2
   exit 2
 fi
 

@@ -4,15 +4,15 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-channel-sample whatsapp [wacli messages export args...]
-  zone-channel-sample imessage chats [imsg args...]
-  zone-channel-sample imessage history --chat-id ID [imsg args...]
-  zone-channel-sample imessage search --query TEXT [imsg args...]
+  channel-sample whatsapp [wacli messages export args...]
+  channel-sample imessage chats [imsg args...]
+  channel-sample imessage history --chat-id ID [imsg args...]
+  channel-sample imessage search --query TEXT [imsg args...]
 
 Writes full validation samples under private ~/pro/lab/zone-channel-ingest/samples.
 EOF
@@ -51,7 +51,7 @@ case "$channel" in
     shift
     out="$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_IMESSAGE_LABEL/imessage-$cmd-sample-$stamp.jsonl"
     zone_channel_audit "sample" "imessage" "$cmd" "$@"
-    zone-imsg-read "$cmd" "$@" > "$out"
+    channel-imessage-read "$cmd" "$@" > "$out"
     chmod 600 "$out"
     echo "$out"
     ;;

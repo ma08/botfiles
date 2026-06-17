@@ -28,7 +28,7 @@ fi
 : "${ZONE_CHANNEL_LINKEDIN_SCREENSHOTS:=$ZONE_CHANNEL_LINKEDIN_STORE/screenshots}"
 : "${ZONE_CHANNEL_LINKEDIN_SAMPLE_DIR:=$ZONE_CHANNEL_SAMPLE_DIR/$ZONE_CHANNEL_LINKEDIN_LABEL}"
 : "${ZONE_CHANNEL_LINKEDIN_TOOL_DIR:=$ZONE_CHANNEL_ROOT/tools/linkedin-playwright}"
-: "${ZONE_CHANNEL_LINKEDIN_EXTRACTOR:=$HOME/pro/botfiles/bin/zone-li-extract.cjs}"
+: "${ZONE_CHANNEL_LINKEDIN_EXTRACTOR:=$HOME/pro/botfiles/bin/channel-linkedin-extract.cjs}"
 : "${ZONE_CHANNEL_LINKEDIN_CHROME_BIN:=/usr/bin/google-chrome}"
 : "${ZONE_CHANNEL_LINKEDIN_PLAYWRIGHT_VERSION:=1.60.0}"
 : "${ZONE_CHANNEL_LINKEDIN_LOCK:=$ZONE_CHANNEL_LINKEDIN_STORE/browser.lock}"
@@ -148,7 +148,7 @@ zone_channel_linkedin_lock() {
   chmod 600 "$ZONE_CHANNEL_LINKEDIN_LOCK" 2>/dev/null || true
   if ! flock -n 9; then
     echo "LinkedIn browser profile is already in use: $ZONE_CHANNEL_LINKEDIN_CHROME_PROFILE" >&2
-    echo "Close the other zone-li-login/read/health process and retry." >&2
+    echo "Close the other channel-linkedin-login/read/health process and retry." >&2
     return 75
   fi
 }

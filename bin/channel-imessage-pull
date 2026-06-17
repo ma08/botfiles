@@ -4,12 +4,12 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-. "$script_dir/zone-channel-common"
+. "$script_dir/channel-common"
 
 usage() {
   cat <<'EOF'
 Usage:
-  zone-imsg-pull [--with-attachments]
+  channel-imessage-pull [--with-attachments]
 
 Pulls a consistent iMessage chat.db snapshot from sourya-mac into the private
 VM store. Attachment copying is optional because it can be large.
@@ -41,7 +41,7 @@ zone_channel_sync_audit "imessage" "snapshot-start" "$host"
 
 ssh "$host" 'bash -s' > "$archive" <<'REMOTE'
 set -euo pipefail
-tmp="$(mktemp -d "${TMPDIR:-/tmp}/zone-imsg-snapshot.XXXXXX")"
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/channel-imessage-snapshot.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 sqlite3 "$HOME/Library/Messages/chat.db" ".backup '$tmp/chat.db'"
 sqlite3 "$tmp/chat.db" 'pragma quick_check;' >&2
