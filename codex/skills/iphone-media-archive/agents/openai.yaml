@@ -1,0 +1,4 @@
+interface:
+  display_name: "iPhone Media Archive"
+  short_description: "Backup-first raw iPhone media archive"
+  default_prompt: "Use $iphone-media-archive to back up, extract, verify, and safely clean up iPhone photos and videos with a raw external-drive archive."
