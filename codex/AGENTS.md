@@ -49,6 +49,13 @@ These are user-level instructions for the Codex agent shared across all projects
 - After copying the image, update `user_inputs/input_artifacts/index.md` with the source payload details, capture time, and local artifact path.
 - Prefer analyzing the captured local artifact over asking for or relying on an expiring S3 URL. If SSH/SCP fails and no local path is reachable, ask for the S3 URL or a fresh payload.
 
+## External Link Access
+
+- If a user-provided link, task-input link, or discovered link appears material to the task but you cannot access its content with the available tools, do not skip it silently or proceed as if the content was known.
+- Tell the user which link could not be accessed, briefly state what failed or what permission/auth/context is missing, and explain why the missing content may matter.
+- When `request_user_input` is available, use it to ask an interactive multiple-choice question before proceeding. Offer options such as: the user can paste or upload the content, the agent can retry through another available route, or the agent can proceed without that content while recording the limitation.
+- If an interactive question tool is unavailable, ask the same choice clearly in chat and wait when the inaccessible content is important to the outcome.
+
 ## Shell Environment (two-layer bootstrap)
 
 Botfiles uses a two-layer shell model:
