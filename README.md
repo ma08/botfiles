@@ -255,7 +255,7 @@ Botfiles uses a two-layer shell environment model:
 
 **`.botenv` (core, non-interactive safe)**
 - Secrets from `secrets/local/*.rc`
-- PATH additions (`$BOTFILES_ROOT/bin`, `~/.local/bin`, `/usr/local/bin`)
+- PATH additions (`$BOTFILES_ROOT/bin`, `~/.local/bin`, Homebrew/Linuxbrew bins, `/usr/local/bin`)
 - Core env: `BOTFILES_ROOT`, `EDITOR`, `VISUAL`, `TERM`, `UV_BIN`
 - Safe to source from any context: SSH commands, cron, systemd, agent exec
 - Exposes repo-managed executables like `oracle` and `oracle-mcp` to non-interactive shells

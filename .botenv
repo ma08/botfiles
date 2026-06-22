@@ -8,7 +8,7 @@
 # layer (.botrc) should source this file and then add aliases, prompts,
 # and other interactive-only configuration on top.
 #
-# Double-source guard: idempotent — returns immediately if already loaded.
+# Double-source guard: idempotent within the current shell.
 
 if [ "${_BOTENV_LOADED:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
@@ -52,15 +52,28 @@ if command -v nvim >/dev/null 2>&1; then
   _botenv_default_editor=nvim
 elif [ -x /opt/homebrew/bin/nvim ]; then
   _botenv_default_editor=/opt/homebrew/bin/nvim
+elif [ -x /home/linuxbrew/.linuxbrew/bin/nvim ]; then
+  _botenv_default_editor=/home/linuxbrew/.linuxbrew/bin/nvim
 elif [ -x /usr/local/bin/nvim ]; then
   _botenv_default_editor=/usr/local/bin/nvim
 else
   _botenv_default_editor=vim
 fi
 
-export EDITOR="${EDITOR:-$_botenv_default_editor}"
-export VISUAL="${VISUAL:-$EDITOR}"
-export GIT_EDITOR="${GIT_EDITOR:-$EDITOR}"
+case "${EDITOR:-}" in
+  ""|vim|*/vim) export EDITOR="$_botenv_default_editor" ;;
+  *) export EDITOR ;;
+esac
+
+case "${VISUAL:-}" in
+  ""|vim|*/vim) export VISUAL="$EDITOR" ;;
+  *) export VISUAL ;;
+esac
+
+case "${GIT_EDITOR:-}" in
+  ""|vim|*/vim) export GIT_EDITOR="$EDITOR" ;;
+  *) export GIT_EDITOR ;;
+esac
 unset _botenv_default_editor
 
 # --- Normalize TERM for headless or unsupported terminal types ----------
@@ -83,7 +96,7 @@ IFS=:
 
 for _botenv_path_entry in ${PATH:-}; do
   case "$_botenv_path_entry" in
-    "$BOTFILES_ROOT/bin"|"$HOME/.local/bin"|"/usr/local/bin") ;;
+    "$BOTFILES_ROOT/bin"|"$HOME/.local/bin"|"/opt/homebrew/bin"|"/opt/homebrew/sbin"|"/home/linuxbrew/.linuxbrew/bin"|"/home/linuxbrew/.linuxbrew/sbin"|"/usr/local/bin"|"/usr/local/sbin") ;;
     "")
       ;;
     *)
@@ -99,7 +112,20 @@ done
 IFS=$_botenv_old_ifs
 unset _botenv_old_ifs _botenv_path_entry
 
-_botenv_path_prefix="$BOTFILES_ROOT/bin:$HOME/.local/bin:/usr/local/bin"
+_botenv_path_prefix="$BOTFILES_ROOT/bin:$HOME/.local/bin"
+for _botenv_path_entry in \
+  /opt/homebrew/bin \
+  /opt/homebrew/sbin \
+  /home/linuxbrew/.linuxbrew/bin \
+  /home/linuxbrew/.linuxbrew/sbin \
+  /usr/local/bin \
+  /usr/local/sbin; do
+  if [ -d "$_botenv_path_entry" ]; then
+    _botenv_path_prefix="$_botenv_path_prefix:$_botenv_path_entry"
+  fi
+done
+unset _botenv_path_entry
+
 if [ -n "$_botenv_path_rest" ]; then
   PATH="$_botenv_path_prefix:$_botenv_path_rest"
 else
@@ -115,4 +141,5 @@ fi
 
 # --- Mark loaded -------------------------------------------------------
 _BOTENV_LOADED=1
-export _BOTENV_LOADED
+# Keep this shell-local so child shells still evaluate .botenv through
+# BASH_ENV/zshenv instead of inheriting a stale "already loaded" marker.
