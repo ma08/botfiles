@@ -33,6 +33,8 @@ Botfiles uses a two-layer shell model:
 - **`.botenv`** — Non-interactive-safe core: secrets, PATH (`$BOTFILES_ROOT/bin`, `~/.local/bin`, `/usr/local/bin`), `BOTFILES_ROOT`, `EDITOR`, `TERM`, `UV_BIN`. Sourced for ALL shell contexts (interactive, SSH commands, agent exec, cron). This is what non-interactive scripts and hooks should source.
 - **`.botrc`** — Interactive layer: sources `.botenv`, then adds aliases (`cc`, `bedcc`, `zj`), shell modules (`20-ssh-workflows.sh`, `30-oracle.sh`), and functions (`oracle`, `work-ml`) on top of the shared executable wrappers.
 
+`.botenv` should prefer `nvim` for `EDITOR`, `VISUAL`, and `GIT_EDITOR` when Neovim is installed, falling back to `vim` otherwise.
+
 When writing scripts or hooks that need botfiles env in a non-interactive context, source `.botenv` (not `.botrc`) for a lighter, safer load.
 
 On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_profile` > `~/.bash_login` > `~/.profile`, whichever bash reads first) to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.

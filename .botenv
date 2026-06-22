@@ -48,8 +48,20 @@ if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
 fi
 
 # --- Default editor for CLI tools (Codex, git, etc.) -------------------
-export EDITOR=vim
-export VISUAL=vim
+if command -v nvim >/dev/null 2>&1; then
+  _botenv_default_editor=nvim
+elif [ -x /opt/homebrew/bin/nvim ]; then
+  _botenv_default_editor=/opt/homebrew/bin/nvim
+elif [ -x /usr/local/bin/nvim ]; then
+  _botenv_default_editor=/usr/local/bin/nvim
+else
+  _botenv_default_editor=vim
+fi
+
+export EDITOR="${EDITOR:-$_botenv_default_editor}"
+export VISUAL="${VISUAL:-$EDITOR}"
+export GIT_EDITOR="${GIT_EDITOR:-$EDITOR}"
+unset _botenv_default_editor
 
 # --- Normalize TERM for headless or unsupported terminal types ----------
 # Ink- and curses-based CLIs (Claude Code, ranger, etc.) need a valid TERM
