@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Task Work"
+  short_description: "Commit task-scoped repo changes safely"
+  default_prompt: "Use $commit-task-work to commit the relevant files for the current task."
