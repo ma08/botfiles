@@ -19,7 +19,7 @@ file_opener = "cursor"
 # Activate one with `--profile <name>` (see ~/pro/botfiles/.botrc wrappers).
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
 model = "gpt-5.5"
-service_tier = "fast"
+service_tier = "default"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
 [tui.keymap.global]
