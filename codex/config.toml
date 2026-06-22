@@ -22,6 +22,9 @@ model = "gpt-5.5"
 service_tier = "fast"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
+[tui.keymap.global]
+toggle_vim_mode = "alt-v"
+
 [projects."/Users/sourya4/pro/ladduu_agent_stack"]
 trust_level = "trusted"
 
