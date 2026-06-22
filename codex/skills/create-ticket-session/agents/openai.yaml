@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Ticket Session"
+  short_description: "Create a ticket and launch a session"
+  default_prompt: "Use $create-ticket-session to create a Linear ticket and start a zellij worker session."
