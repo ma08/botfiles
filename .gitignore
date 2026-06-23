@@ -30,3 +30,6 @@ codex/skills/.system/
 
 # OS files
 .DS_Store
+codex/config.toml.bak*
+codex/config.toml.secrets*
+codex/config.toml.vmback*
