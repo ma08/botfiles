@@ -1,0 +1,4 @@
+interface:
+  display_name: "Oracle Review Goal Plan"
+  short_description: "Create goal plans with Oracle review loops"
+  default_prompt: "Use $create-oracle-review-powered-goal-plan to create a Codex goal plan with a GPT-5.5 Pro Oracle review loop."
