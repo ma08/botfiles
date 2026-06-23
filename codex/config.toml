@@ -141,7 +141,9 @@ env_key = "V0_API_KEY"
 wire_api = "responses"
 
 [mcp_servers.notion]
-url = "https://mcp.notion.com/mcp"
+command = "bash"
+args = ["-lc", "exec \"$HOME/pro/botfiles/bin/notion-mcp\""]
+startup_timeout_sec = 120
 
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_code_context_exa,crawling_exa,company_research_exa,people_search_exa,deep_researcher_start,deep_researcher_check"
@@ -169,6 +171,10 @@ guardian_approval = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
+apps = true
+
+[apps.asdk_app_69c18c28f1188191bf5b8445c4ab0a2e]
+enabled = false
 
 [tui.model_availability_nux]
 "gpt-5.5" = 4

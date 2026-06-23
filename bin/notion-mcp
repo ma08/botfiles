@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$HOME/pro/botfiles/.botenv" ]; then
+  # shellcheck source=/dev/null
+  source "$HOME/pro/botfiles/.botenv"
+fi
+
+if [ -f "$HOME/pro/botfiles/secrets/local/notion.rc" ]; then
+  # shellcheck source=/dev/null
+  source "$HOME/pro/botfiles/secrets/local/notion.rc"
+fi
+
+if [ -z "${NOTION_TOKEN:-}" ] && [ -n "${NOTION_API_KEY:-}" ]; then
+  export NOTION_TOKEN="$NOTION_API_KEY"
+fi
+
+load_notion_key_from_env_file() {
+  local env_file="$1"
+  local line value
+
+  [ -f "$env_file" ] || return 0
+  line="$(grep -E '^[[:space:]]*(export[[:space:]]+)?NOTION_API_KEY=' "$env_file" | tail -n 1 || true)"
+  [ -n "$line" ] || return 0
+
+  value="${line#*=}"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+
+  if [ -n "$value" ]; then
+    export NOTION_TOKEN="$value"
+  fi
+}
+
+if [ -z "${NOTION_TOKEN:-}" ]; then
+  load_notion_key_from_env_file "$HOME/pro/personal_os/.env"
+fi
+
+if [ -z "${NOTION_TOKEN:-}" ]; then
+  echo "notion-mcp: missing NOTION_TOKEN or NOTION_API_KEY" >&2
+  echo "notion-mcp: set it in ~/pro/botfiles/secrets/local/notion.rc or ~/pro/personal_os/.env" >&2
+  exit 1
+fi
+
+export NOTION_TOKEN
+exec npx -y @notionhq/notion-mcp-server
