@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Force a fresh core-env load for hook invocations. Codex Desktop/App Server can
+# inherit an older shell env with _BOTENV_LOADED=1 and stale notification flags.
+unset _BOTENV_LOADED
+
 # Load shared cross-machine environment (BOTFILES_ROOT, UV_BIN, provider envs).
 # shellcheck disable=SC1091
 . "$HOME/pro/botfiles/.botrc"
