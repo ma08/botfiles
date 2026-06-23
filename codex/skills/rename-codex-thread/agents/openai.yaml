@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rename Codex Thread"
+  short_description: "Rename Codex app thread labels"
+  default_prompt: "Use $rename-codex-thread to rename the current Codex app thread to a clearer natural-language title."
