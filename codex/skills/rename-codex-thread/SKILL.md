@@ -9,11 +9,27 @@ description: Rename Codex app thread labels and titles in local Codex state. Use
 
 Use `scripts/rename_codex_thread.py` for all writes. The Codex app sidebar is backed by `~/.codex/state_5.sqlite` or another `state_*.sqlite` database, not just `~/.codex/session_index.jsonl`.
 
-1. Pick a concise, human-readable title.
+1. Pick a concise, human-readable title using the default format below.
 2. Identify the target thread id.
 3. Run the script with `--thread-id <id>` when known.
 4. For the active/recent thread, use `--current` only when that is clearly what the user means.
 5. Ask the user to refresh or reopen the Codex app if the old label is still cached.
+
+## Default Title Format
+
+Use this format by default:
+
+```text
+<tracker id>: <natural language explanatory title>
+```
+
+Examples:
+
+- `ZON-221: Research Stanford Autonomous Agents Lab collaboration path`
+- `owner/repo#123: Fix webhook retry idempotency`
+- `[no ticker]: Investigate local notification spam`
+
+For tracker-backed work, use the human-facing tracker identifier from task metadata or local context, such as a Linear identifier (`ZON-221`) or an equivalent GitHub issue reference (`owner/repo#123`). Do not use raw tracker UUIDs. If no Linear ticket, GitHub issue, or equivalent tracker exists, use `[no ticker]` as the prefix. The title after the colon should explain the work in natural language, not repeat the first prompt or skill invocation.
 
 ## Commands
 
@@ -22,7 +38,7 @@ Rename a known thread:
 ```bash
 python /home/azureuser/pro/botfiles/codex/skills/rename-codex-thread/scripts/rename_codex_thread.py \
   --thread-id 019eedf1-89cc-7c23-8cc7-a7d2bffd4bff \
-  --title "Find the best ways to contribute to Ambuda again"
+  --title "ZON-218: Find the best ways to contribute to Ambuda again"
 ```
 
 Rename the most recently updated unarchived thread:
@@ -30,7 +46,7 @@ Rename the most recently updated unarchived thread:
 ```bash
 python /home/azureuser/pro/botfiles/codex/skills/rename-codex-thread/scripts/rename_codex_thread.py \
   --current \
-  --title "Investigate ncmpcpp crashes and media keys"
+  --title "[no ticker]: Investigate ncmpcpp crashes and media keys"
 ```
 
 Preview recent candidates:
