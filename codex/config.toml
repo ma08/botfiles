@@ -1,6 +1,18 @@
 # Rollback option:
 # model = "gpt-5.2-codex"
+
+# Top-level defaults apply to bare `codex` (no --profile). We deliberately
+# point the default at the Azure OpenAI provider so a plain `codex` runs
+# against our Azure resource (key-based auth) and never triggers the ChatGPT
+# OAuth sign-in prompt. Previously `.botrc` shadowed bare `codex` with an
+# injected `--profile chatgpt`, which loaded chatgpt.config.toml
+# (model_provider = "openai" + forced_login_method = "chatgpt") and forced the
+# login screen. That wrapper was removed; bare `codex` is now vanilla and reads
+# these settings. Use `--profile chatgpt` / `codex-chatgpt` to opt into ChatGPT.
+model = "gpt-5.5"
+model_provider = "azure"
 model_reasoning_effort = "xhigh"
+
 web_search = "live"
 personality = "pragmatic"
 # Keep notify minimal in config.toml; execution details live in the runner script.
@@ -18,7 +30,7 @@ file_opener = "cursor"
 # top-level `profile = "..."` selector and nested `[profiles.*]` tables.
 # Activate one with `--profile <name>` (see ~/pro/botfiles/.botrc wrappers).
 history.persistence = "save-all" # Docs: https://developers.openai.com/codex/config-reference
-model = "gpt-5.5"
+
 service_tier = "default"
 # Leave history.max_bytes unset so Codex does not drop old entries via a configured byte cap.
 
