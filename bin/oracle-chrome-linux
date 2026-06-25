@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-exec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage "$@"
+case "$(uname -s)" in
+  Darwin)
+    chrome_path="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    if [ ! -x "$chrome_path" ]; then
+      echo "oracle-chrome-linux: Google Chrome not found at $chrome_path" >&2
+      exit 1
+    fi
+    exec "$chrome_path" "$@"
+    ;;
+  *)
+    if [ ! -x /usr/bin/google-chrome ]; then
+      echo "oracle-chrome-linux: /usr/bin/google-chrome not found" >&2
+      exit 1
+    fi
+    exec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage "$@"
+    ;;
+esac

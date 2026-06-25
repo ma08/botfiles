@@ -203,39 +203,39 @@ oracle() {
     export AZURE_OPENAI_API_KEY="$ORACLE_AZURE_OPENAI_API_KEY"
   fi
 
-  if ! _botfiles_oracle_is_subcommand_invocation "${args[@]}"; then
+  if ! _botfiles_oracle_is_subcommand_invocation "$@"; then
     local default_gpt55_browser=0
-    if ! _botfiles_oracle_engine_specified "${args[@]}" && ! _botfiles_oracle_model_specified "${args[@]}" && ! _botfiles_oracle_browser_requested "${args[@]}"; then
+    if ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_model_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
       default_gpt55_browser=1
-    elif _botfiles_oracle_browser_requested "${args[@]}" && ! _botfiles_oracle_model_specified "${args[@]}"; then
+    elif _botfiles_oracle_browser_requested "$@" && ! _botfiles_oracle_model_specified "$@"; then
       default_gpt55_browser=1
-    elif _botfiles_oracle_model_is_gpt55 "${args[@]}" && ! _botfiles_oracle_engine_specified "${args[@]}"; then
+    elif _botfiles_oracle_model_is_gpt55 "$@" && ! _botfiles_oracle_engine_specified "$@"; then
       default_gpt55_browser=1
     fi
 
     if [ "$default_gpt55_browser" -eq 1 ]; then
-      if ! _botfiles_oracle_engine_specified "${args[@]}" && ! _botfiles_oracle_browser_requested "${args[@]}"; then
+      if ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
         defaults+=(--engine browser)
       fi
-      if ! _botfiles_oracle_option_specified --browser-manual-login "${args[@]}"; then
+      if ! _botfiles_oracle_option_specified --browser-manual-login "$@"; then
         defaults+=(--browser-manual-login)
       fi
       local chrome_path="${ORACLE_CHROME_PATH:-$HOME/pro/botfiles/bin/oracle-chrome-linux}"
-      if [ -x "$chrome_path" ] && ! _botfiles_oracle_option_specified --browser-chrome-path "${args[@]}"; then
+      if [ -x "$chrome_path" ] && ! _botfiles_oracle_option_specified --browser-chrome-path "$@"; then
         defaults+=(--browser-chrome-path "$chrome_path")
       fi
-      if ! _botfiles_oracle_model_specified "${args[@]}"; then
+      if ! _botfiles_oracle_model_specified "$@"; then
         defaults+=(--model "5.5 Pro")
       fi
-      if ! _botfiles_oracle_option_specified --browser-model-strategy "${args[@]}"; then
+      if ! _botfiles_oracle_option_specified --browser-model-strategy "$@"; then
         defaults+=(--browser-model-strategy select)
       fi
-    elif ! _botfiles_oracle_engine_specified "${args[@]}" && ! _botfiles_oracle_browser_requested "${args[@]}"; then
+    elif ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
       defaults+=(--engine api)
-      if ! _botfiles_oracle_model_specified "${args[@]}"; then
+      if ! _botfiles_oracle_model_specified "$@"; then
         defaults+=(--model gpt-5.4-pro)
       fi
-      if ! _botfiles_oracle_route_specified "${args[@]}"; then
+      if ! _botfiles_oracle_route_specified "$@"; then
         if [ -n "${ORACLE_AZURE_OPENAI_ENDPOINT:-}" ] && [ -n "${ORACLE_AZURE_OPENAI_DEPLOYMENT:-}" ]; then
           defaults+=(--azure-endpoint "$ORACLE_AZURE_OPENAI_ENDPOINT" --azure-deployment "$ORACLE_AZURE_OPENAI_DEPLOYMENT")
           if [ -n "${ORACLE_AZURE_OPENAI_API_VERSION:-}" ]; then
@@ -244,10 +244,10 @@ oracle() {
         fi
       fi
     else
-      if ! _botfiles_oracle_model_specified "${args[@]}"; then
+      if ! _botfiles_oracle_model_specified "$@"; then
         defaults+=(--model gpt-5.4-pro)
       fi
-      if ! _botfiles_oracle_browser_requested "${args[@]}" && ! _botfiles_oracle_route_specified "${args[@]}"; then
+      if ! _botfiles_oracle_browser_requested "$@" && ! _botfiles_oracle_route_specified "$@"; then
         if [ -n "${ORACLE_AZURE_OPENAI_ENDPOINT:-}" ] && [ -n "${ORACLE_AZURE_OPENAI_DEPLOYMENT:-}" ]; then
           defaults+=(--azure-endpoint "$ORACLE_AZURE_OPENAI_ENDPOINT" --azure-deployment "$ORACLE_AZURE_OPENAI_DEPLOYMENT")
           if [ -n "${ORACLE_AZURE_OPENAI_API_VERSION:-}" ]; then
@@ -266,8 +266,14 @@ oracle() {
     oracle_cmd+=("${args[@]}")
   fi
 
-  local effective_args=("${defaults[@]}" "${args[@]}")
-  if [ -z "${DISPLAY:-}" ] && _botfiles_oracle_browser_requested "${effective_args[@]}" && command -v xvfb-run >/dev/null 2>&1; then
+  local effective_args=()
+  if [ "${#defaults[@]}" -gt 0 ]; then
+    effective_args+=("${defaults[@]}")
+  fi
+  if [ "${#args[@]}" -gt 0 ]; then
+    effective_args+=("${args[@]}")
+  fi
+  if [ "${#effective_args[@]}" -gt 0 ] && [ -z "${DISPLAY:-}" ] && _botfiles_oracle_browser_requested "${effective_args[@]}" && command -v xvfb-run >/dev/null 2>&1; then
     local xvfb_cmd=(xvfb-run -a)
     xvfb_cmd+=("${oracle_cmd[@]}")
     _botfiles_oracle_exec_node24 "${xvfb_cmd[@]}"

@@ -177,6 +177,10 @@ sudo apt-get install -y poppler-utils
 
 Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream pulls stay simple. Install Poppler at the machine level, and for one-off Python PDF work prefer `uv run --with reportlab,pdfplumber,pypdf ...` from a task scratchpad instead of mutating arbitrary project environments.
 
+## Mac Keep-Awake GUI
+
+For Mac lid-closed keep-awake workflows, prefer the free Amphetamine menu-bar app plus its official Power Protect / Enhancer guidance instead of maintaining a custom `pmset` wrapper. See [`docs/mac-keep-awake-amphetamine.md`](docs/mac-keep-awake-amphetamine.md).
+
 ## Quick Setup
 
 1. **Clone the repository**

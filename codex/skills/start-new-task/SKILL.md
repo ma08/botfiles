@@ -4,8 +4,9 @@ description: >-
   Initialize a new task folder with status.md, user_inputs/initial.md,
   user_inputs/input_artifacts/, task-progress-artifacts/, and
   task-progress-artifacts/scratchpad/. Supports GitHub issue URL inputs,
-  Linear issue URL inputs, tracker-informed slugs, and machine/zellij
-  metadata capture with optional live-session issue block sync.
+  Linear issue URL inputs, default Linear issue creation for trackerless
+  starts, tracker-informed slugs, and machine/zellij metadata capture with
+  optional live-session issue block sync.
 ---
 
 # Start New Task
@@ -66,6 +67,22 @@ Use output fields:
 - `Agent Session ID`
 - `Zellij Session`
 - `Zellij Link`
+
+### Step 2A: Create Linear Tracker For Trackerless Starts
+If `Tracker Kind` is `none`, create a new Linear ticket before slugging unless the user explicitly asked for local-only/no-tracker work or named a different tracker.
+
+1. Use the `linear` skill / Linear MCP tools to create the issue.
+2. Infer the most appropriate team/project/labels from local context when obvious; otherwise default to the normal personal workflow team and keep project unset.
+3. Include the user's original description, concise goal, likely scope, and acceptance criteria in the Linear issue.
+4. Assign to the user when that is the established workspace convention.
+5. After creation, rerun `resolve_task_context.py` with the new Linear issue URL and use the resulting tracker-aware fields for all later steps.
+6. If Linear tooling/auth is unavailable, continue in degraded local-only mode, record why no tracker was created in `status.md`, and tell the user.
+
+Skip this step only when:
+- the original description already contains a GitHub or Linear tracker,
+- the user explicitly says not to create a tracker,
+- the user explicitly asks for a different tracking destination,
+- or Linear creation is blocked and degraded local-only mode is the only viable path.
 
 ### Step 3: Slug and Folder Naming
 - If the primary tracker is GitHub, slug format is `repo-issue-<number>-<title>`.
@@ -203,4 +220,5 @@ The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`
 - No `SYSTEM_NAME`: fallback to hostname, then `unknown`.
 - No zellij session: `Zellij Session: none`, `Zellij Link: none`.
 - No GitHub CLI/auth: skip issue-body update, keep local metadata.
+- No Linear tooling/auth for trackerless starts: create the local task folder, record why no Linear tracker was created, and do not block task start.
 - No tracker URL: local workflow only.
