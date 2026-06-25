@@ -10,8 +10,11 @@
 # login screen. That wrapper was removed; bare `codex` is now vanilla and reads
 # these settings. Use `--profile chatgpt` / `codex-chatgpt` to opt into ChatGPT.
 model = "gpt-5.5"
-model_provider = "azure"
 model_reasoning_effort = "xhigh"
+
+# Use this if you want default profile to use azure
+# (necessary for codex desktop to use azure - useful when out of usage limit)
+# model_provider = "azure"
 
 web_search = "live"
 personality = "pragmatic"
