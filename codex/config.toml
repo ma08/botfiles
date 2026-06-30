@@ -1,19 +1,19 @@
+# Keep vanilla `codex` / `codex --yolo` on the persistent local ChatGPT login.
+# `cli_auth_credentials_store = "file"` makes the cache explicit at
+# `$CODEX_HOME/auth.json` (normally `~/.codex/auth.json`) instead of relying on
+# keyring/auto behavior on SSH VMs.
+cli_auth_credentials_store = "file"
+forced_login_method = "chatgpt"
+
 # Rollback option:
 # model = "gpt-5.2-codex"
-
-# Top-level defaults apply to bare `codex` (no --profile). We deliberately
-# point the default at the Azure OpenAI provider so a plain `codex` runs
-# against our Azure resource (key-based auth) and never triggers the ChatGPT
-# OAuth sign-in prompt. Previously `.botrc` shadowed bare `codex` with an
-# injected `--profile chatgpt`, which loaded chatgpt.config.toml
-# (model_provider = "openai" + forced_login_method = "chatgpt") and forced the
-# login screen. That wrapper was removed; bare `codex` is now vanilla and reads
-# these settings. Use `--profile chatgpt` / `codex-chatgpt` to opt into ChatGPT.
 model = "gpt-5.5"
+model_provider = "openai"
 model_reasoning_effort = "xhigh"
 
-# Use this if you want default profile to use azure
-# (necessary for codex desktop to use azure - useful when out of usage limit)
+# Azure remains available explicitly with `codex --profile azure`; do not set
+# Azure as the top-level provider unless vanilla ChatGPT subscription login is
+# intentionally being bypassed.
 # model_provider = "azure"
 
 web_search = "live"
@@ -179,14 +179,13 @@ url = "https://mcp.linear.app/mcp"
 goals = true
 steer = true
 shell_snapshot = true
-# apps = true
+apps = false
 multi_agent = true
 guardian_approval = true
 # rmcp_client = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
-apps = true
 
 [apps.asdk_app_69c18c28f1188191bf5b8445c4ab0a2e]
 enabled = false

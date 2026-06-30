@@ -329,12 +329,12 @@ Set `CODEX_APP_NOTIFY_PROXY_SCOPE=global` to opt back into one shared proxy.
 Direct terminal aliases:
 
 ```bash
-codex-azure        # uses App Server notifications by default
-codex-openai       # uses App Server notifications by default
-codex-chatgpt      # uses App Server notifications by default
-codexy             # yolo/bypass via App Server notifications by default
-codexy-azure       # yolo/bypass + profile azure via notifications by default
-codexn              # codex through the App Server notification proxy
+codex-azure        # vanilla codex with --profile azure
+codex-openai       # vanilla codex with --profile openai_api
+codex-chatgpt      # vanilla codex with --profile chatgpt
+codexy             # vanilla codex --yolo
+codexy-azure       # vanilla codex --yolo --profile azure
+codexn              # legacy shim for vanilla codex
 codexn-azure        # profile azure
 codexn-openai       # profile openai_api
 codexny-azure       # bypass approvals/sandbox plus profile azure
@@ -344,42 +344,39 @@ codexn-logs         # show sanitized proxy event log
 codexn-stop         # stop proxy + app-server
 ```
 
-The legacy convenience aliases (`codex-azure`, `codexy-azure`, and related
-profile variants) read `CODEX_APP_NOTIFY_DEFAULT`, which defaults to `true`.
-Set it to `false` for a raw-Codex shell while keeping the explicit `codexn*`
-aliases config-independent:
+The App Server notification aliases are paused by default. The legacy
+convenience aliases (`codex-azure`, `codexy-azure`, `codexn*`, and related
+profile variants) now route through raw vanilla Codex so they share the normal
+`~/.codex/auth.json` ChatGPT login cache:
 
 ```bash
-export CODEX_APP_NOTIFY_DEFAULT=false
 codexy-azure
-
-codexny-azure      # still always uses the notification path
+codexny-azure
 ```
 
-Detached zellij task launches use the notification path by default when
-possible:
+Detached zellij task launches use raw Codex by default:
 
 ```bash
 start-zellij-session-for-task ZON-170
 ```
 
-Use raw Codex only for fallback/debug work:
+Opt into the paused notification path only for explicit testing:
 
 ```bash
-start-zellij-session-for-task --no-codex-app-notify ZON-170
-start-zellij-session-for-task-raw ZON-170
+start-zellij-session-for-task --codex-app-notify ZON-170
 ```
 
 Optional defaults live in `secrets/local/codex-app-server.rc`; the template is
-`secrets/templates/codex-app-server.rc.example`. The built-in defaults bind
-listeners to `127.0.0.1`; the App Server keeps a stable default port, while the
-notification proxy port is session-scoped unless you opt into global/shared
+`secrets/templates/codex-app-server.rc.example`. This file is intentionally not
+loaded by `.botenv` while the notification path is paused. The built-in defaults
+bind listeners to `127.0.0.1`; the App Server keeps a stable default port, while
+the notification proxy port is session-scoped unless you opt into global/shared
 scope:
 
 ```bash
 export CODEX_APP_SERVER_PORT=17370
 export CODEX_APP_NOTIFY_PROXY_SCOPE=session
-export CODEX_APP_NOTIFY_DEFAULT=true
+export CODEX_APP_NOTIFY_DEFAULT=false
 export CODEX_APP_NOTIFY_DRY_RUN=false
 ```
 
@@ -503,33 +500,37 @@ Interactive picker behavior:
 
 ### Detached Task Session Launcher
 
-Use `start-zellij-session-for-task` when you want to kick off a second Codex run
-inside a detached zellij session without stealing the current terminal:
+Use `start-zellij-session-for-task` when you want to kick off a second coding
+agent run inside a detached zellij session without stealing the current
+terminal. Codex is the default backend; Claude and Bedrock Claude can be
+selected explicitly:
 
 ```bash
 start-zellij-session-for-task "https://linear.app/trymyzone/issue/ZON-39/define-append-only-pr-review-comment-contract-keyed-by-head-sha"
 start-zellij-session-for-task ZON-39
 start-zellij-session-for-task --target ml "Investigate flaky Linear live-session sync"
+start-zellij-session-for-task --backend claude ZON-39
+start-zellij-session-for-task --backend bedccy ZON-39
 ```
 
 Behavior:
 - Resolves tracker-aware slugs with the same shared task-status tooling used by `start-new-task`.
 - Creates a detached zellij session whose name matches the resolved task slug.
 - Renames the initial tab to `[TRACKER-ID]` when a tracker is present.
-- Launches Codex as the session's default shell so attaching lands on the live Codex UI.
-- If the detached session comes up but the pane does not visibly show Codex/start-new-task output within a short verification window, the helper fails instead of treating session creation alone as success.
-- Launches Codex through `codex-app-notify-session` by default so
-  `request_user_input` prompts can send WhatsApp/Gmail notifications through
-  the local App Server proxy.
-- Pass `--no-codex-app-notify` or use `start-zellij-session-for-task-raw` to
-  use raw Codex for fallback/debug work.
-- Uses the current machine's default Codex profile instead of forcing a profile override.
-- Clears inherited `CODEX_*` session metadata before starting the child Codex process.
-- Seeds the child interactive Codex session with the exact initial `$start-new-task <original input>` prompt.
+- Launches the selected backend as the session's default shell so attaching lands on the live agent UI.
+- If the detached session comes up but the pane does not visibly show the selected backend/start-new-task output within a short verification window, the helper fails instead of treating session creation alone as success.
+- Launches Codex through raw vanilla `codex` by default, preserving the shared
+  `~/.codex/auth.json` ChatGPT login cache.
+- `--backend claude` launches `claude --dangerously-skip-permissions`.
+- `--backend bedccy` launches `CLAUDE_CODE_USE_BEDROCK=1 claude --dangerously-skip-permissions`.
+- Pass `--codex-app-notify` only when intentionally testing the paused App
+  Server notification path; it only affects the Codex backend.
+- Uses the current machine's default Codex profile instead of forcing a profile override when the backend is Codex.
+- Clears inherited `CODEX_*` session metadata before starting a child Codex process.
+- Seeds the child interactive session with the exact initial `$start-new-task <original input>` prompt.
 - That seeded `start-new-task` flow is expected to continue through initial tracker/local context review and first-pass plan approval in the child session when enough information is already available.
-- Uses `codex-app-notify-session --dangerously-bypass-approvals-and-sandbox`,
-  preserving the current CLI equivalent of the older `--yolo` shorthand while
-  routing through the App Server notification proxy.
+- Uses `codex --dangerously-bypass-approvals-and-sandbox` for Codex launches,
+  preserving the current CLI equivalent of the older `--yolo` shorthand.
 - Prints the attach hint (`zellij attach ...`, `work-ml ...`, `work-arya ...`, or `work-agent ...`) plus the seeded initial prompt after launch.
 - Supports `--dry-run` for inspection without starting the session.
 - For remote targets, fails early if the resolved project root is not checked out on that host instead of launching an immediately exited session.

@@ -26,28 +26,19 @@ unset _botrc_dir
 # with an explicit `--profile <name>`.
 #
 # Bare `codex` is intentionally left UNWRAPPED: it runs the vanilla binary and
-# picks up the top-level `config.toml`, which is configured to use the Azure
-# OpenAI provider (model_provider = "azure" + AZURE_OPENAI_API_KEY) so no
-# ChatGPT login prompt appears. Use the explicit `codex-azure` /
-# `codex-chatgpt` / `codex-openai` helpers below to select another profile.
+# picks up the top-level `config.toml`, which is configured to use persistent
+# ChatGPT subscription auth through `~/.codex/auth.json`. Use explicit
+# `codex-azure` / `codex-openai` helpers to select non-ChatGPT providers.
 unalias codex codex-azure codex-openai codex-chatgpt \
   codexy codexy-azure codexy-openai codexy-chatgpt 2>/dev/null || true
 
 # Bare `codex` is deliberately NOT shadowed by a shell function here, so it
-# runs the vanilla binary against the Azure-configured top-level config.toml.
+# runs the vanilla binary against the ChatGPT-configured top-level config.toml.
 #
-# `_botrc_codex_default` is still used by the explicit profile helpers below
-# to route through the app-server notification session by default (unless
-# CODEX_APP_NOTIFY_DEFAULT is disabled).
+# `_botrc_codex_default` is intentionally raw Codex for now. The app-server
+# notification path is paused because it has caused auth/session drift.
 _botrc_codex_default() {
-  case "${CODEX_APP_NOTIFY_DEFAULT:-true}" in
-    0|false|FALSE|no|NO|off|OFF)
-      command codex "$@"
-      ;;
-    *)
-      codex-app-notify-session "$@"
-      ;;
-  esac
+  command codex "$@"
 }
 
 codex-azure() { _botrc_codex_default --profile azure "$@"; }
@@ -55,22 +46,24 @@ codex-openai() { _botrc_codex_default --profile openai_api "$@"; }
 codex-chatgpt() { _botrc_codex_default --profile chatgpt "$@"; }
 
 # --- Codex yolo aliases (parallel to ccy for Claude) ----------------------
-# Bare `codexy` runs vanilla yolo against the Azure top-level config.toml.
+# Bare `codexy` runs vanilla yolo against the ChatGPT top-level config.toml.
 codexy() { _botrc_codex_default --yolo "$@"; }
 codexy-azure() { _botrc_codex_default --yolo --profile azure "$@"; }
 codexy-openai() { _botrc_codex_default --yolo --profile openai_api "$@"; }
 codexy-chatgpt() { _botrc_codex_default --yolo --profile chatgpt "$@"; }
 
-# --- Codex App Server notification aliases --------------------------------
-alias codexn="codex-app-notify-session"
-alias codexn-azure="codex-app-notify-session --profile azure"
-alias codexn-openai="codex-app-notify-session --profile openai_api"
-alias codexn-chatgpt="codex-app-notify-session --profile chatgpt"
+# --- Legacy Codex notification aliases -------------------------------------
+# Notification/app-server aliases are paused; keep old names as raw Codex
+# compatibility shims so muscle memory does not accidentally start app-server.
+alias codexn="codex"
+alias codexn-azure="codex --profile azure"
+alias codexn-openai="codex --profile openai_api"
+alias codexn-chatgpt="codex --profile chatgpt"
 
-alias codexny="codex-app-notify-session --dangerously-bypass-approvals-and-sandbox"
-alias codexny-azure="codex-app-notify-session --profile azure --dangerously-bypass-approvals-and-sandbox"
-alias codexny-openai="codex-app-notify-session --profile openai_api --dangerously-bypass-approvals-and-sandbox"
-alias codexny-chatgpt="codex-app-notify-session --profile chatgpt --dangerously-bypass-approvals-and-sandbox"
+alias codexny="codex --yolo"
+alias codexny-azure="codex --yolo --profile azure"
+alias codexny-openai="codex --yolo --profile openai_api"
+alias codexny-chatgpt="codex --yolo --profile chatgpt"
 
 alias codexn-start="codex-app-notify-start"
 alias codexn-stop="codex-app-notify-stop"

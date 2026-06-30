@@ -14,5 +14,4 @@ sandbox_mode = "workspace-write"
 js_repl = false
 apps = false
 guardian_approval = true
-tui_app_server = false
 prevent_idle_sleep = false

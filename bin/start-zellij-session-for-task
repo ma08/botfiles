@@ -17,17 +17,20 @@ source "$BOTFILES_ROOT/shell/20-ssh-workflows.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  start-zellij-session-for-task [--target here|ml|arya|agent] [--project-root <path>] [--session-name <name>] [--tab-name <name>] [--no-codex-app-notify] [--dry-run] <linear-url|linear-id|github-issue-url|task description>
+  start-zellij-session-for-task [--backend codex|claude|bedccy] [--target here|ml|arya|agent] [--project-root <path>] [--session-name <name>] [--tab-name <name>] [--codex-app-notify] [--no-codex-app-notify] [--dry-run] <linear-url|linear-id|github-issue-url|task description>
 
-Starts a detached zellij session, launches Codex as the session's default
-shell, and seeds the child Codex session with the initial prompt:
+Starts a detached zellij session, launches the selected coding agent as the
+session's default shell, and seeds the child session with the initial prompt:
   $start-new-task <original input>
 
 Notes:
+  - Default backend is `codex`.
+  - `--backend claude` launches `claude --dangerously-skip-permissions`.
+  - `--backend bedccy` launches Bedrock Claude with skipped permissions.
   - Default target is `here` (the current machine).
   - Remote targets reuse the same host selection defaults as `work-ml`, `work-arya`, and `work-agent`.
-  - Uses codex-app-notify-session by default so request_user_input prompts can notify through the App Server proxy.
-  - Pass `--no-codex-app-notify` to use raw Codex for fallback/debug work.
+  - Codex uses raw vanilla `codex` by default.
+  - Pass `--codex-app-notify` only when intentionally testing the paused app-server notification path.
 EOF
 }
 
@@ -115,7 +118,7 @@ build_codex_command() {
   esac
 done < <(env)
 if ! command -v codex-app-notify-session >/dev/null 2>&1; then
-  echo "start-zellij-session-for-task: codex-app-notify-session is unavailable; rerun with --no-codex-app-notify for raw Codex fallback" >&2
+  echo "start-zellij-session-for-task: codex-app-notify-session is unavailable; rerun without --codex-app-notify for raw Codex" >&2
   exit 1
 fi
 exec codex-app-notify-session --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quoted_prompt"
@@ -125,7 +128,7 @@ exec codex-app-notify-session --dangerously-bypass-approvals-and-sandbox --no-al
   printf '%s ' \
 'while IFS="=" read -r _name _rest; do
   case "$_name" in
-    CODEX_HOME|CODEX_APP_*)
+    CODEX_HOME)
       ;;
     CODEX_*)
       unset "$_name"
@@ -135,11 +138,89 @@ done < <(env)
 exec codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen -- '"$quoted_prompt"
 }
 
+build_claude_command() {
+  local initial_prompt="$1"
+  local backend="$2"
+  local quoted_prompt
+  local provider_setup=""
+
+  printf -v quoted_prompt '%q' "$initial_prompt"
+  case "$backend" in
+    bedccy)
+      provider_setup='export CLAUDE_CODE_USE_BEDROCK=1'
+      ;;
+    claude)
+      provider_setup=':'
+      ;;
+    *)
+      die "unsupported Claude backend: $backend"
+      ;;
+  esac
+
+  printf '%s\n' \
+'while IFS="=" read -r _name _rest; do
+  case "$_name" in
+    CODEX_HOME)
+      ;;
+    CODEX_*)
+      unset "$_name"
+      ;;
+  esac
+done < <(env)
+export CODING_AGENT=claude
+export CLAUDECODE=1' \
+"$provider_setup" \
+"exec claude --dangerously-skip-permissions $quoted_prompt"
+}
+
+build_agent_command() {
+  local initial_prompt="$1"
+  local backend="$2"
+  local use_codex_app_notify="$3"
+
+  case "$backend" in
+    codex)
+      build_codex_command "$initial_prompt" "$use_codex_app_notify"
+      ;;
+    claude|bedccy)
+      build_claude_command "$initial_prompt" "$backend"
+      ;;
+    *)
+      die "unsupported backend: $backend"
+      ;;
+  esac
+}
+
+codex_notify_bootstrap_env() {
+  local backend="$1"
+  local use_codex_app_notify="$2"
+
+  if [ "$backend" != "codex" ]; then
+    return 0
+  fi
+  if [ "$use_codex_app_notify" != "true" ]; then
+    return 0
+  fi
+
+  cat <<'EOF'
+export CODEX_APP_NOTIFY_SESSION_KEY="$ZELLIJ_SESSION_NAME"
+case "${CODEX_APP_NOTIFY_PROXY_SCOPE:-session}" in
+  session|"")
+    unset CODEX_APP_NOTIFY_PROXY_PORT
+    unset CODEX_APP_NOTIFY_STATE_DIR
+    unset CODEX_APP_NOTIFY_BASE_STATE_DIR
+    unset CODEX_APP_NOTIFY_PROXY_STATE_DIR
+    ;;
+esac
+EOF
+}
+
 build_bootstrap_script() {
   local project_root="$1"
   local session_name="$2"
   local initial_prompt="$3"
-  local use_codex_app_notify="$4"
+  local backend="$4"
+  local use_codex_app_notify="$5"
   cat <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -149,19 +230,46 @@ if [ -f "\$BOTFILES_ROOT/.botenv" ]; then
   source "\$BOTFILES_ROOT/.botenv"
 fi
 export ZELLIJ_SESSION_NAME=$(printf '%q' "$session_name")
-export CODEX_APP_NOTIFY_SESSION_KEY="\$ZELLIJ_SESSION_NAME"
-case "\${CODEX_APP_NOTIFY_PROXY_SCOPE:-session}" in
-  session|"")
-    unset CODEX_APP_NOTIFY_PROXY_PORT
-    unset CODEX_APP_NOTIFY_STATE_DIR
-    unset CODEX_APP_NOTIFY_BASE_STATE_DIR
-    unset CODEX_APP_NOTIFY_PROXY_STATE_DIR
-    ;;
-esac
+$(codex_notify_bootstrap_env "$backend" "$use_codex_app_notify")
 rm -f -- "\$0" >/dev/null 2>&1 || true
 $(build_cd_command "$project_root")
-$(build_codex_command "$initial_prompt" "$use_codex_app_notify")
+$(build_agent_command "$initial_prompt" "$backend" "$use_codex_app_notify")
 EOF
+}
+
+verify_regex_for_backend() {
+  local backend="$1"
+
+  case "$backend" in
+    codex)
+      printf '(codex|OpenAI Codex|approvals-and-sandbox|start-new-task)\n'
+      ;;
+    claude|bedccy)
+      printf '(Claude|claude|bypas|dangerously-skip-permissions|start-new-task)\n'
+      ;;
+    *)
+      printf '(start-new-task)\n'
+      ;;
+  esac
+}
+
+agent_label_for_backend() {
+  local backend="$1"
+
+  case "$backend" in
+    codex)
+      printf 'Codex\n'
+      ;;
+    claude)
+      printf 'Claude\n'
+      ;;
+    bedccy)
+      printf 'Bedrock Claude\n'
+      ;;
+    *)
+      printf '%s\n' "$backend"
+      ;;
+  esac
 }
 
 build_launch_script() {
@@ -169,6 +277,7 @@ build_launch_script() {
   local tab_name="$2"
   local bootstrap_script="$3"
   local python_cmd="$4"
+  local backend="$5"
   local bootstrap_b64
   local attach_cmd
   local ensure_web_cmd
@@ -176,6 +285,8 @@ build_launch_script() {
   local create_bootstrap_cmd
   local run_cmd
   local verify_cmd
+  local verify_regex
+  local agent_label
 
   bootstrap_b64="$(
     BOOTSTRAP_SCRIPT="$bootstrap_script" "$python_cmd" - <<'PY'
@@ -210,14 +321,16 @@ PY'
 'fi'
   printf -v run_cmd 'ZELLIJ_SESSION_NAME=%q zellij run -- "$bootstrap_path" >/dev/null 2>&1' "$session_name"
   printf -v rename_cmd 'zellij -s %q action rename-tab %q >/dev/null 2>&1 || true' "$session_name" "$tab_name"
+  verify_regex="$(verify_regex_for_backend "$backend")"
+  agent_label="$(agent_label_for_backend "$backend")"
   printf -v verify_cmd '%s\n' \
 'for _attempt in 1 2 3 4 5 6 7 8 9 10; do' \
-'  if zellij -s '"$session_name"' action dump-screen -f -p terminal_1 2>/dev/null | grep -Eq "(codex|OpenAI Codex|approvals-and-sandbox|start-new-task)"; then' \
+'  if zellij -s '"$session_name"' action dump-screen -f -p terminal_1 2>/dev/null | grep -Eq '"$(printf %q "$verify_regex")"'; then' \
 '    exit 0' \
 '  fi' \
 '  sleep 1' \
 'done' \
-'echo "start-zellij-session-for-task: detached session came up, but Codex did not become visible in the pane" >&2' \
+'echo "start-zellij-session-for-task: detached session came up, but '"$agent_label"' did not become visible in the pane" >&2' \
 'exit 1'
 
   printf 'set -euo pipefail\n%s\n%s\n%s\n%s\nsleep 1\n%s\n%s\n' \
@@ -229,12 +342,33 @@ PY'
     "$verify_cmd"
 }
 
+normalize_backend() {
+  local value="$1"
+
+  case "$value" in
+    codex)
+      printf 'codex\n'
+      ;;
+    raw-codex|codex-raw)
+      printf 'codex-raw\n'
+      ;;
+    claude|ccy)
+      printf 'claude\n'
+      ;;
+    bedccy|bedrock-claude|claude-bedrock)
+      printf 'bedccy\n'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 session_exists_local() {
   local session_name="$1"
 
-  zellij list-sessions --reverse --no-formatting 2>/dev/null \
+  zellij list-sessions --short --no-formatting 2>/dev/null \
     | sed '/^No active zellij sessions found\.?$/d' \
-    | sed 's/ \[Created.*$//' \
     | grep -Fxq "$session_name"
 }
 
@@ -243,7 +377,7 @@ session_exists_remote() {
   local session_name="$2"
 
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
-    "zellij list-sessions --reverse --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\\.?$/d' | sed 's/ \\[Created.*$//'" \
+    "zellij list-sessions --short --no-formatting 2>/dev/null | sed '/^No active zellij sessions found\\.?$/d'" \
     | grep -Fxq "$session_name"
 }
 
@@ -332,7 +466,8 @@ project_root="$PWD"
 session_name_override=""
 tab_name_override=""
 dry_run=0
-codex_app_notify_env="${START_ZELLIJ_SESSION_CODEX_APP_NOTIFY:-true}"
+backend="${START_ZELLIJ_SESSION_BACKEND:-codex}"
+codex_app_notify_env="${START_ZELLIJ_SESSION_CODEX_APP_NOTIFY:-false}"
 case "$codex_app_notify_env" in
   0|false|FALSE|no|NO|off|OFF)
     codex_app_notify="false"
@@ -344,6 +479,22 @@ esac
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --backend)
+      backend="${2:-}"
+      shift 2
+      ;;
+    --codex)
+      backend="codex"
+      shift
+      ;;
+    --claude)
+      backend="claude"
+      shift
+      ;;
+    --bedccy|--bedrock-claude)
+      backend="bedccy"
+      shift
+      ;;
     --target)
       target="${2:-}"
       shift 2
@@ -366,6 +517,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-codex-app-notify)
       codex_app_notify="false"
+      shift
+      ;;
+    --codex-app-notify)
+      codex_app_notify="true"
       shift
       ;;
     -h|--help)
@@ -392,6 +547,13 @@ done
 }
 
 description="$*"
+
+normalized_backend="$(normalize_backend "$backend")" || die "unsupported backend: $backend"
+backend="$normalized_backend"
+if [ "$backend" = "codex-raw" ]; then
+  backend="codex"
+  codex_app_notify="false"
+fi
 
 project_root_abs="$(cd "$project_root" && pwd -P)"
 python_cmd="$(pick_python_cmd)" || die "python or python3 is required on the launching machine"
@@ -422,8 +584,8 @@ else
 fi
 
 initial_prompt="\$start-new-task $description"
-bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$session_name" "$initial_prompt" "$codex_app_notify")"
-launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script" "$python_cmd")"
+bootstrap_script="$(build_bootstrap_script "$canonical_project_root" "$session_name" "$initial_prompt" "$backend" "$codex_app_notify")"
+launch_script="$(build_launch_script "$session_name" "$tab_name" "$bootstrap_script" "$python_cmd" "$backend")"
 attach_hint="$(attach_hint_for_target "$target" "$session_name")"
 
 resolved_host="$(resolve_target_host "$target")" || die "unsupported or unreachable target: $target"
@@ -457,7 +619,12 @@ if [ "$dry_run" -eq 1 ]; then
   printf 'Tracker Kind: %s\n' "$tracker_kind"
   printf 'Tracker URL: %s\n' "$tracker_url"
   printf 'Canonical Project Root: %s\n' "$canonical_project_root"
-  printf 'Codex App Notify: %s\n' "$codex_app_notify"
+  printf 'Backend: %s\n' "$backend"
+  if [ "$backend" = "codex" ]; then
+    printf 'Codex App Notify: %s\n' "$codex_app_notify"
+  else
+    printf 'Codex App Notify: n/a\n'
+  fi
   printf 'Initial Prompt: %s\n' "$initial_prompt"
   printf 'Attach Hint: %s\n' "$attach_hint"
   printf 'Launch Script:\n%s' "$launch_script"
@@ -473,7 +640,12 @@ if [ "$target" = "here" ] || [ "$resolved_host" = "local" ]; then
   printf 'Tab: %s\n' "$tab_name"
   printf 'Tracker: %s\n' "$tracker_url"
   printf 'Project Root: %s\n' "$canonical_project_root"
-  printf 'Codex App Notify: %s\n' "$codex_app_notify"
+  printf 'Backend: %s\n' "$backend"
+  if [ "$backend" = "codex" ]; then
+    printf 'Codex App Notify: %s\n' "$codex_app_notify"
+  else
+    printf 'Codex App Notify: n/a\n'
+  fi
   printf 'Attach: %s\n' "$attach_hint"
   printf 'Initial Prompt: %s\n' "$initial_prompt"
   printf 'Zellij Link: %s\n' "$zellij_link"
@@ -488,7 +660,12 @@ printf 'Session: %s\n' "$session_name"
 printf 'Tab: %s\n' "$tab_name"
 printf 'Tracker: %s\n' "$tracker_url"
 printf 'Project Root: %s\n' "$canonical_project_root"
-printf 'Codex App Notify: %s\n' "$codex_app_notify"
+printf 'Backend: %s\n' "$backend"
+if [ "$backend" = "codex" ]; then
+  printf 'Codex App Notify: %s\n' "$codex_app_notify"
+else
+  printf 'Codex App Notify: n/a\n'
+fi
 printf 'Attach: %s\n' "$attach_hint"
 printf 'Initial Prompt: %s\n' "$initial_prompt"
 printf 'Zellij Link: remote-machine-local\n'
