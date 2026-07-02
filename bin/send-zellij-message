@@ -50,6 +50,52 @@ def fail(message: str) -> int:
     return 2
 
 
+def explicit_zellij_result(args: argparse.Namespace, resolution_result: dict) -> dict:
+    current_machine = resolution_result.get("current_machine", TRACKER_KIND_NONE)
+    return {
+        "status": "resolved",
+        "resolution_source": "zellij_session_explicit",
+        "current_machine": current_machine,
+        "query": args.zellij_session,
+        "primary": {
+            "project_root": TRACKER_KIND_NONE,
+            "task_status_root": TRACKER_KIND_NONE,
+            "task_dir": TRACKER_KIND_NONE,
+            "status_file": TRACKER_KIND_NONE,
+            "metadata": {
+                "tracker_kind": TRACKER_KIND_NONE,
+                "tracker_url": TRACKER_KIND_NONE,
+                "tracker_human_id": TRACKER_KIND_NONE,
+                "tracker_title": TRACKER_KIND_NONE,
+                "machine": current_machine,
+                "coding_agent": TRACKER_KIND_NONE,
+                "agent_session_id": TRACKER_KIND_NONE,
+                "task_folder": TRACKER_KIND_NONE,
+                "task_status_path": TRACKER_KIND_NONE,
+                "transcript_path": TRACKER_KIND_NONE,
+                "workspace_path": TRACKER_KIND_NONE,
+                "zellij_session": args.zellij_session,
+                "zellij_link": TRACKER_KIND_NONE,
+                "remote_session_anchor_kind": TRACKER_KIND_NONE,
+                "remote_session_anchor_id": TRACKER_KIND_NONE,
+                "github_issue": TRACKER_KIND_NONE,
+                "github_repo": TRACKER_KIND_NONE,
+                "github_issue_number": TRACKER_KIND_NONE,
+                "linear_issue_id": TRACKER_KIND_NONE,
+                "linear_issue_identifier": TRACKER_KIND_NONE,
+                "linear_team_id": TRACKER_KIND_NONE,
+                "linear_team_name": TRACKER_KIND_NONE,
+                "linear_project_id": TRACKER_KIND_NONE,
+                "linear_project_name": TRACKER_KIND_NONE,
+            },
+            "recap": [
+                "What this task is about: Explicit zellij session override was used.",
+                "Current status: Task metadata was ambiguous, so this send targets the local session only.",
+            ],
+        },
+    }
+
+
 def should_send_codex_confirm_enter(message_text: str, client_commands: list[str]) -> bool:
     needs_confirm = "\n" in message_text or len(message_text) >= CODEX_SECONDARY_ENTER_THRESHOLD_CHARS
     if not needs_confirm:
@@ -74,17 +120,20 @@ def main() -> int:
         zellij_session=args.zellij_session,
     )
     if result.get("status") != "resolved":
-        if args.json:
-            print(json_dump(result))
+        if args.zellij_session and result.get("status") == "ambiguous":
+            result = explicit_zellij_result(args, result)
         else:
-            print(
-                result.get(
-                    "warning",
-                    "send-zellij-message: unable to resolve a unique target.",
-                ),
-                file=sys.stderr,
-            )
-        return 2
+            if args.json:
+                print(json_dump(result))
+            else:
+                print(
+                    result.get(
+                        "warning",
+                        "send-zellij-message: unable to resolve a unique target.",
+                    ),
+                    file=sys.stderr,
+                )
+            return 2
 
     primary = result["primary"]
     metadata = primary["metadata"]
