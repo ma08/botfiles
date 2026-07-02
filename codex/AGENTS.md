@@ -161,6 +161,8 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - For regular non-Symphony multi-session work, prefer the shared skills `cross-session-context`, `cross-session-message`, and `pr-autoreview-loop`.
 - Target other sessions by tracker ref or task slug first. Use `--task-dir`, `--status-file`, or `--zellij-session` only for lower-level or debug workflows.
 - Treat task/status metadata as the primary source of truth, transcript tail as a targeted fallback, and live zellij inspection as diagnostic context.
+- When running inside Codex Desktop and the target is another Codex Desktop thread, use the `codex_app` thread tools (`list_threads`, `read_thread`, `send_message_to_thread`) instead of zellij. Omit model/thinking overrides unless explicitly requested.
+- Codex CLI and Claude Code should not assume they can message Codex Desktop threads unless an explicit app/tool bridge is available. Do not write SQLite state, JSONL logs, or notification proxy state to simulate a human prompt.
 - Keep cross-session sends preview-first. `send-zellij-message` should stay in dry-run mode until the resolved session/tab target is clearly correct; use `--execute` and `--submit enter` explicitly.
 - For long or multiline Codex prompts, `send-zellij-message` now adds a delayed confirm Enter automatically after `--submit enter` because one immediate Enter can leave the prompt staged in the composer.
 - Do not use cross-session message send as remote control. It is for bounded prompt delivery into a known live target only.

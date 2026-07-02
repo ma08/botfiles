@@ -1,7 +1,8 @@
 # Cross-Session Orchestration Contract
 
 These helpers define the v1 contract for non-Symphony cross-session work in
-regular Codex and Claude sessions.
+regular Codex and Claude sessions. They also document the Codex Desktop
+app-thread transport when the runtime exposes `codex_app` tools.
 
 ## Target Resolution
 
@@ -12,6 +13,8 @@ Use tracker-first targeting by default. Resolve targets in this order:
 3. `--zellij-session`
 4. tracker reference (`ZON-71`, Linear URL, GitHub issue URL)
 5. task slug
+6. Codex Desktop thread search, when `codex_app` tools are available and no
+   task/zellij target resolves or the user explicitly targets a Desktop thread
 
 If resolution is ambiguous, stop and show candidate task homes instead of
 guessing.
@@ -24,13 +27,39 @@ guessing.
 - tracker metadata when present
 - transcript tail as a targeted fallback when a transcript path is available
 - zellij session/tab/client details as diagnostics, not the primary contract
+- Codex Desktop `read_thread` status and turn summaries when the target is an
+  app thread and `codex_app` tools are available
 
 Transcript fallback supports Codex session JSONL, Claude per-session JSONL, and
 Claude `history.jsonl` fallback filtered by session id when available.
 
+Codex Desktop thread context is app-level context. It is useful for current turn
+status and summaries, but it does not replace task status files for tracked
+work.
+
+## Transport Capability
+
+Use the highest-level supported transport available in the current runtime:
+
+- Codex Desktop -> Codex Desktop thread: use `list_threads`, `read_thread`, and
+  `send_message_to_thread`.
+- Codex Desktop -> zellij-backed terminal session: use the zellij helpers after
+  target resolution.
+- Codex CLI or Claude Code -> zellij-backed terminal session: use the zellij
+  helpers.
+- Codex CLI or Claude Code -> Codex Desktop thread: no universal first-class
+  transport is assumed. Use an explicit supported bridge if one is available, or
+  ask the user to send from a Codex Desktop thread.
+
+Do not treat local Codex app SQLite state, JSONL logs, or notification proxy
+state as a prompt-injection API. Those may be valid for read-only diagnostics or
+label management when a dedicated skill says so, but they are not a standard way
+to make a Desktop thread receive a new human prompt.
+
 ## Message Send
 
-`send-zellij-message` is preview-first and bounded:
+`send-zellij-message` is preview-first and bounded for zellij-backed terminal
+sessions:
 
 - dry-run is the default
 - `--execute` is required to perform a write
@@ -45,6 +74,11 @@ Claude `history.jsonl` fallback filtered by session id when available.
   choose the tab from `[TRACKER-ID]` or a single-tab session
 
 This helper is for bounded prompt delivery, not remote control.
+
+For Codex Desktop threads, `send_message_to_thread` is the actual send. Preview
+means resolving the target thread, surfacing ambiguity, and reading the thread
+first when needed. Omit model and reasoning overrides unless the user explicitly
+asks for them.
 
 ## PR Autoreview
 
