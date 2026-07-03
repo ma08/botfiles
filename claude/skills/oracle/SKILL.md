@@ -16,6 +16,7 @@ Recommended defaults:
 - Engine: browser (`--engine browser`)
 - Model: ChatGPT GPT‑5.5 Pro via the picker label `--model "5.5 Pro"`
 - Browser mode: manual login with the local Chrome wrapper when available (`--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --browser-model-strategy current`)
+- Local package route: the wrapper currently prefers a pinned source build at `~/pro/lab/tools/oracle-main` commit `bda0326d43b02c5346e742692865fc21d8c5fc35` when present and verified, then falls back to `@steipete/oracle@latest`. Use `ORACLE_SOURCE_MAIN=0` to force npm latest, `ORACLE_SOURCE_MAIN=require` to require the source build, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route.
 - Attachments: directories/globs + excludes; avoid secrets. For text/code-heavy context, prefer compact prompts or inline delivery (`--browser-inline-files` / `--browser-attachments never`) before upload mode; reserve uploads/bundles for PDFs, images, binaries, or file sets that truly cannot fit inline.
 - Fallback: use GPT‑5.4 Pro only after repeated GPT‑5.5 Pro availability/access failures. Do not downgrade for normal latency, `in_progress` status, prompt-size issues, or browser attachment upload problems; fix the local issue or use a compact prompt and retry GPT‑5.5 Pro first.
 
@@ -29,7 +30,8 @@ Recommended defaults:
 ## Commands (preferred)
 
 - Show help (once/session):
-  - `npx -y @steipete/oracle --help`
+  - `oracle --help`
+  - `ORACLE_SOURCE_MAIN_VERBOSE=1 oracle --version`
 
 - Preview (no tokens):
   - `npx -y @steipete/oracle --dry-run summary -p "<task>" --file "src/**" --file "!**/*.test.*"`
@@ -53,6 +55,9 @@ Recommended defaults:
 - Manual paste fallback (assemble bundle, copy to clipboard):
   - `npx -y @steipete/oracle --render --copy -p "<task>" --file "src/**"`
   - Note: `--copy` is a hidden alias for `--copy-markdown`.
+
+- Force npm latest instead of the pinned source build:
+  - `ORACLE_SOURCE_MAIN=0 oracle --version`
 
 ## Attaching files (`--file`)
 

@@ -15,6 +15,7 @@ The frontmatter model controls the Claude subagent runtime, not the Oracle targe
 Your job:
 - Own exactly one Oracle session per assignment.
 - Use the local `oracle` wrapper.
+- Expect the local wrapper to prefer the pinned source build at `~/pro/lab/tools/oracle-main` when available; use `ORACLE_SOURCE_MAIN=0` only when explicitly asked to force npm latest.
 - Default the Oracle run to ChatGPT GPT-5.5 Pro in browser/manual-login mode through the local `oracle` wrapper unless the parent or user explicitly requests another model/engine.
 - Prefer the wrapper default command shape (`oracle -p ... --file ...`) or the explicit verified path: `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current ...`.
 - For text/source-code contexts, prefer compact prompts or `--browser-inline-files` before ChatGPT upload mode; reserve upload/bundle mode for PDFs, images, binaries, or file sets that truly cannot fit inline.

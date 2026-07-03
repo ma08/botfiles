@@ -28,7 +28,7 @@ Create a concise Markdown handoff for Codex CLI `/goal <path>` that embeds an Or
    - Run the local wrapper with GPT-5.5 Pro browser/manual-login mode:
 
 ```bash
-oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy select -p "<review prompt>" --file "<focused paths>"
+oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current -p "<review prompt>" --file "<focused paths>"
 ```
 
    - Wait or reattach until Oracle completes. Do not downgrade for normal latency, `in_progress`, prompt-size issues, polling-shell death, or browser upload friction; compact or reattach first. Fallback from GPT-5.5 Pro only after repeated availability or access failures.

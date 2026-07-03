@@ -44,6 +44,95 @@ _botfiles_oracle_exec_node24() {
   return 1
 }
 
+_botfiles_oracle_source_main_commit() {
+  printf '%s\n' "${ORACLE_SOURCE_MAIN_COMMIT:-bda0326d43b02c5346e742692865fc21d8c5fc35}"
+}
+
+_botfiles_oracle_source_main_root() {
+  printf '%s\n' "${ORACLE_SOURCE_MAIN_ROOT:-$HOME/pro/lab/tools/oracle-main}"
+}
+
+_botfiles_oracle_source_main_enabled() {
+  case "${ORACLE_SOURCE_MAIN:-1}" in
+    0|false|False|FALSE|no|No|NO|off|Off|OFF|npm|latest)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+_botfiles_oracle_source_main_required() {
+  case "${ORACLE_SOURCE_MAIN:-1}" in
+    require|required|must)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+_botfiles_oracle_source_main_error() {
+  if _botfiles_oracle_source_main_required; then
+    echo "oracle wrapper: pinned source build unavailable: $*" >&2
+    return 1
+  fi
+  if [ -n "${ORACLE_SOURCE_MAIN_VERBOSE:-}" ]; then
+    echo "oracle wrapper: using npm latest fallback because pinned source build is unavailable: $*" >&2
+  fi
+  return 0
+}
+
+_botfiles_oracle_resolve_command() {
+  local binary="$1"
+  local dist_binary
+
+  BOTFILES_ORACLE_RESOLVED_CMD=()
+
+  case "$binary" in
+    oracle)
+      dist_binary="oracle-cli.js"
+      ;;
+    oracle-mcp)
+      dist_binary="oracle-mcp.js"
+      ;;
+    *)
+      echo "oracle wrapper: unknown binary '$binary'" >&2
+      return 1
+      ;;
+  esac
+
+  if _botfiles_oracle_source_main_enabled; then
+    local source_root source_commit source_head source_bin
+    source_root="$(_botfiles_oracle_source_main_root)"
+    source_commit="$(_botfiles_oracle_source_main_commit)"
+    source_bin="$source_root/dist/bin/$dist_binary"
+
+    if [ ! -r "$source_bin" ]; then
+      _botfiles_oracle_source_main_error "missing $source_bin" || return 1
+    elif [ ! -d "$source_root/.git" ]; then
+      _botfiles_oracle_source_main_error "missing $source_root/.git" || return 1
+    elif ! command -v git >/dev/null 2>&1; then
+      _botfiles_oracle_source_main_error "git is not available to verify $source_root" || return 1
+    else
+      source_head="$(git -C "$source_root" rev-parse HEAD 2>/dev/null || true)"
+      if [ "$source_head" = "$source_commit" ]; then
+        if [ -n "${ORACLE_SOURCE_MAIN_VERBOSE:-}" ]; then
+          echo "oracle wrapper: using pinned source build $source_commit at $source_root" >&2
+        fi
+        BOTFILES_ORACLE_RESOLVED_CMD=(node "$source_bin")
+        return 0
+      fi
+      _botfiles_oracle_source_main_error "$source_root is at ${source_head:-unknown}, expected $source_commit" || return 1
+    fi
+  fi
+
+  if [ "$binary" = "oracle-mcp" ]; then
+    BOTFILES_ORACLE_RESOLVED_CMD=(npx -y @steipete/oracle@latest oracle-mcp)
+  else
+    BOTFILES_ORACLE_RESOLVED_CMD=(npx -y @steipete/oracle@latest)
+  fi
+  return 0
+}
+
 _botfiles_oracle_browser_requested() {
   local expect_engine_value=0
   local arg
@@ -258,7 +347,8 @@ oracle() {
     fi
   fi
 
-  local oracle_cmd=(npx -y @steipete/oracle@latest)
+  _botfiles_oracle_resolve_command oracle || return 1
+  local oracle_cmd=("${BOTFILES_ORACLE_RESOLVED_CMD[@]}")
   if [ "${#defaults[@]}" -gt 0 ]; then
     oracle_cmd+=("${defaults[@]}")
   fi
@@ -283,5 +373,10 @@ oracle() {
 }
 
 oracle-mcp() {
-  _botfiles_oracle_exec_node24 npx -y @steipete/oracle@latest oracle-mcp "$@"
+  _botfiles_oracle_resolve_command oracle-mcp || return 1
+  local oracle_cmd=("${BOTFILES_ORACLE_RESOLVED_CMD[@]}")
+  if [ "$#" -gt 0 ]; then
+    oracle_cmd+=("$@")
+  fi
+  _botfiles_oracle_exec_node24 "${oracle_cmd[@]}"
 }
