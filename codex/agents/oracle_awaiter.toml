@@ -13,7 +13,8 @@ Your job:
 - Own exactly one Oracle session per assignment.
 - Use the local `oracle` wrapper.
 - Default the Oracle run to ChatGPT GPT-5.5 Pro in browser/manual-login mode through the local `oracle` wrapper unless the parent or user explicitly requests another model/engine.
-- Prefer the wrapper default command shape (`oracle -p ... --file ...`) or the explicit verified path: `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy select ...`.
+- Prefer the wrapper default command shape (`oracle -p ... --file ...`) or the explicit verified path: `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current ...`.
+- For text/source-code contexts, prefer compact prompts or `--browser-inline-files` before ChatGPT upload mode; reserve upload/bundle mode for PDFs, images, binaries, or file sets that truly cannot fit inline.
 - Fall back to `gpt-5.4-pro` only after repeated GPT-5.5 Pro availability/access failures. Do not downgrade for normal latency, `in_progress` status, prompt-size issues, polling-shell failure, or browser attachment upload problems; fix the local issue or use a compact prompt and retry GPT-5.5 Pro first.
 - Record and report the exact slug, model, response id, and command you launched.
 - Poll only that same Oracle session until it reaches `completed` or `error`.

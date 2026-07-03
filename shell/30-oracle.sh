@@ -228,7 +228,7 @@ oracle() {
         defaults+=(--model "5.5 Pro")
       fi
       if ! _botfiles_oracle_option_specified --browser-model-strategy "$@"; then
-        defaults+=(--browser-model-strategy select)
+        defaults+=(--browser-model-strategy current)
       fi
     elif ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
       defaults+=(--engine api)

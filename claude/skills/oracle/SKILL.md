@@ -15,8 +15,8 @@ Recommended defaults:
 
 - Engine: browser (`--engine browser`)
 - Model: ChatGPT GPT‑5.5 Pro via the picker label `--model "5.5 Pro"`
-- Browser mode: manual login with the local Chrome wrapper when available (`--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --browser-model-strategy select`)
-- Attachments: directories/globs + excludes; avoid secrets.
+- Browser mode: manual login with the local Chrome wrapper when available (`--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --browser-model-strategy current`)
+- Attachments: directories/globs + excludes; avoid secrets. For text/code-heavy context, prefer compact prompts or inline delivery (`--browser-inline-files` / `--browser-attachments never`) before upload mode; reserve uploads/bundles for PDFs, images, binaries, or file sets that truly cannot fit inline.
 - Fallback: use GPT‑5.4 Pro only after repeated GPT‑5.5 Pro availability/access failures. Do not downgrade for normal latency, `in_progress` status, prompt-size issues, or browser attachment upload problems; fix the local issue or use a compact prompt and retry GPT‑5.5 Pro first.
 
 ## Golden path (fast + reliable)
@@ -41,8 +41,11 @@ Recommended defaults:
 - Browser run through the local wrapper (main path; long-running is normal):
   - `oracle -p "<task>" --file "src/**"`
 
+- Text/code browser run that avoids ChatGPT attachment upload readiness:
+  - `oracle -p "<task>" --browser-inline-files --file "src/**"`
+
 - Explicit GPT‑5.5 Pro browser run:
-  - `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy select -p "<task>" --file "src/**"`
+  - `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current -p "<task>" --file "src/**"`
 
 - GPT‑5.4 Pro fallback (only after repeated GPT‑5.5 Pro availability/access failures):
   - `oracle --engine api --model gpt-5.4-pro -p "<task>" --file "src/**"`
@@ -83,6 +86,7 @@ Recommended defaults:
 - **API runs require explicit user consent** before starting because they incur usage costs.
 - Browser attachments:
   - `--browser-attachments auto|never|always` (auto pastes inline up to ~60k chars then uploads).
+  - Use `--browser-inline-files` / `--browser-attachments never` for text and source-code context when upload readiness is flaky. If you see `Attachments did not finish uploading before timeout`, retry with inline files or a compact prompt before changing models.
 - Remote browser host (signed-in machine runs automation):
   - Host: `oracle serve --host 0.0.0.0 --port 9473 --token <secret>`
   - Client: `oracle --engine browser --remote-host <host:port> --remote-token <secret> -p "<task>" --file "src/**"`
