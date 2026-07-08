@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Fable Advisor"
+  short_description: "Subscription-backed Fable reviews"
+  default_prompt: "Use $claude-fable-advisor to review this plan with subscription-backed Fable 5."
