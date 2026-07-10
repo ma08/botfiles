@@ -159,6 +159,7 @@ Subagents are bounded workers, not co-owners of the goal.
 - A `stale_pending_inspection` lease is still blocking state: every mutation-capable preflight must fail until inspection ends with an explicit release; it cannot coexist with a replacement lease on the same target.
 - Database- or service-mutating test runners require an exclusive resource lease and do not overlap a writer.
 - Reviewers use fresh context and read-only scope. Prefer the strongest current native reasoning model at a controlled reasoning level; do not hard-code a stale model as permanent frontier policy.
+- When using native GPT-5.6 Sol, Terra, or Luna subagents, always select `max` reasoning effort for workers, explorers, and reviewers.
 - Oracle or cross-provider review is optional diversity/tie-breaking unless the accepted plan makes it mandatory.
 
 ## Safety And Recovery
