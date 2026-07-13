@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rename Active Codex Threads"
+  short_description: "Refresh recent Codex thread titles"
+  default_prompt: "Use $rename-active-codex-threads to update all recently active Codex thread names now."
