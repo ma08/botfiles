@@ -1,4 +1,0 @@
-interface:
-  display_name: "Goal Traceability Loop"
-  short_description: "Goal-driven feature and validation matrix loop"
-  default_prompt: "Use $goal-traceability-loop to turn this accepted spec into a goal-driven implementation loop with a feature/test traceability matrix."
