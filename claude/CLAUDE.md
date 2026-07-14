@@ -79,7 +79,7 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - `~/pro/botfiles/codex/skills/oracle` and `~/pro/botfiles/claude/skills/oracle` are local Oracle workflow skills derived from `steipete/oracle/skills/oracle`; they intentionally include local GPT-5.5 Pro browser defaults, so do not overwrite them from upstream without reapplying the local policy.
 - Keep the Oracle skill copies, `AGENTS.md` / `CLAUDE.md`, the Oracle awaiter agents, and the botfiles shell wrapper aligned when Oracle defaults change.
 - On machines where the default Node runtime is below 22, use the local `oracle` and `oracle-mcp` wrappers from `~/pro/botfiles/bin/` (symlinked into `~/.local/bin` by `setup.sh` and also loaded as shell functions from `~/pro/botfiles/.botrc`) instead of raw `npx -y @steipete/oracle`.
-- Until npm `@steipete/oracle@latest` contains the upstream browser fixes from PR #271 and PR #276, the local wrapper may route to the pinned source build at `~/pro/lab/tools/oracle-main` when it is present, built, and exactly at commit `bda0326d43b02c5346e742692865fc21d8c5fc35`; otherwise it falls back to `npx -y @steipete/oracle@latest`. Use `ORACLE_SOURCE_MAIN=0` to force npm latest, `ORACLE_SOURCE_MAIN=require` to fail instead of falling back, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route. Do not vendor the upstream repo into botfiles; rebuild it in `~/pro/lab/tools/oracle-main` with Node 24/pnpm when the pinned commit changes.
+- Since npm `@steipete/oracle@latest` now contains the upstream browser fixes from PR #271 and PR #276, the local wrapper defaults to `npx -y @steipete/oracle@latest`. The pinned source build at `~/pro/lab/tools/oracle-main` is now opt-in only; use `ORACLE_SOURCE_MAIN=1` to prefer it when present and verified, `ORACLE_SOURCE_MAIN=require` to fail instead of falling back, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route. Do not vendor the upstream repo into botfiles; rebuild it in `~/pro/lab/tools/oracle-main` with Node 24/pnpm when the pinned commit changes.
 - In this environment, default Oracle requests with no explicit engine/model should use ChatGPT GPT-5.5 Pro in browser manual-login mode through the local wrapper. The wrapper should expand plain `oracle -p "<prompt>" [--file ...]` to the verified browser path: `--engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current` when that Chrome wrapper is available.
 - If the user explicitly asks for another model, a multi-model run, or a faster/cheaper pass, honor that. Otherwise fall back from GPT-5.5 Pro to `gpt-5.4-pro` only after repeated GPT-5.5 Pro availability/access failures; do not downgrade for normal latency, `in_progress`, prompt-size issues, polling-shell failures, or browser attachment upload issues.
 - For browser runs with text/source-code context, prefer compact prompts or inline file delivery (`--browser-inline-files` / `--browser-attachments never`) before ChatGPT upload mode. Reserve upload/bundle mode for PDFs, images, binaries, or file sets that truly cannot fit inline.
@@ -98,6 +98,10 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 ## Reviewer Agent
 
 - Use the read-only `reviewer` custom subagent at `~/pro/botfiles/claude/agents/reviewer.md` (synced to `~/.claude/agents/reviewer.md`) for PR or working-tree review focused on correctness, security, regressions, and missing tests.
+
+## Native Subagent Reasoning
+
+- Whenever spawning a native GPT-5.6 Sol, Terra, or Luna subagent, always set its reasoning effort to `max`. Do not use lower reasoning levels for those model families, including for explorers, workers, or reviewers.
 
 ## Task Status Tracking
 
@@ -198,3 +202,13 @@ Whenever you are creating any visual artifact (website, image, TUI, video etc.) 
 Since the user is a startup founder, by default, use the startup's branding and design aesthetics found at `~/pro/personal_os/context/zone/ZONE_FRONTEND_STYLE_GUIDE.md`
 
 Always make sure to ask suitable questions to the user for design aesthetics if needed to confirm before implementing.
+
+### Diagram Authoring (default: Figma)
+
+For article/blog/explanatory diagrams and similar polished visual figures, **default to authoring natively in Figma** via the Figma MCP (`use_figma`), not by generating an SVG/PIL/Mermaid/D2 file and replicating it afterward. The user evaluated PIL, D2, Mermaid, hand-SVG, Excalidraw, and Figma for editorial diagrams (ZON-227, 2026-06-25) and chose Figma: best output quality plus first-class human editability (real text nodes to retype, shapes/curves to drag, full typographic control).
+
+- Build directly in a Figma file: real TEXT nodes, vector curves, shapes; iterate with the screenshot→critique→fix loop using `get_screenshot`.
+- Watching the user's edits is **pull-on-demand, not live**: after the user edits, re-read with `get_screenshot` / `get_metadata` / `get_design_context` when they say to look. There is no push/webhook; do not assume you'll be notified of changes.
+- Reach for code-first diagram tools (SVG/PIL) only when the user needs bulk generation, regeneration-from-data, or a git-diffable source of truth — and even then, offer "import into Figma as editable" as the final step.
+- The reliability of each tool for editorial diagrams is documented in the ZON-227 artifacts under the ZON-223 task folder (`claude-diagram-style-iteration/`).
+- Excalidraw gotcha if ever used: its dark background is a canvas app-setting (`viewBackgroundColor`) that does NOT travel through element export/import — bake a background rectangle into the elements instead.
