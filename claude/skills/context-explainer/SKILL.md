@@ -1,70 +1,86 @@
 ---
 name: context-explainer
-description: Create self-contained HTML explainers that help a human understand the full context of a task, issue family, PR, architecture, or implementation plan. Use when the user asks for an HTML/webpage/visual explainer, wants background plus diagrams, asks whether related issues are worth taking up, needs an end-to-end mental model, or wants the artifact copied/opened on a local Mac from a remote VM.
+description: Create source-grounded explainers for research, engineering, architecture, task, issue, PR, and implementation-plan context. Use for end-to-end mental models, technical pitches, decision briefs, or artifacts copied to a local Mac. Research/engineering mode is real LaTeX compiled to PDF with native TikZ/PGF figures; regular mode is minimal self-contained HTML.
 ---
 
 # Context Explainer
 
-Build a readable, source-grounded HTML artifact that explains context, decisions, architecture, and next steps. The output is a local artifact for human review, not production app code.
+Create an artifact that teaches the reader a durable mental model. Prefer quiet typography, evidence, and useful figures over interface decoration.
 
-## Workflow
+## 1. Resolve scope and sources
 
-1. Resolve the active task folder.
-   - Prefer an existing task folder/status file when the request continues an active task.
-   - Put curated HTML at `task-progress-artifacts/<slug>.html`.
-   - Put screenshots, raw logs, and intermediate captures in `task-progress-artifacts/scratchpad/`.
+1. Resolve the canonical task folder and status file.
+2. Put curated outputs under task-progress-artifacts/; put build logs, rendered pages, screenshots, and intermediate files under task-progress-artifacts/scratchpad/.
+3. Inspect primary code, tests, issue/PR state, docs, results, and prior artifacts. Verify mutable external state when relevant.
+4. Distinguish facts, measurements, inferences, proposals, and unresolved questions.
 
-2. Gather truth from primary sources.
-   - Inspect current code, tests, issue/PR state, docs, and prior task artifacts.
-   - For GitHub issues/PRs, verify current state with `gh` or the GitHub app; stale issue text is common.
-   - If the user asks for public inspiration or latest external context, browse and cite the sources used.
-   - If the user explicitly asks for Oracle or the decision is broad/risky, run Oracle with a tight file bundle and record the engine/model evidence.
+## 2. Select one style
 
-3. Write the explanation thesis before editing HTML.
-   - State a visual thesis: mood, material, and energy.
-   - State a content plan: background, source map, architecture, decision matrix, next actions.
-   - State an interaction thesis: sticky navigation, expandable evidence, hover/focus diagrams, or lightweight scroll structure.
+- **Research / engineering** — default for experiments, benchmark methodology, system architecture, research proposals, evaluation plans, and technical pitches. Read [references/research-engineering-style.md](references/research-engineering-style.md) completely and start from [assets/research-engineering-template.tex](assets/research-engineering-template.tex).
+- **Regular artifact** — default for task context, issue families, product plans, PR explanations, and general decision briefs. Read [references/regular-style.md](references/regular-style.md) completely and start from [assets/regular-template.html](assets/regular-template.html).
+- Honor an explicit style or output-format request. If the audience or use case is ambiguous, choose the quieter style; do not ask merely about aesthetics.
 
-4. Create a self-contained HTML page.
-   - Use inline CSS and inline SVG diagrams; avoid external build steps.
-   - Include a first-screen overview, a section map, issue/PR relationship diagrams, architecture/data-flow diagrams, a decision matrix, risks/traps, validation commands, and source references.
-   - Distinguish facts from inferences. Mark stale or ambiguous issue state clearly.
-   - Keep prose scannable: dense enough for technical context, but not a wall of markdown.
+Research mode produces editable .tex source and a PDF compiled by a real LaTeX engine. Regular mode normally produces self-contained HTML.
 
-5. Verify visually.
-   - Use the Playwright skill/wrapper for desktop and mobile screenshots.
-   - Check browser console output and fix real errors.
-   - Inspect screenshots for text overlap, illegible diagrams, horizontal overflow, and broken responsive layout.
+## 3. State the thesis before authoring
 
-6. Make it easy for the user to open.
-   - If running on the user's Mac, provide the local HTML path and optionally open it.
-   - If running on a remote VM, copy the HTML to the Mac with `scripts/copy_explainer_to_mac.py` or an equivalent `scp` command.
-   - Default remote alias: `sourya-mac`.
-   - Default destination: `/Users/sourya4/Desktop/`.
+Send a concise commentary update covering:
 
-7. Update task status.
-   - Add the HTML and verification screenshots to the artifact list.
-   - Mention where it was copied for local viewing.
-   - Preserve unrelated status content.
+- **Argument:** the one sentence the reader should remember.
+- **Reader path:** the minimum section sequence needed to establish it.
+- **Figure plan:** only relationships that materially benefit from a visual.
 
-## Helper Script
+Do not invent an interaction thesis when a static paper or essay is clearer.
 
-Use the bundled helper after generating an HTML artifact:
+## 4. Author the artifact
 
-```bash
-python /home/azureuser/pro/botfiles/codex/skills/context-explainer/scripts/copy_explainer_to_mac.py \
-  path/to/explainer.html \
-  --machine sourya-mac \
-  --dest-dir /Users/sourya4/Desktop \
-  --open
-```
+### Research / engineering
 
-The script prints the destination path and verifies the remote file exists. Use `--open` only when the user wants it opened on the Mac.
+1. Copy the LaTeX template into the task artifact and replace its placeholders.
+2. Use semantic LaTeX structure: title, author, abstract, numbered sections, labels/references, proper tables, captions, equations, and bibliography entries.
+3. Author technical diagrams natively with TikZ/PGF. Use PGFPlots for data plots. Keep labels selectable and visual language consistent with the paper.
+4. Keep source reproducible and self-contained where practical. Capture any external image locally and use relative paths.
+5. Compile with scripts/compile_research_explainer.py; use --fail-on-warnings for the final freeze unless a reviewed harmless warning is documented. Do not fake a LaTeX look with HTML-to-PDF.
 
-## Quality Bar
+### Regular artifact
 
-- The page should teach the user's mental model, not just summarize files.
-- Diagrams should explain relationships that prose alone makes hard to hold.
-- Recommendations should be candid about scope, cost, duplication risk, and validation.
-- Do not launch expensive model/cloud jobs just because the explainer describes them.
-- Do not silently skip inaccessible material links; record the limitation or ask for input.
+1. Copy the HTML template into the task artifact and replace its placeholders.
+2. Keep it self-contained: inline CSS, inline SVG when needed, and no build step or remote font dependency.
+3. Use semantic HTML, accessible contrast, selectable text, descriptive captions, and print CSS.
+
+For either mode, use diagrams only when they clarify sequence, hierarchy, branching, repeated mappings, or causal relationships. Prefer one strong figure to many decorated boxes. Cite primary local paths and external sources near the claims they support.
+
+## 5. Visual constraints
+
+- Avoid gradients, glass effects, glowing borders, metric-card walls, badge/pill overload, oversized hero text, and dense sticky navigation.
+- Do not turn every paragraph into a card. Let whitespace, headings, rules, tables, captions, and ordinary prose carry structure.
+- Limit the palette to text, paper/background, rules, and at most one restrained accent plus a semantic warning color.
+- Research PDFs should look like authored technical papers, not web pages printed to PDF.
+
+## 6. Verify
+
+### Research / engineering
+
+1. Compile at least twice so references and page numbers settle.
+2. Fail on LaTeX errors. Review the compiler's final-log warning summary for overfull/underfull boxes, undefined references, missing glyphs, and duplicate labels; final artifacts should normally pass --fail-on-warnings.
+3. Use pdfinfo, pdftotext, and Poppler page rendering.
+4. Inspect the title page, every technical figure, the densest table, section transitions, and the final references page. Fix clipping, awkward floats, widows/orphans, and bad page breaks.
+
+### Regular artifact
+
+1. Use the Playwright skill/wrapper for desktop and narrow/mobile screenshots.
+2. Check console output, horizontal overflow, typography, tables, figures, captions, and link behavior.
+
+## 7. Deliver and record
+
+- On a remote VM, use scripts/copy_explainer_to_mac.py for PDF, TeX, or HTML. Default alias: sourya-mac; default destination: /Users/sourya4/Desktop/. Use --open only when requested.
+- Update the task status with curated outputs, source, QA captures/renders, copy destination, and material limitations.
+- Preserve unrelated task and repository changes.
+
+## Quality bar
+
+- The first page/screen establishes the question, proposed answer, and why it matters.
+- The artifact is pleasant to read linearly and scannable in under two minutes.
+- Architecture figures expose inputs, state, decisions, outputs, and information boundaries where relevant.
+- Recommendations state scope, falsification criteria, risks, and the cheapest credible next validation.
+- Do not launch costly experiments merely because the explainer proposes them.

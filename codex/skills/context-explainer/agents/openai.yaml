@@ -1,4 +1,4 @@
 interface:
   display_name: "Context Explainer"
-  short_description: "Create task context HTML explainers"
-  default_prompt: "Use $context-explainer to create a self-contained HTML explainer for this task and copy it to my Mac if needed."
+  short_description: "Create LaTeX research or minimal web explainers"
+  default_prompt: "Use $context-explainer to create a source-grounded real-LaTeX research PDF or minimal regular HTML explainer, as appropriate."

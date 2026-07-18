@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy a generated HTML explainer to a Mac over SSH/SCP and optionally open it."""
+"""Copy a generated HTML, TeX, or PDF explainer to a Mac and optionally open it."""
 
 from __future__ import annotations
 
@@ -16,18 +16,18 @@ def run(cmd: list[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("html", type=Path, help="Path to the local HTML explainer")
+    parser.add_argument("artifact", type=Path, help="Path to the local HTML, TeX, or PDF explainer")
     parser.add_argument("--machine", default="sourya-mac", help="SSH alias for the Mac")
     parser.add_argument("--dest-dir", default="/Users/sourya4/Desktop", help="Destination directory on the Mac")
     parser.add_argument("--name", help="Destination filename; defaults to source basename")
-    parser.add_argument("--open", action="store_true", help="Open the copied HTML on the Mac")
+    parser.add_argument("--open", action="store_true", help="Open the copied artifact on the Mac")
     args = parser.parse_args()
 
-    source = args.html.expanduser().resolve()
+    source = args.artifact.expanduser().resolve()
     if not source.is_file():
-        raise SystemExit(f"HTML file does not exist: {source}")
-    if source.suffix.lower() not in {".html", ".htm"}:
-        raise SystemExit(f"Expected an HTML file, got: {source}")
+        raise SystemExit(f"Explainer artifact does not exist: {source}")
+    if source.suffix.lower() not in {".html", ".htm", ".tex", ".pdf"}:
+        raise SystemExit(f"Expected an HTML, TeX, or PDF file, got: {source}")
 
     filename = args.name or source.name
     remote_path = PurePosixPath(args.dest_dir) / filename

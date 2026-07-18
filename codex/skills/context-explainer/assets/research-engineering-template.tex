@@ -1,0 +1,122 @@
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[letterpaper,margin=0.82in]{geometry}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds,shapes.geometric}
+\usepackage{xurl}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{fancyhdr}
+
+\definecolor{AccentBlue}{HTML}{174EA6}
+\definecolor{RuleGray}{HTML}{B8B8B8}
+\definecolor{SoftBlue}{HTML}{EDF3FB}
+\definecolor{SoftGreen}{HTML}{F0F5F2}
+\definecolor{SoftGray}{HTML}{F5F5F3}
+\definecolor{RiskRed}{HTML}{9B2C2C}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=AccentBlue,
+  citecolor=AccentBlue,
+  urlcolor=AccentBlue,
+  pdfauthor={Research explainer author},
+  pdftitle={Research explainer title}
+}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{nosep,leftmargin=1.45em}
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{2em}
+\renewcommand{\arraystretch}{1.16}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+\tikzset{
+  flow/.style={
+    draw=black!55,
+    rounded corners=1.2pt,
+    line width=0.55pt,
+    align=left,
+    inner sep=5pt,
+    minimum height=9mm,
+    font=\small
+  },
+  lm/.style={flow,draw=AccentBlue,fill=SoftBlue},
+  sim/.style={flow,draw=black!55!green,fill=SoftGreen},
+  rule/.style={flow,fill=SoftGray},
+  arrow/.style={-{Latex[length=2.2mm]},line width=0.55pt,draw=black!65},
+  feedback/.style={arrow,dashed,draw=black!50}
+}
+
+\title{\vspace{-1.5em}\bfseries {{TITLE}}}
+\author{{{AUDIENCE}}\\\small {{STATUS}}}
+\date{{{DATE}}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+{{ABSTRACT}}
+\end{abstract}
+
+\section{Decision}
+\label{sec:decision}
+{{DECISION}}
+
+\section{Evidence}
+\label{sec:evidence}
+{{EVIDENCE}}
+
+\section{Architecture}
+\label{sec:architecture}
+{{ARCHITECTURE}}
+
+% Native technical figure example:
+% \begin{figure}[t]
+% \centering
+% \begin{tikzpicture}[node distance=8mm]
+%   \node[rule] (input) {Input};
+%   \node[lm,right=of input] (judge) {LM module};
+%   \node[sim,right=of judge] (execute) {Exact simulation};
+%   \draw[arrow] (input) -- (judge);
+%   \draw[arrow] (judge) -- (execute);
+% \end{tikzpicture}
+% \caption{Complete explanatory caption.}
+% \label{fig:architecture}
+% \end{figure}
+
+\section{Optimization or execution procedure}
+\label{sec:procedure}
+{{PROCEDURE}}
+
+\section{Evaluation and falsification}
+\label{sec:evaluation}
+{{EVALUATION}}
+
+\section{Risks and recommendation}
+\label{sec:risks}
+{{RISKS}}
+
+\begin{thebibliography}{9}
+% Replace this complete example entry and duplicate \bibitem blocks as needed.
+\bibitem{source}
+Author or organization. \emph{Source title}. Year. \url{https://example.com/source}.
+\end{thebibliography}
+
+\end{document}
