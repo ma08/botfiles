@@ -27,6 +27,36 @@ Recommended defaults:
 3. Run with the local `oracle` wrapper so it selects the ChatGPT GPT‑5.5 Pro browser/manual-login path by default; use API only when you explicitly want it.
 4. If the run detaches/timeouts: reattach to the stored session (don’t re-run).
 
+## ChatGPT Project routing
+
+Oracle can create a new browser conversation inside an existing ChatGPT Project by passing that project's exact `/project` URL through `--chatgpt-url`. Treat the project URL as a context scope: the new chat inherits the project's available files and instructions, subject to that project's ChatGPT memory/settings.
+
+Private project names, aliases, and URLs must not be stored in this public skill repository. Before a project-scoped Oracle request, inspect `~/pro/personal_os/context/projects.md` for a matching entry under its private Oracle/ChatGPT project-route registry.
+
+Routing rules:
+
+- When the user names a project and exactly one private registry entry matches, automatically add that entry's project URL; do not ask the user to repeat it.
+- Do not set a project URL as a shell-wide or wrapper-wide default. Unrelated or ambiguous Oracle work must use the normal non-project route unless the user supplies a URL.
+- Do not copy private project identifiers or URLs from the registry into botfiles, logs intended for publication, or public issue/commit text.
+- Project placement does not guarantee that prior chats are available as memory. When project context materially affects the answer, ask Oracle to identify whether supporting context came from a project file, project instruction, or prior project chat, and verify distinctive facts rather than accepting a generic claim.
+- Project conversations are intentionally not auto-archived by Oracle's default browser archive policy.
+
+Project-scoped GPT-5.6 Sol route on the VM (account/browser default supplies the Pro effort; Oracle does not expose `pro` as a CLI thinking-time selector):
+
+```bash
+ORACLE_SOURCE_MAIN=require ORACLE_SOURCE_MAIN_VERBOSE=1 oracle \
+  --engine browser \
+  --remote-chrome 127.0.0.1:9223 \
+  --chatgpt-url '<project-url-from-private-registry>' \
+  --model gpt-5.6-sol \
+  --browser-model-strategy select \
+  --browser-attachments never \
+  --slug project-oracle-consult \
+  -p '<task>'
+```
+
+Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unavailable, start and keep the existing `~/pro/botfiles/bin/oracle-browser-login-vm` desktop alive, use its localhost-only noVNC tunnel for login/Cloudflare if needed, and then retry the same `--remote-chrome` route. Do not silently switch to an API run.
+
 ## Commands (preferred)
 
 - Show help (once/session):
