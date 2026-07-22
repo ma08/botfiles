@@ -45,7 +45,9 @@ _botfiles_oracle_exec_node24() {
 }
 
 _botfiles_oracle_source_main_commit() {
-  printf '%s\n' "${ORACLE_SOURCE_MAIN_COMMIT:-bda0326d43b02c5346e742692865fc21d8c5fc35}"
+  # PR #320 canary: accept GPT-5.6 Sol with a separately rendered Pro effort pill.
+  # This stays opt-in; it does not add a CLI selector for Pro effort.
+  printf '%s\n' "${ORACLE_SOURCE_MAIN_COMMIT:-ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18}"
 }
 
 _botfiles_oracle_source_main_root() {
@@ -53,12 +55,12 @@ _botfiles_oracle_source_main_root() {
 }
 
 _botfiles_oracle_source_main_enabled() {
-  case "${ORACLE_SOURCE_MAIN:-1}" in
-    0|false|False|FALSE|no|No|NO|off|Off|OFF|npm|latest)
-      return 1
+  case "${ORACLE_SOURCE_MAIN:-0}" in
+    1|true|True|TRUE|yes|Yes|YES|on|On|ON|source|main|canary|require|required|must)
+      return 0
       ;;
   esac
-  return 0
+  return 1
 }
 
 _botfiles_oracle_source_main_required() {
