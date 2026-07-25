@@ -7,25 +7,26 @@ description: Use the @steipete/oracle CLI to bundle a prompt plus the right file
 
 Oracle bundles your prompt + selected files into one “one-shot” request so another model can answer with real repo context (API or browser automation). Treat outputs as advisory: verify against the codebase + tests.
 
-## Main use case (browser, ChatGPT GPT‑5.5 Pro)
+## Main use case (browser, ChatGPT GPT‑5.6 Sol + Pro)
 
-Default workflow here: use the local `oracle` wrapper with ChatGPT GPT‑5.5 Pro in browser/manual-login mode whenever it is available. This is the “human in the loop” path: it can take ~10 minutes to ~1 hour; expect a stored session you can reattach to.
+Default workflow here: use the local `oracle` wrapper with ChatGPT GPT‑5.6 Sol and the account/UI Intelligence effort set to Pro. Pro is a separate ChatGPT effort, not a `gpt-5.6-pro` CLI identifier. This is the “human in the loop” path: it can take ~10 minutes to ~1 hour; expect a stored session you can reattach to or harvest.
 
 Recommended defaults:
 
 - Engine: browser (`--engine browser`)
-- Model: ChatGPT GPT‑5.5 Pro via the picker label `--model "5.5 Pro"`
-- Browser mode: manual login with the local Chrome wrapper when available (`--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --browser-model-strategy current`)
-- Local package route: the wrapper defaults to `@steipete/oracle@latest`. A pinned source build at `~/pro/lab/tools/oracle-main` commit `ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18` (upstream PR #320) is available as an opt-in canary: use `ORACLE_SOURCE_MAIN=1` to prefer it when present and verified, `ORACLE_SOURCE_MAIN=require` to require it, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route. This canary accepts GPT-5.6 Sol when ChatGPT renders Pro as a separate effort pill; it does not provide a CLI selector for the Pro effort. A 2026-07-21 VM browser smoke proved submission and a completed Pro answer after manual Cloudflare clearance, but Oracle's current ChatGPT detector missed the rendered answer and kept polling, so do not promote this canary to the shared default until automatic capture is fixed and revalidated.
+- Model: `--model gpt-5.6-sol` with `--browser-model-strategy select`; the signed-in ChatGPT profile supplies the separate Pro effort.
+- Browser mode: reuse `--remote-chrome 127.0.0.1:9223` when the supported login desktop is already running; otherwise use manual login with `--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux"`.
+- Local package route: for no-model browser requests, the wrapper prefers the pinned source build at `~/pro/lab/tools/oracle-main` commit `ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18` (upstream PR #320) when it is present and verified. If unavailable, npm latest may be used only with the same GPT-5.6 Sol target. Use `ORACLE_SOURCE_MAIN=0` to force npm, `ORACLE_SOURCE_MAIN=require` to require the pinned build, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route.
+- Verification: confirm the browser/session evidence shows GPT-5.6 Sol and Pro. If the foreground detector misses a visibly completed answer, run `oracle session <slug> --harvest` against the same bound tab before declaring failure.
 - Attachments: directories/globs + excludes; avoid secrets. For text/code-heavy context, prefer compact prompts or inline delivery (`--browser-inline-files` / `--browser-attachments never`) before upload mode; reserve uploads/bundles for PDFs, images, binaries, or file sets that truly cannot fit inline.
-- Fallback: use GPT‑5.4 Pro only after repeated GPT‑5.5 Pro availability/access failures. Do not downgrade for normal latency, `in_progress` status, prompt-size issues, or browser attachment upload problems; fix the local issue or use a compact prompt and retry GPT‑5.5 Pro first.
+- Fallback: do not silently downgrade no-model work to GPT-5.5/5.4 or switch it to an API route. Fix or surface browser/profile/canary issues and retry GPT-5.6 Sol + Pro. Honor another model or engine only when the user explicitly requests it.
 
 ## Golden path (fast + reliable)
 
 1. Pick a tight file set (fewest files that still contain the truth).
 2. Preview what you’re about to send (`--dry-run` + `--files-report` when needed).
-3. Run with the local `oracle` wrapper so it selects the ChatGPT GPT‑5.5 Pro browser/manual-login path by default; use API only when you explicitly want it.
-4. If the run detaches/timeouts: reattach to the stored session (don’t re-run).
+3. Run with the local `oracle` wrapper so it selects ChatGPT GPT‑5.6 Sol + Pro by default; use API only when explicitly requested.
+4. If the run detaches/timeouts, reattach to or harvest the stored session; don’t start a duplicate run.
 
 ## ChatGPT Project routing
 
@@ -64,11 +65,11 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
   - `ORACLE_SOURCE_MAIN_VERBOSE=1 oracle --version`
 
 - Preview (no tokens):
-  - `npx -y @steipete/oracle --dry-run summary -p "<task>" --file "src/**" --file "!**/*.test.*"`
-  - `npx -y @steipete/oracle --dry-run full -p "<task>" --file "src/**"`
+  - `oracle --dry-run summary -p "<task>" --file "src/**" --file "!**/*.test.*"`
+  - `oracle --dry-run full -p "<task>" --file "src/**"`
 
 - Token/cost sanity:
-  - `npx -y @steipete/oracle --dry-run summary --files-report -p "<task>" --file "src/**"`
+  - `oracle --dry-run summary --files-report -p "<task>" --file "src/**"`
 
 - Browser run through the local wrapper (main path; long-running is normal):
   - `oracle -p "<task>" --file "src/**"`
@@ -76,18 +77,19 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 - Text/code browser run that avoids ChatGPT attachment upload readiness:
   - `oracle -p "<task>" --browser-inline-files --file "src/**"`
 
-- Explicit GPT‑5.5 Pro browser run:
-  - `oracle --engine browser --browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux" --model "5.5 Pro" --browser-model-strategy current -p "<task>" --file "src/**"`
+- Explicit default browser run:
+  - `oracle --engine browser --remote-chrome 127.0.0.1:9223 --model gpt-5.6-sol --browser-model-strategy select -p "<task>" --file "src/**"`
 
-- GPT‑5.4 Pro fallback (only after repeated GPT‑5.5 Pro availability/access failures):
+- Explicit GPT‑5.4 Pro API override (only when the user requests it):
   - `oracle --engine api --model gpt-5.4-pro -p "<task>" --file "src/**"`
 
 - Manual paste fallback (assemble bundle, copy to clipboard):
-  - `npx -y @steipete/oracle --render --copy -p "<task>" --file "src/**"`
+  - `oracle --render --copy -p "<task>" --file "src/**"`
   - Note: `--copy` is a hidden alias for `--copy-markdown`.
 
-- Opt into the pinned source build canary:
+- Inspect or require the pinned source route:
   - `ORACLE_SOURCE_MAIN=1 ORACLE_SOURCE_MAIN_VERBOSE=1 oracle --version`
+  - `ORACLE_SOURCE_MAIN=require ORACLE_SOURCE_MAIN_VERBOSE=1 oracle --version`
 
 ## Attaching files (`--file`)
 
@@ -112,11 +114,11 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 
 - Target: keep total input under ~196k tokens.
 - Use `--files-report` (and/or `--dry-run json`) to spot the token hogs before spending.
-- If you need hidden/advanced knobs: `npx -y @steipete/oracle --help --verbose`.
+- If you need hidden/advanced knobs: `oracle --help --verbose`.
 
 ## Engines (API vs browser)
 
-- Auto-pick: uses `api` when `OPENAI_API_KEY` is set, otherwise `browser`.
+- The local wrapper forces no-model requests onto the GPT-5.6 Sol + Pro browser route. Explicit engine/model requests remain authoritative.
 - Browser engine supports GPT + Gemini only; use `--engine api` for Claude/Grok/Codex or multi-model runs.
 - **API runs require explicit user consent** before starting because they incur usage costs.
 - Browser attachments:
@@ -130,9 +132,10 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 
 - Stored under `~/.oracle/sessions` (override with `ORACLE_HOME_DIR`).
 - Browser runs save durable files under `~/.oracle/sessions/<id>/artifacts/`, including `transcript.md`, Deep Research reports, and downloaded ChatGPT-generated images when available.
-- Runs may detach or take a long time (browser + GPT‑5.5 Pro often does). If the CLI times out: don’t re-run; reattach.
+- Runs may detach or take a long time (browser + GPT‑5.6 Sol + Pro often does). If the CLI times out: don’t re-run; reattach or harvest.
   - List: `oracle status --hours 72`
   - Attach: `oracle session <id> --render`
+  - Harvest: `oracle session <id> --harvest`
 - Use `--slug "<3-5 words>"` to keep session IDs readable.
 - Duplicate prompt guard exists; use `--force` only when you truly want a fresh run.
 

@@ -46,7 +46,7 @@ _botfiles_oracle_exec_node24() {
 
 _botfiles_oracle_source_main_commit() {
   # PR #320 canary: accept GPT-5.6 Sol with a separately rendered Pro effort pill.
-  # This stays opt-in; it does not add a CLI selector for Pro effort.
+  # This is preferred for no-model defaults; it does not add a CLI selector for Pro effort.
   printf '%s\n' "${ORACLE_SOURCE_MAIN_COMMIT:-ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18}"
 }
 
@@ -225,6 +225,36 @@ _botfiles_oracle_model_is_gpt55() {
   return 1
 }
 
+_botfiles_oracle_model_is_gpt56() {
+  local expect_model_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_model_value" -eq 1 ]; then
+      case "$arg" in
+        *5.6*|*gpt-5.6*|*GPT-5.6*)
+          return 0
+          ;;
+      esac
+      expect_model_value=0
+      continue
+    fi
+    case "$arg" in
+      --model|--models|-m)
+        expect_model_value=1
+        ;;
+      --model=*5.6*|--models=*5.6*|-m*5.6*|--model=*gpt-5.6*|--models=*gpt-5.6*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+_botfiles_oracle_local_remote_chrome_ready() {
+  command -v curl >/dev/null 2>&1 &&
+    curl --fail --silent --max-time 1 http://127.0.0.1:9223/json/version >/dev/null 2>&1
+}
+
 _botfiles_oracle_option_specified() {
   local option="$1"
   shift
@@ -289,42 +319,66 @@ _botfiles_oracle_is_subcommand_invocation() {
 oracle() {
   local args=("$@")
   local defaults=()
+  local oracle_source_main_explicit=0
+  if [ "${ORACLE_SOURCE_MAIN+x}" = "x" ]; then
+    oracle_source_main_explicit=1
+  fi
+  local ORACLE_SOURCE_MAIN="${ORACLE_SOURCE_MAIN-}"
 
   if [ -n "${ORACLE_AZURE_OPENAI_API_KEY:-}" ] && [ -z "${AZURE_OPENAI_API_KEY:-}" ]; then
     export AZURE_OPENAI_API_KEY="$ORACLE_AZURE_OPENAI_API_KEY"
   fi
 
   if ! _botfiles_oracle_is_subcommand_invocation "$@"; then
-    local default_gpt55_browser=0
+    local default_gpt56_model=0
+    local default_chatgpt_browser=0
     if ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_model_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
-      default_gpt55_browser=1
+      default_gpt56_model=1
+      default_chatgpt_browser=1
     elif _botfiles_oracle_browser_requested "$@" && ! _botfiles_oracle_model_specified "$@"; then
-      default_gpt55_browser=1
-    elif _botfiles_oracle_model_is_gpt55 "$@" && ! _botfiles_oracle_engine_specified "$@"; then
-      default_gpt55_browser=1
+      default_gpt56_model=1
+      default_chatgpt_browser=1
+    elif { _botfiles_oracle_model_is_gpt55 "$@" || _botfiles_oracle_model_is_gpt56 "$@"; } &&
+      ! _botfiles_oracle_engine_specified "$@"; then
+      default_chatgpt_browser=1
     fi
 
-    if [ "$default_gpt55_browser" -eq 1 ]; then
+    if [ "$default_gpt56_model" -eq 1 ] && [ "$default_chatgpt_browser" -eq 1 ] &&
+      [ "$oracle_source_main_explicit" -eq 0 ]; then
+      ORACLE_SOURCE_MAIN=1
+    fi
+
+    if [ "$default_chatgpt_browser" -eq 1 ]; then
       if ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
         defaults+=(--engine browser)
       fi
-      if ! _botfiles_oracle_option_specified --browser-manual-login "$@"; then
-        defaults+=(--browser-manual-login)
-      fi
-      local chrome_path="${ORACLE_CHROME_PATH:-$HOME/pro/botfiles/bin/oracle-chrome-linux}"
-      if [ -x "$chrome_path" ] && ! _botfiles_oracle_option_specified --browser-chrome-path "$@"; then
-        defaults+=(--browser-chrome-path "$chrome_path")
+      if ! _botfiles_oracle_option_specified --browser-manual-login "$@" &&
+        ! _botfiles_oracle_option_specified --browser-chrome-path "$@" &&
+        ! _botfiles_oracle_option_specified --remote-chrome "$@"; then
+        if _botfiles_oracle_local_remote_chrome_ready; then
+          defaults+=(--remote-chrome 127.0.0.1:9223)
+        else
+          defaults+=(--browser-manual-login)
+          local chrome_path="${ORACLE_CHROME_PATH:-$HOME/pro/botfiles/bin/oracle-chrome-linux}"
+          if [ -x "$chrome_path" ]; then
+            defaults+=(--browser-chrome-path "$chrome_path")
+          fi
+        fi
       fi
       if ! _botfiles_oracle_model_specified "$@"; then
-        defaults+=(--model "5.5 Pro")
+        defaults+=(--model gpt-5.6-sol)
       fi
       if ! _botfiles_oracle_option_specified --browser-model-strategy "$@"; then
-        defaults+=(--browser-model-strategy current)
+        if [ "$default_gpt56_model" -eq 1 ] || _botfiles_oracle_model_is_gpt56 "$@"; then
+          defaults+=(--browser-model-strategy select)
+        else
+          defaults+=(--browser-model-strategy current)
+        fi
       fi
     elif ! _botfiles_oracle_engine_specified "$@" && ! _botfiles_oracle_browser_requested "$@"; then
       defaults+=(--engine api)
       if ! _botfiles_oracle_model_specified "$@"; then
-        defaults+=(--model gpt-5.4-pro)
+        defaults+=(--model gpt-5.6-sol)
       fi
       if ! _botfiles_oracle_route_specified "$@"; then
         if [ -n "${ORACLE_AZURE_OPENAI_ENDPOINT:-}" ] && [ -n "${ORACLE_AZURE_OPENAI_DEPLOYMENT:-}" ]; then
@@ -336,7 +390,7 @@ oracle() {
       fi
     else
       if ! _botfiles_oracle_model_specified "$@"; then
-        defaults+=(--model gpt-5.4-pro)
+        defaults+=(--model gpt-5.6-sol)
       fi
       if ! _botfiles_oracle_browser_requested "$@" && ! _botfiles_oracle_route_specified "$@"; then
         if [ -n "${ORACLE_AZURE_OPENAI_ENDPOINT:-}" ] && [ -n "${ORACLE_AZURE_OPENAI_DEPLOYMENT:-}" ]; then
