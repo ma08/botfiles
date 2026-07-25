@@ -36,6 +36,7 @@ if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
     "$BOTFILES_ROOT/secrets/local/linear.rc" \
     "$BOTFILES_ROOT/secrets/local/claude-bedrock.rc" \
     "$BOTFILES_ROOT/secrets/local/claude-vertex.rc" \
+    "$BOTFILES_ROOT/secrets/local/gemini.rc" \
     "$BOTFILES_ROOT/secrets/local/codex-azure.rc" \
     "$BOTFILES_ROOT/secrets/local/codex-openai.rc" \
     "$BOTFILES_ROOT/secrets/local/deep-research.rc" \
