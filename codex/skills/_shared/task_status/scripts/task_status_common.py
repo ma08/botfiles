@@ -9,7 +9,7 @@ import re
 import socket
 import subprocess
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from html import unescape
 from pathlib import Path
 from shlex import quote as shell_quote
@@ -28,6 +28,11 @@ BULLET_PREFIX_RE = re.compile(r"^[-*+]\s+")
 NUMBERED_PREFIX_RE = re.compile(r"^\d+\.\s+")
 GITHUB_ISSUE_RE = re.compile(
     r"^https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)(?:[/?#].*)?$",
+    re.IGNORECASE,
+)
+GITHUB_PULL_REQUEST_RE = re.compile(
+    r"^https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/pull/(?P<number>\d+)"
+    r"(?:[/?#].*)?$",
     re.IGNORECASE,
 )
 LINEAR_ISSUE_RE = re.compile(
@@ -51,7 +56,8 @@ TASK_FOLDER_TIME_PREFIX_RE = re.compile(r"^\d{2}h\d{2}m\d{2}sPST-")
 TASK_HASH_SUFFIX_RE = re.compile(r"-[0-9a-f]{8,}$")
 ISSUE_SLUG_WITH_SEMANTIC_RE = re.compile(r"^(.+-issue-\d+)(?:-(.+))?$")
 PST_LABEL_RE = re.compile(
-    r"^(?P<date>\d{4}-\d{2}-\d{2}) ~(?P<hour>\d{2}):(?P<minute>\d{2})(?P<ampm>am|pm) PST$"
+    r"^(?P<date>\d{4}-\d{2}-\d{2}) ~(?P<hour>\d{2}):(?P<minute>\d{2})(?P<ampm>am|pm) PST$",
+    re.IGNORECASE,
 )
 
 TASK_METADATA_START = "<!-- TASK-METADATA:START -->"
@@ -66,6 +72,7 @@ TRACKER_KIND_LINEAR = "linear"
 TRACKER_KIND_NONE = "none"
 TRACKER_REMOTE_SESSION_MARKER = "LIVE-SESSION"
 LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql"
+TASK_RECAP_STALE_DAYS = 14
 
 TASK_METADATA_REQUIRED_FIELDS = (
     "tracker_kind",
@@ -207,6 +214,14 @@ class TaskCandidate:
     task_dir: Path
     status_file: Path | None
     metadata: dict[str, str]
+
+
+@dataclass(frozen=True)
+class TaskRecapParts:
+    about: str | None
+    current: str | None
+    next_steps: str | None
+    last_updated: datetime | None
 
 
 @dataclass(frozen=True)
@@ -1642,6 +1657,30 @@ def extract_markdown_inline_field(text: str, field_name: str) -> str | None:
     return value or None
 
 
+def extract_markdown_header_field(text: str, field_name: str) -> str | None:
+    pattern = re.compile(
+        rf"^\s*(?:[-*+]\s+)?(?:\*\*)?{re.escape(field_name)}(?:\*\*)?:\s*(?P<value>.+?)\s*$"
+    )
+    in_code_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        heading = ATX_HEADING_RE.match(stripped)
+        if heading and len(heading.group("hashes")) >= 2:
+            break
+        match = pattern.match(line)
+        if not match:
+            continue
+        value = clean_summary_text(match.group("value"))
+        if value:
+            return value
+    return None
+
+
 def extract_markdown_section(text: str, headings: Iterable[str]) -> str | None:
     targets = [normalize_markdown_heading(heading) for heading in headings if heading]
     if not targets:
@@ -1736,36 +1775,279 @@ def truncate_summary(text: str, *, max_chars: int = 240) -> str:
     return f"{clipped}..."
 
 
-def build_task_recap(status_file: Path | None) -> list[str]:
+def extract_task_recap_parts(status_file: Path | None) -> TaskRecapParts:
     if not status_file or not status_file.is_file():
-        return [
-            "What this task is about: Task summary is not available yet.",
-            "Current status: Current status is not recorded yet.",
-            "Next steps: Add or update the task status file before relying on this recap.",
-        ]
+        return TaskRecapParts(None, None, None, None)
 
     text = read_text(status_file)
     title = extract_markdown_title(text)
-    goal = extract_markdown_inline_field(text, "Goal")
-    status = extract_markdown_inline_field(text, "Status")
+    goal = extract_markdown_header_field(text, "Goal") or extract_markdown_inline_field(text, "Goal")
+    status = extract_markdown_header_field(text, "Status") or extract_markdown_inline_field(text, "Status")
+    last_updated = extract_markdown_header_field(text, "Last Updated")
     current_items = collect_markdown_items(extract_markdown_section(text, ["Current State"]))
     next_items = collect_markdown_items(extract_markdown_section(text, ["Next Steps"]))
 
-    about_value = goal or title or (current_items[0] if current_items else "Task summary is not available yet")
-    current_value = status or (
-        " ".join(current_items[:2]) if current_items else "Current status is not recorded yet"
-    )
-    next_value = (
-        " ".join(next_items[:2])
-        if next_items
-        else "Review the status file and add the next steps if this task needs a fresh handoff."
+    return TaskRecapParts(
+        about=goal or title or (current_items[-1] if current_items else None),
+        current=status or (" ".join(current_items[-2:]) if current_items else None),
+        next_steps=" ".join(next_items[:2]) if next_items else None,
+        last_updated=parse_pst_label(last_updated) if last_updated else None,
     )
 
+
+def render_task_recap(parts: TaskRecapParts) -> list[str]:
+    about_value = parts.about or "Task summary is not available yet"
+    current_value = parts.current or "Current status is not recorded yet"
+    next_value = parts.next_steps or "Add or update the task status file before relying on this recap"
     return [
         f"What this task is about: {truncate_summary(ensure_sentence(about_value))}",
         f"Current status: {truncate_summary(ensure_sentence(current_value))}",
         f"Next steps: {truncate_summary(ensure_sentence(next_value))}",
     ]
+
+
+def task_recap_is_stale(parts: TaskRecapParts) -> bool:
+    if not parts.last_updated:
+        return False
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    return now - parts.last_updated > timedelta(days=TASK_RECAP_STALE_DAYS)
+
+
+def task_recap_needs_runtime(parts: TaskRecapParts) -> bool:
+    return not all((parts.about, parts.current, parts.next_steps)) or task_recap_is_stale(parts)
+
+
+def build_task_recap(status_file: Path | None) -> list[str]:
+    return render_task_recap(extract_task_recap_parts(status_file))
+
+
+def extract_github_pull_request_ref(text: str) -> tuple[str, int, str] | None:
+    for url in extract_urls(text):
+        match = GITHUB_PULL_REQUEST_RE.match(url)
+        if not match:
+            continue
+        repo_key = f"{match.group('owner')}/{match.group('repo')}"
+        return (repo_key, int(match.group("number")), url)
+    return None
+
+
+def fetch_github_pull_request_runtime(repo_key: str, number: int) -> dict[str, object] | None:
+    if not gh_available():
+        return None
+    code, stdout, _ = run_command(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(number),
+            "--repo",
+            repo_key,
+            "--json",
+            "number,state,isDraft,mergeStateStatus,title,url,updatedAt",
+        ],
+        timeout_seconds=20,
+    )
+    if code != 0:
+        return None
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def extract_github_repo_keys(text: str) -> list[str]:
+    repo_keys: list[str] = []
+    seen: set[str] = set()
+    for url in extract_urls(text):
+        parsed = urlparse(url)
+        if (parsed.hostname or "").lower() != "github.com":
+            continue
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) < 2:
+            continue
+        repo_key = parse_github_repo_key(f"{path_parts[0]}/{path_parts[1]}")
+        if repo_key and repo_key not in seen:
+            seen.add(repo_key)
+            repo_keys.append(repo_key)
+    return repo_keys
+
+
+def resolve_runtime_repo_root(
+    text: str,
+    metadata: dict[str, str],
+    project_root: Path | None,
+) -> Path | None:
+    for repo_key in extract_github_repo_keys(text)[:3]:
+        matches = find_local_repo_roots_for_github_repo(
+            repo_key,
+            current_project_root=project_root,
+        )
+        if matches:
+            return matches[0]
+
+    raw_candidates = [metadata.get("workspace_path", "")]
+    if project_root:
+        raw_candidates.append(str(project_root))
+    for raw_path in raw_candidates:
+        if not raw_path or raw_path == "none":
+            continue
+        candidate = Path(raw_path).expanduser().resolve()
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def inspect_local_git_repository(repo_root: Path) -> tuple[str, str] | None:
+    code, stdout, _ = run_command(
+        ["git", "-C", str(repo_root), "status", "--short", "--branch"],
+        timeout_seconds=10,
+    )
+    if code != 0:
+        return None
+
+    lines = stdout.splitlines()
+    branch_line = lines[0][3:].strip() if lines and lines[0].startswith("## ") else "detached HEAD"
+    branch = branch_line.split("...", 1)[0].strip() or "detached HEAD"
+    changed_count = sum(1 for line in lines[1:] if line.strip())
+    log_code, log_stdout, _ = run_command(
+        ["git", "-C", str(repo_root), "log", "-1", "--format=%h%x1f%s"],
+        timeout_seconds=10,
+    )
+    commit_detail = ""
+    if log_code == 0 and log_stdout.strip():
+        commit, _, subject = log_stdout.strip().partition("\x1f")
+        commit_detail = f" at {commit}" if commit else ""
+        if subject:
+            commit_detail += f" ({truncate_summary(subject, max_chars=100)})"
+
+    if changed_count:
+        current = (
+            f"Runtime investigation: local {repo_root.name} has {changed_count} uncommitted change(s) "
+            f"on {branch}{commit_detail}"
+        )
+        next_steps = f"Review the {changed_count} local change(s) in {repo_root.name} before handoff."
+    else:
+        current = f"Runtime investigation: local {repo_root.name} is clean on {branch}{commit_detail}"
+        next_steps = "Record the next owner or handoff criterion in the task status file."
+    return current, next_steps
+
+
+def investigate_task_recap(
+    status_file: Path | None,
+    *,
+    metadata: dict[str, str] | None = None,
+    project_root: Path | None = None,
+    caller_path: Path | None = None,
+) -> tuple[str | None, str | None, str | None]:
+    text = read_text(status_file) if status_file else ""
+    metadata = metadata or {}
+    runtime_about = metadata.get("tracker_title", "").strip() or None
+    if runtime_about == "none":
+        runtime_about = None
+
+    pull_request = extract_github_pull_request_ref(text)
+    if pull_request:
+        repo_key, number, fallback_url = pull_request
+        pull_data = fetch_github_pull_request_runtime(repo_key, number)
+        if pull_data:
+            state = str(pull_data.get("state") or "unknown").strip().lower()
+            merge_state = str(pull_data.get("mergeStateStatus") or "").strip().lower()
+            is_draft = bool(pull_data.get("isDraft"))
+            url = str(pull_data.get("url") or fallback_url).strip()
+            runtime_about = runtime_about or str(pull_data.get("title") or "").strip() or None
+            detail = f" ({merge_state})" if merge_state else ""
+            draft_label = " draft" if is_draft else ""
+            current = f"Runtime investigation: GitHub PR #{number} is {state}{draft_label}{detail}"
+            if state == "open" and not is_draft:
+                next_steps = f"Complete human review and merge {url}."
+            elif state == "open":
+                next_steps = f"Finish the draft PR before requesting review: {url}."
+            elif state == "merged":
+                next_steps = f"Confirm the merged change is applied where this task runs: {url}."
+            else:
+                next_steps = f"Review the PR state and record the next owner: {url}."
+            return runtime_about, current, next_steps
+
+    tracker_url = metadata.get("tracker_url", "").strip()
+    if not tracker_url or tracker_url == "none":
+        tracker_url = extract_markdown_header_field(text, "Tracker") or ""
+    tracker_kind = metadata.get("tracker_kind", "").strip().lower()
+    if tracker_kind not in {TRACKER_KIND_LINEAR, TRACKER_KIND_GITHUB}:
+        if parse_linear_issue_url(tracker_url):
+            tracker_kind = TRACKER_KIND_LINEAR
+        elif parse_github_issue_url(tracker_url):
+            tracker_kind = TRACKER_KIND_GITHUB
+    if tracker_kind == TRACKER_KIND_LINEAR:
+        linear_ref = parse_linear_issue_url(tracker_url)
+        if linear_ref:
+            issue = fetch_linear_issue_data(linear_ref, caller_path=caller_path)
+            if issue:
+                runtime_about = runtime_about or issue.title or None
+                state = issue.state_name or "unknown"
+                normalized_state = state.lower()
+                current = f"Runtime investigation: Linear {issue.identifier} is in {state}."
+                if "review" in normalized_state:
+                    next_steps = f"Complete human review for {issue.url}."
+                elif "need" in normalized_state and "input" in normalized_state:
+                    next_steps = f"Provide the requested input on {issue.url}."
+                else:
+                    next_steps = f"Review the current Linear state and record the next owner: {issue.url}."
+                return runtime_about, current, next_steps
+    elif tracker_kind == TRACKER_KIND_GITHUB:
+        issue_ref = parse_github_issue_url(tracker_url)
+        if issue_ref:
+            issue = fetch_issue_data(issue_ref)
+            if issue:
+                runtime_about = runtime_about or issue.title or None
+                state = issue.state or "unknown"
+                current = f"Runtime investigation: GitHub issue #{issue.ref.number} is {state.lower()}."
+                next_steps = f"Review the issue state and record the next owner: {issue.ref.url}."
+                return runtime_about, current, next_steps
+
+    repo_root = resolve_runtime_repo_root(text, metadata, project_root)
+    if repo_root:
+        repo_recap = inspect_local_git_repository(repo_root)
+        if repo_recap:
+            current, next_steps = repo_recap
+            return runtime_about, current, next_steps
+
+    return (
+        runtime_about,
+        "Runtime investigation found no reachable tracker or local Git repository signal",
+        "Add a current status and explicit next steps to the task status file.",
+    )
+
+
+def build_runtime_task_recap(
+    status_file: Path | None,
+    *,
+    metadata: dict[str, str] | None = None,
+    project_root: Path | None = None,
+    caller_path: Path | None = None,
+) -> list[str]:
+    parts = extract_task_recap_parts(status_file)
+    if not task_recap_needs_runtime(parts):
+        return render_task_recap(parts)
+
+    runtime_about, runtime_current, runtime_next_steps = investigate_task_recap(
+        status_file,
+        metadata=metadata,
+        project_root=project_root,
+        caller_path=caller_path,
+    )
+    current = runtime_current if not parts.current or task_recap_is_stale(parts) else parts.current
+    next_steps = parts.next_steps or (
+        f"Runtime investigation: {runtime_next_steps}" if runtime_next_steps else None
+    )
+    return render_task_recap(
+        TaskRecapParts(
+            about=parts.about or runtime_about,
+            current=current,
+            next_steps=next_steps,
+            last_updated=parts.last_updated,
+        )
+    )
 
 
 def sanitize_task_label(raw_value: str) -> str:
@@ -1988,7 +2270,7 @@ def parse_pst_label(value: str) -> datetime | None:
 
     hour = int(match.group("hour"))
     minute = int(match.group("minute"))
-    ampm = match.group("ampm")
+    ampm = match.group("ampm").lower()
     if ampm == "am":
         hour = 0 if hour == 12 else hour
     else:

@@ -16,7 +16,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from task_status_common import (  # noqa: E402
     TaskCandidate,
     RuntimeTaskContext,
-    build_task_recap,
+    build_runtime_task_recap,
     infer_project_root_from_path,
     load_task_candidates,
     normalize_task_metadata,
@@ -57,6 +57,7 @@ def print_entry(
     age_days: int | None,
     *,
     include_recap: bool = False,
+    recap_project_root: Path | None = None,
 ) -> None:
     metadata = normalize_task_metadata(
         candidate.metadata,
@@ -91,7 +92,12 @@ def print_entry(
     print(f"  Zellij Link: {metadata.get('zellij_link', 'none')}")
     if include_recap:
         print("  Recap:")
-        for line in build_task_recap(candidate.status_file):
+        for line in build_runtime_task_recap(
+            candidate.status_file,
+            metadata=metadata,
+            project_root=recap_project_root,
+            caller_path=Path(__file__),
+        ):
             print(f"    - {line}")
 
 
@@ -124,6 +130,7 @@ def print_candidate_group(
     candidates: list[TaskCandidate],
     today,
     max_entries: int,
+    project_root: Path,
 ) -> None:
     if not candidates:
         return
@@ -132,6 +139,7 @@ def print_candidate_group(
             label,
             candidate=candidate,
             age_days=task_age_days(candidate.task_dir, today),
+            recap_project_root=project_root,
         )
         print("")
     if len(candidates) > max_entries:
@@ -221,6 +229,7 @@ def handle_current_session_lookup(
             candidate=pointer_candidate,
             age_days=task_age_days(pointer_candidate.task_dir, today),
             include_recap=True,
+            recap_project_root=project_root,
         )
         return 0
 
@@ -233,6 +242,7 @@ def handle_current_session_lookup(
             candidate=direct_pointer_candidate,
             age_days=task_age_days(direct_pointer_candidate.task_dir, today),
             include_recap=True,
+            recap_project_root=project_root,
         )
         return 0
 
@@ -250,6 +260,7 @@ def handle_current_session_lookup(
             candidate=matches[0],
             age_days=task_age_days(matches[0].task_dir, today),
             include_recap=True,
+            recap_project_root=project_root,
         )
         return 0
 
@@ -303,16 +314,17 @@ def handle_slug_lookup(
         candidate=primary,
         age_days=task_age_days(primary.task_dir, today),
         include_recap=True,
+        recap_project_root=project_root,
     )
 
     related, stale = split_related_and_stale(remainder, today)
     if related:
         print("")
-        print_candidate_group("Related", related, today, max_entries)
+        print_candidate_group("Related", related, today, max_entries, project_root)
     if stale:
         if related:
             print("")
-        print_candidate_group("Stale", stale, today, max_entries)
+        print_candidate_group("Stale", stale, today, max_entries, project_root)
     return 0
 
 
@@ -326,11 +338,13 @@ def main() -> int:
 
     if direct_candidate:
         today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        direct_project_root = infer_project_root_from_path(direct_candidate.status_file) or direct_candidate.task_dir
         print_entry(
             "Primary",
             candidate=direct_candidate,
             age_days=task_age_days(direct_candidate.task_dir, today),
             include_recap=True,
+            recap_project_root=direct_project_root,
         )
         return 0
 

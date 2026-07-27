@@ -51,6 +51,11 @@ python ~/pro/botfiles/claude/skills/_shared/task_status/scripts/get_task_details
     - what this task is about
     - current status
     - next steps / whether the user needs to do anything
+  - When the status file lacks one of those recap fields, or its `Last Updated`
+    value is over 14 days old, performs a bounded read-only runtime investigation:
+    the first linked GitHub PR, then the primary GitHub/Linear tracker, then a
+    matching local Git checkout. Runtime-derived recap lines are labeled
+    `Runtime investigation`.
 - Direct `--status-file` / `--task-dir` targeting prints the same primary-task recap
 - Optional Related tasks (same slug pattern) only when `task-slug` is used
 - Optional Stale tasks (>7 days old) only when `task-slug` is used
@@ -65,7 +70,9 @@ If no task is found for the current session, print a clear message and suggest `
 - Default mode is current-task-for-this-session; use `task-slug` when you intentionally want cross-session lookup.
 - Multiple tasks in one agent session are supported: the current task is whichever task was most recently touched by `start-new-task` or `save-task-status` in this session.
 - Legacy or unsynced task folders without a managed `Task Metadata` block cannot be auto-resolved as the current session task.
-- The recap is best-effort and is derived from common status-file sections such as `**Goal**`, `**Status**`, `## Current State`, and `## Next Steps`.
+- The static recap recognizes both header fields such as `- Status:` and
+  `**Status**:`, then prefers the newest `## Current State` items when no
+  explicit status exists. Runtime investigation is a fallback, never a write.
 - Task status root resolution order:
   1. `CLAUDE.md` `task-status-root`
   2. `AGENTS.md` `task-status-root`
