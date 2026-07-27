@@ -57,10 +57,12 @@
     "playwright@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
     "linear@claude-plugins-official": true,
-    "notion@claude-plugins-official": false
+    "notion@claude-plugins-official": false,
+    "figma@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
+  "tui": "fullscreen",
   "autoMemoryEnabled": true,
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-daltonized",
