@@ -14,6 +14,7 @@ credentials_file="$accounts_dir/$alias_name.json"
 state_root="${GWS_ACCOUNT_STATE_DIR:-$HOME/.config/gws/account-state}"
 state_dir="$state_root/$alias_name"
 normalized_credentials="$state_dir/credentials.json"
+token_cache="$state_dir/token_cache.json"
 client_secret_file="${HOME}/.config/gws/client_secret.json"
 
 if [[ ! -f "$credentials_file" ]]; then
@@ -42,6 +43,10 @@ dest.write_text(json.dumps(data))
 PY
 
 chmod 600 "$normalized_credentials"
+
+if [[ -f "$token_cache" && "$credentials_file" -nt "$token_cache" ]]; then
+  rm -f "$token_cache"
+fi
 
 export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$normalized_credentials"
 export GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$state_dir"

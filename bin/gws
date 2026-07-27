@@ -11,7 +11,9 @@ find_real_gws() {
   fi
 
   shopt -s nullglob
-  for candidate in "${HOME}"/.nvm/versions/node/*/bin/gws; do
+  for candidate in \
+    "${HOME}"/.local/opt/node-*/bin/gws \
+    "${HOME}"/.nvm/versions/node/*/bin/gws; do
     if [[ -x "${candidate}" ]]; then
       printf '%s\n' "${candidate}"
       return 0
@@ -27,7 +29,8 @@ if [[ -z "${real_gws}" ]]; then
   cat >&2 <<'EOF'
 gws wrapper: could not find the installed googleworkspace/cli binary.
 
-Expected a real binary under:
+Expected a real binary under one of:
+  $HOME/.local/opt/node-*/bin/gws
   $HOME/.nvm/versions/node/*/bin/gws
 
 Install it with:
