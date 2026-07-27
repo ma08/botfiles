@@ -6,6 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$script_dir/channel-common"
 
+zone_channel_route_if_needed "linkedin" "$@"
+
 usage() {
   cat <<'EOF'
 Usage:

@@ -56,6 +56,13 @@ Config:
 ~/pro/lab/zone-channel-ingest/config/channel-ingest.env
 ```
 
+The canonical personal-channel collector is the private GCP host
+`research-cpu-01-ts` (`research-cpu-01`). The wrappers route WhatsApp and
+LinkedIn commands there automatically from other configured agent contexts.
+iMessage reads route to the live `sourya-mac` database when invoked from Linux;
+on the Mac they read locally. Set `ZONE_CHANNEL_EXEC_LOCAL=1` only inside the
+resolved backend host to suppress another routing hop.
+
 ## Health
 
 Start with:
@@ -64,13 +71,14 @@ Start with:
 channel-health
 ```
 
-This reports installed versions, private store paths, disk usage/cap, WhatsApp
-auth status, whether the copied iMessage database exists, and LinkedIn browser
-state paths.
-
-For LinkedIn-specific checks:
+This reports the current machine's installed versions, private store paths,
+disk usage/cap, WhatsApp auth status, iMessage database state, and LinkedIn
+browser state paths. For an authoritative multi-source check, also run one
+bounded command per source because each wrapper resolves its canonical host:
 
 ```bash
+channel-imessage-read chats --limit 1 --json
+channel-whatsapp-read chats list --limit 1
 channel-linkedin-health
 ```
 
@@ -89,7 +97,7 @@ channel-whatsapp-read messages context --chat JID --id MSG_ID --before 5 --after
 On-demand sync:
 
 ```bash
-channel-whatsapp-sync
+channel-whatsapp-sync sync --once --idle-exit 30s --refresh-contacts --refresh-groups
 ```
 
 Pairing is an interactive human step:
@@ -101,9 +109,22 @@ channel-whatsapp-auth --phone "+15551234567"
 Do not run pairing or sync with broad history/backfill options unless the task
 requires it and the storage cap has been checked.
 
+`research-cpu-01-ts` is the only WhatsApp sync writer. Do not run a second
+collector on the retired Azure host or another machine. Reads remain forced
+read-only even when invoked from another context.
+
 ## iMessage
 
-Pull a copied database from `sourya-mac`:
+Normal reads use the live `sourya-mac` database, including when invoked from
+Linux through the routing wrapper:
+
+```bash
+channel-imessage-read chats --limit 20 --json
+channel-imessage-read search --query "query" --limit 20 --json
+channel-imessage-read history --chat-id ID --limit 50 --json
+```
+
+Pull a copied database to the current Linux host only as a fallback snapshot:
 
 ```bash
 channel-imessage-pull
@@ -116,14 +137,6 @@ reviewed:
 channel-imessage-pull --with-attachments
 ```
 
-Read-only examples against the copied Linux database:
-
-```bash
-channel-imessage-read chats --limit 20 --json
-channel-imessage-read search --query "query" --limit 20 --json
-channel-imessage-read history --chat-id ID --limit 50 --json
-```
-
 Linux `imsg` is read-only for a copied macOS `chat.db`; it is not a live
 iMessage client and cannot send messages.
 
@@ -132,7 +145,7 @@ iMessage client and cannot send messages.
 LinkedIn access uses a dedicated VM Chrome profile plus Playwright browser
 automation. It is read-only by construction in v1.
 
-Human login from a VM GUI/remote desktop terminal:
+Human login from the `research-cpu-01-ts` GUI/remote desktop terminal:
 
 ```bash
 channel-linkedin-login
@@ -186,13 +199,14 @@ user explicitly asks to promote content.
 - If `channel-imessage-pull` fails, check SSH access to `sourya-mac`, remote
   `sqlite3`, and macOS Full Disk Access/TCC behavior. Do not install a Mac-side
   LaunchAgent without explicit user approval.
-- If `channel-imessage-read` fails with Swift libraries missing, verify
-  `ZONE_CHANNEL_SWIFT_RUNTIME_DIR` in the private config.
+- If a Linux `channel-imessage-read` fails before reaching the Mac, check its
+  SSH alias and `sourya-mac` Full Disk Access first. Swift runtime troubleshooting
+  applies only to the copied-database fallback.
 - If `wacli` commands fail on locks or auth, use `channel-health` and
   `channel-whatsapp-read auth status` before retrying.
 - If `channel-linkedin-health` reports `login_required_or_not_verified`, run
-  `channel-linkedin-login` from a VM GUI/remote desktop terminal and complete LinkedIn
-  login manually.
+  `channel-linkedin-login` from a `research-cpu-01-ts` GUI/remote desktop
+  terminal and complete LinkedIn login manually.
 - If LinkedIn selectors fail, keep the raw failure private and update the
   Playwright extractor rather than broadening scans or using private APIs
   without fresh user approval.

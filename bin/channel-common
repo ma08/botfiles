@@ -16,7 +16,11 @@ fi
 : "${ZONE_CHANNEL_WHATSAPP_LABEL:=whatsapp-sourya}"
 : "${ZONE_CHANNEL_LINKEDIN_LABEL:=linkedin-sourya}"
 : "${ZONE_CHANNEL_IMESSAGE_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_IMESSAGE_LABEL}"
-: "${ZONE_CHANNEL_IMESSAGE_DB:=$ZONE_CHANNEL_IMESSAGE_STORE/current/chat.db}"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  : "${ZONE_CHANNEL_IMESSAGE_DB:=$HOME/Library/Messages/chat.db}"
+else
+  : "${ZONE_CHANNEL_IMESSAGE_DB:=$ZONE_CHANNEL_IMESSAGE_STORE/current/chat.db}"
+fi
 : "${ZONE_CHANNEL_IMESSAGE_ATTACHMENTS:=$ZONE_CHANNEL_IMESSAGE_STORE/attachments}"
 : "${ZONE_CHANNEL_IMESSAGE_SNAPSHOTS:=$ZONE_CHANNEL_IMESSAGE_STORE/snapshots}"
 : "${ZONE_CHANNEL_WACLI_STORE:=$ZONE_CHANNEL_ROOT/stores/$ZONE_CHANNEL_WHATSAPP_LABEL}"
@@ -34,7 +38,11 @@ fi
 : "${ZONE_CHANNEL_LINKEDIN_CHROME_BIN:=/usr/bin/google-chrome}"
 : "${ZONE_CHANNEL_LINKEDIN_PLAYWRIGHT_VERSION:=1.60.0}"
 : "${ZONE_CHANNEL_LINKEDIN_LOCK:=$ZONE_CHANNEL_LINKEDIN_STORE/browser.lock}"
-: "${ZONE_CHANNEL_IMSG_BIN:=$ZONE_CHANNEL_ROOT/tools/imsg/0.11.0/imsg}"
+if [[ "$(uname -s)" == "Darwin" ]] && command -v imsg >/dev/null 2>&1; then
+  : "${ZONE_CHANNEL_IMSG_BIN:=$(command -v imsg)}"
+else
+  : "${ZONE_CHANNEL_IMSG_BIN:=$ZONE_CHANNEL_ROOT/tools/imsg/0.11.0/imsg}"
+fi
 : "${ZONE_CHANNEL_SWIFT_RUNTIME_DIR:=/home/linuxbrew/.linuxbrew/opt/swift/libexec/lib/swift/linux}"
 : "${ZONE_CHANNEL_LOG_DIR:=$ZONE_CHANNEL_ROOT/logs}"
 : "${ZONE_CHANNEL_SCRATCH_DIR:=$ZONE_CHANNEL_ROOT/scratch}"
@@ -42,6 +50,8 @@ fi
 : "${ZONE_CHANNEL_SYNC_AUDIT_LOG:=$ZONE_CHANNEL_LOG_DIR/sync-audit.ndjson}"
 : "${ZONE_CHANNEL_VALIDATION_SUMMARY:=$ZONE_CHANNEL_LOG_DIR/validation-summary.md}"
 : "${ZONE_CHANNEL_MAC_HOST:=sourya-mac}"
+: "${ZONE_CHANNEL_COLLECTOR_HOST:=research-cpu-01-ts}"
+: "${ZONE_CHANNEL_COLLECTOR_LOCAL_HOSTNAMES:=research-cpu-01}"
 : "${ZONE_CHANNEL_WACLI_MAX_DB_SIZE:=80GB}"
 
 zone_channel_ensure_dirs() {
@@ -71,6 +81,55 @@ zone_channel_require_cmd() {
     echo "Missing required command: $cmd" >&2
     return 127
   fi
+}
+
+zone_channel_is_collector_host() {
+  local current_host candidate
+  current_host="$(hostname -s)"
+  for candidate in $ZONE_CHANNEL_COLLECTOR_LOCAL_HOSTNAMES; do
+    if [[ "$current_host" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+zone_channel_remote_exec() {
+  local host="$1"
+  shift
+  local remote_command quoted_arg
+  remote_command='. "$HOME/pro/botfiles/.botenv" 2>/dev/null || true; export ZONE_CHANNEL_EXEC_LOCAL=1; exec'
+  for quoted_arg in "$@"; do
+    printf -v quoted_arg '%q' "$quoted_arg"
+    remote_command+=" $quoted_arg"
+  done
+  exec ssh -o BatchMode=yes -o ConnectTimeout=15 "$host" "$remote_command"
+}
+
+zone_channel_route_if_needed() {
+  local channel="$1"
+  shift
+
+  if [[ "${ZONE_CHANNEL_EXEC_LOCAL:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  case "$channel" in
+    imessage)
+      if [[ "$(uname -s)" != "Darwin" ]]; then
+        zone_channel_remote_exec "$ZONE_CHANNEL_MAC_HOST" "$(basename "$0")" "$@"
+      fi
+      ;;
+    whatsapp|linkedin)
+      if ! zone_channel_is_collector_host; then
+        zone_channel_remote_exec "$ZONE_CHANNEL_COLLECTOR_HOST" "$(basename "$0")" "$@"
+      fi
+      ;;
+    *)
+      echo "Unknown channel route: $channel" >&2
+      return 2
+      ;;
+  esac
 }
 
 zone_channel_now() {
@@ -121,7 +180,9 @@ zone_channel_sync_audit() {
 }
 
 zone_channel_usage_bytes() {
-  du -sb "$ZONE_CHANNEL_ROOT" 2>/dev/null | awk '{print $1}'
+  local kib
+  kib="$(du -sk "$ZONE_CHANNEL_ROOT" 2>/dev/null | awk '{print $1}')"
+  printf '%s\n' "$((kib * 1024))"
 }
 
 zone_channel_human_bytes() {

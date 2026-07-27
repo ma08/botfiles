@@ -6,6 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$script_dir/channel-common"
 
+zone_channel_route_if_needed "imessage" "$@"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -13,7 +15,7 @@ Usage:
   channel-imessage-read history --chat-id ID --limit 50 --json
   channel-imessage-read search --query "text" --limit 20 --json
 
-Runs Linux read-only imsg against the copied VM chat.db.
+Runs read-only imsg against the local macOS database or a copied Linux chat.db.
 EOF
 }
 

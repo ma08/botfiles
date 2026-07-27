@@ -30,7 +30,7 @@ fi
 
 echo
 if [[ -x "$ZONE_CHANNEL_IMSG_BIN" ]]; then
-  zone_channel_imsg_env "$ZONE_CHANNEL_IMSG_BIN" --version
+  zone_channel_imsg_env "$ZONE_CHANNEL_IMSG_BIN" --version || true
 else
   echo "imsg=missing: $ZONE_CHANNEL_IMSG_BIN"
 fi
