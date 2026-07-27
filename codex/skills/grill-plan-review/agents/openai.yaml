@@ -1,0 +1,4 @@
+interface:
+  display_name: "Grill Plan Review"
+  short_description: "Review long plans one decision at a time"
+  default_prompt: "Use $grill-plan-review to review this plan through concise decisions, then persist the confirmed plan."

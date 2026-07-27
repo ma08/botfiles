@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zotero Research Library"
+  short_description: "Read and manage Zotero research notes"
+  default_prompt: "Use $zotero-research-library to inspect my Zotero papers, notes, and annotations and produce a reading digest."
