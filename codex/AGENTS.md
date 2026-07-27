@@ -10,6 +10,7 @@ These are user-level instructions for the Codex agent shared across all projects
 - For any long-lived behavior preference that should apply across projects and sessions, update both `~/pro/botfiles/codex/AGENTS.md` and `~/pro/botfiles/claude/CLAUDE.md`.
 - If the preference changes a skill's behavior or workflow, update the matching files in both `~/pro/botfiles/codex/skills/` and `~/pro/botfiles/claude/skills/`.
 - If the preference is only for one repo, one task, or a temporary session, keep it in the local project instructions or task notes instead of the global botfiles.
+- Codex thread titles associated with ZON-155 are a deliberate visual-divider exception: begin them with exactly `------- ZON-155`, then retain the normal ` · stable domain · current status` suffix.
 
 ## GitHub Authorship
 
