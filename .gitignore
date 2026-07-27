@@ -28,8 +28,21 @@ codex/.openai_codex_config_rc
 # Codex system skills are machine-managed and can differ by OS/Codex version
 codex/skills/.system/
 
+# Codex app-managed runtime skills can differ by product surface and OS
+codex/skills/chronicle/
+codex/skills/hatch-pet/
+
 # OS files
 .DS_Store
+*.swp
+excalidraw.log
 codex/config.toml.bak*
 codex/config.toml.secrets*
 codex/config.toml.vmback*
+
+# Hermes curator/runtime state is generated locally
+hermes/skills/.bundled_manifest
+hermes/skills/.curator_backups/
+hermes/skills/.curator_state
+hermes/skills/.usage.json
+hermes/skills/.usage.json.lock
