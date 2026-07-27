@@ -44,6 +44,22 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
 - When a task needs cloud actions from the CLI, read `~/pro/personal_os/context/cloud-access.md` first.
 - Treat that file as the shared runbook for current Azure/AWS/GCP access patterns, trusted machine context, verification commands, and other cross-machine cloud CLI notes.
 - Use the `~/pro/...` path form when referring to it, and consult it before assuming cloud auth is already available or changing login state on a machine.
+- Treat GCP `research-cpu-01` as the canonical Personal OS and cloud
+  control-plane machine. Its canonical repository is
+  `/srv/research/pro/personal_os`; `~/pro/personal_os` resolves there.
+- For new Personal OS Codex tasks or chat threads, use the saved project's main
+  checkout directly by default. Task folders already isolate work; do not create
+  a Personal OS worktree merely because the repository is Git-backed. Create a
+  worktree only when the user explicitly requests one or when a concrete branch
+  or working-tree conflict makes isolation necessary; state that exception
+  before creating it.
+- Treat `sourya-mac` as the primary interactive workstation and a synchronized
+  Personal OS client, not the canonical server-side checkout.
+- Treat the three former Azure VM definitions, four managed disks, and their
+  NIC/public-IP/NSG/VNet shells as deleted under ZON-219 Plans v15C/v15D
+  (July 24, 2026). Do not assume they can be started, reattached, or reached
+  through old Azure IPs. Recovery now uses canonical GCP state, the encrypted
+  GCS archive, and retained Zone/WhatsApp Azure Backup points.
 
 ## Local Screenshot Payloads
 
