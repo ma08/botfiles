@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Botfiles Machines"
+  short_description: "Safely reconcile botfiles across machines"
+  default_prompt: "Use $sync-botfiles-machines to reconcile my botfiles checkouts across the Mac and canonical cloud host."
