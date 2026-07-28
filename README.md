@@ -242,6 +242,8 @@ ln -sf ~/pro/botfiles/claude/skills ~/.claude/skills
 ln -sf ~/pro/botfiles/claude/agents ~/.claude/agents
 [ -e ~/.codex/config.toml ] || install -m 0600 /dev/null ~/.codex/config.toml
 ~/pro/botfiles/bin/install-codex-system-config --apply
+codex plugin add sites@openai-bundled --json
+codex plugin add visualize@openai-bundled --json
 for profile in chatgpt azure openai_api v0; do
   ln -sf ~/pro/botfiles/codex/${profile}.config.toml ~/.codex/${profile}.config.toml
 done
@@ -314,8 +316,8 @@ Codex uses native system/user precedence:
 - `codex/config.system.toml` is the portable authored base;
 - `/etc/codex/config.toml` is a root-owned symlink to that tracked base;
 - `~/.codex/config.toml` is a regular mode-`0600` local overlay for project
-  trust, Desktop/runtime state, marketplace materializations, credentials, and
-  host-only integrations;
+  trust, Desktop/runtime state, native plugin installation, marketplace
+  materializations, credentials, and host-only integrations;
 - sibling profile files remain tracked and are selected explicitly with
   `--profile`.
 
@@ -328,6 +330,10 @@ effective MCP/plugin support without printing values.
 installs `zotero-mcp-server` 0.6.0 when needed, and checks that the Zotero route
 can launch. Linux uses Zotero Web API mode and therefore requires a populated
 `secrets/local/zotero.rc`; macOS uses local Zotero mode by default.
+
+Sites and Visualize are the evidence-backed shared plugin subset. Install them
+with the two native `codex plugin add` commands above; setup reports any missing
+installation but never copies plugin caches or rewrites plugin state itself.
 
 Codex notify flow:
 - `codex/config.system.toml` calls `codex/hooks/run-codex-notify.sh`.

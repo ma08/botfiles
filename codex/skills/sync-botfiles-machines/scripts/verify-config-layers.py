@@ -34,6 +34,7 @@ FORBIDDEN_PORTABLE_PREFIXES = {
     "marketplaces",
     "memories",
     "notice",
+    "plugins",
     "projects",
     "shell_environment_policy",
     "tui.model_availability_nux",
@@ -166,6 +167,20 @@ def source_type(origin: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def origin_matches(
+    origins: dict[str, Any],
+    key: str,
+    value: Any,
+    expected_source: str,
+) -> bool:
+    if isinstance(value, list):
+        return all(
+            source_type(origins.get(f"{key}.{index}")) == expected_source
+            for index in range(len(value))
+        )
+    return source_type(origins.get(key)) == expected_source
+
+
 def portable_prefix_violation(key: str) -> bool:
     return any(key == prefix or key.startswith(f"{prefix}.") for prefix in FORBIDDEN_PORTABLE_PREFIXES)
 
@@ -257,11 +272,16 @@ def main() -> int:
             errors.append(f"unexpected portable MCP: {name}")
 
     portable_plugins = set((portable_data.get("plugins") or {}).keys())
-    if portable_plugins != REQUIRED_PLUGINS:
-        for name in sorted(REQUIRED_PLUGINS - portable_plugins):
-            errors.append(f"portable plugin missing: {name}")
-        for name in sorted(portable_plugins - REQUIRED_PLUGINS):
-            errors.append(f"unsupported portable plugin: {name}")
+    for name in sorted(portable_plugins):
+        errors.append(f"plugin install state must be machine-local: {name}")
+
+    local_plugins = {
+        name
+        for name, config in (user_data.get("plugins") or {}).items()
+        if isinstance(config, dict) and config.get("enabled") is True
+    }
+    for name in sorted(REQUIRED_PLUGINS - local_plugins):
+        errors.append(f"required local plugin state is missing: {name}")
 
     if not system_config.is_symlink():
         errors.append("system config is not a symlink")
@@ -315,7 +335,7 @@ def main() -> int:
             expected_value = value
         if effective_flat.get(key, object()) != expected_value:
             errors.append(f"effective portable key mismatch: {key}")
-        if source_type(origins.get(key)) != expected_source:
+        if not origin_matches(origins, key, expected_value, expected_source):
             errors.append(f"unexpected effective origin for: {key}")
 
     mcp_rows = run_json([str(codex), "mcp", "list", "--json"], cwd=cwd, timeout=args.timeout)
@@ -371,6 +391,7 @@ def main() -> int:
             "approvedOverrides": sorted(allowed_overrides),
             "effectiveMcpNames": sorted(name for name in enabled_mcps if isinstance(name, str)),
             "zoteroRoute": zotero_route_status,
+            "configuredLocalPluginIds": sorted(local_plugins),
             "installedPluginIds": sorted(
                 name for name in installed_plugins if isinstance(name, str)
             ),

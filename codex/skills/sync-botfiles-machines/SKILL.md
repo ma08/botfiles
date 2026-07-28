@@ -114,10 +114,10 @@ Use native Codex configuration precedence:
   `codex/config.system.toml`;
 - `~/.codex/config.toml` is a regular mode-`0600` machine-local file;
 - the system base owns authored portable defaults, the accepted shared MCPs,
-  and only plugins proven supported on every required surface;
+  and no plugin installation/runtime state;
 - the user file owns project trust, notice/migration state, desktop/runtime
-  tables, marketplace paths and timestamps, credentials, and host-only
-  integrations;
+  tables, native plugin installation state, marketplace paths and timestamps,
+  credentials, and host-only integrations;
 - local or plugin-injected MCP additions are allowed;
 - an enumerated Mac notification override may shadow portable `notify`.
 
@@ -154,11 +154,18 @@ The verifier reports names, layer origins, and status only. It checks:
 - app-server layer discovery and effective origins;
 - the accepted six-MCP subset while allowing local additions;
 - Zotero router, credential-mode, and server launch prerequisites;
-- the evidence-backed installed plugin subset.
+- the evidence-backed Sites/Visualize subset in local config and native
+  installed-plugin discovery.
 
-Treat TOML plugin entries as intent, not runtime proof. Use native
-`codex plugin list --json` and marketplace discovery; never copy runtime caches
-between hosts.
+Install the required subset natively on each host:
+
+```bash
+codex plugin add sites@openai-bundled --json
+codex plugin add visualize@openai-bundled --json
+```
+
+Use `codex plugin list --json` and marketplace discovery as runtime proof;
+never copy runtime caches between hosts.
 
 ## 8. Migrate And Exercise Rollback
 

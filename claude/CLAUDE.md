@@ -46,8 +46,8 @@ On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_pr
   `~/pro/botfiles/codex/config.system.toml`; expose that file through the
   root-owned `/etc/codex/config.toml` symlink.
 - Keep `~/.codex/config.toml` as a regular mode-`0600` machine-local file for
-  project trust, runtime/app state, marketplace materializations, credentials,
-  and host-only integrations.
+  project trust, runtime/app state, native plugin installation, marketplace
+  materializations, credentials, and host-only integrations.
 - Do not symlink the user config into botfiles, union trust paths across hosts,
   copy plugin caches, or use a Git clean filter/generated active config.
 - Use `bin/install-codex-system-config` only for the system-link action and the

@@ -95,11 +95,3 @@ guardian_approval = true
 
 # https://github.com/openai/codex/issues/10384
 default_mode_request_user_input = true
-
-# Only this evidence-backed subset is installed and supported on both the Mac
-# Desktop runtime and the GCP CLI. Product-managed Mac plugins remain local.
-[plugins."sites@openai-bundled"]
-enabled = true
-
-[plugins."visualize@openai-bundled"]
-enabled = true

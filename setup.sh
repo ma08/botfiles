@@ -339,6 +339,47 @@ check_codex_config_layers() {
     echo ""
 }
 
+check_codex_plugins() {
+    local enabled_plugin_ids
+    local plugin_report
+    local plugin_id
+
+    echo "Checking shared Codex plugins..."
+    if ! command -v codex >/dev/null 2>&1; then
+        echo "  [ACTION] install Codex before installing shared plugins."
+        echo ""
+        return
+    fi
+
+    plugin_report="$(codex plugin list --json 2>/dev/null || true)"
+    if ! enabled_plugin_ids="$(
+        printf '%s\n' "$plugin_report" |
+            uv run python -c '
+import json
+import sys
+
+report = json.load(sys.stdin)
+for row in report.get("installed", []):
+    if row.get("installed") is True and row.get("enabled") is True:
+        print(row.get("pluginId", ""))
+'
+    )"; then
+        echo "  [WARNING] could not parse native Codex plugin inventory."
+        echo ""
+        return
+    fi
+
+    for plugin_id in sites@openai-bundled visualize@openai-bundled; do
+        if printf '%s\n' "$enabled_plugin_ids" | grep -Fxq "$plugin_id"; then
+            echo "  [OK] $plugin_id"
+        else
+            echo "  [ACTION] codex plugin add $plugin_id --json"
+        fi
+    done
+    echo "  [INFO] plugin installation state stays in the local user config."
+    echo ""
+}
+
 # Install Python dependencies
 install_deps() {
     echo "Installing Python dependencies..."
@@ -632,6 +673,7 @@ main() {
     create_symlinks
     ensure_codex_user_config
     check_codex_config_layers
+    check_codex_plugins
     install_deps
     install_zotero_mcp
     check_secrets

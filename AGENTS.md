@@ -21,6 +21,9 @@
   install the root-owned `/etc/codex/config.toml` symlink.
 - `uv tool install zotero-mcp-server==0.6.0` installs the runtime behind the
   shared Zotero route; Linux also requires `secrets/local/zotero.rc`.
+- `codex plugin add sites@openai-bundled --json` and
+  `codex plugin add visualize@openai-bundled --json` install the supported
+  shared plugin subset into machine-local runtime state.
 - `cd claude/hooks && uv sync` refreshes Python dependencies after updates.
 - `mkdir -p secrets/local` ensures the centralized local secret directory exists.
 - `cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc` sets up WhatsApp notification secrets.
@@ -53,6 +56,8 @@
 - Keep `/etc/codex/config.toml` linked to `codex/config.system.toml` and
   `~/.codex/config.toml` as a regular mode-`0600` local overlay; validate paths
   before setup or migration.
+- Keep native plugin installation and marketplace materializations in the
+  machine-local user layer; never copy plugin caches between hosts.
 
 ## Multiple Machine Support
 One of the primary use cases for this repository is to support multiple machines.
