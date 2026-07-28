@@ -6,14 +6,21 @@
 - `bin/` contains repo-managed executable wrappers that must work in non-interactive shells.
 - `claude/hooks/` contains Python notification hooks plus `pyproject.toml` and `uv.lock` for dependencies.
 - `claude/skills/` is the target for installed skills; `claude/backup_skills/` stores archived skill examples.
-- `codex/` stores Codex CLI config, custom agents, synced Codex skills, and global Codex instructions (`config.toml`, `agents/`, `skills/`, `AGENTS.md`).
+- `codex/` stores the portable Codex system base, explicit profile overrides,
+  custom agents, synced skills, and global instructions
+  (`config.system.toml`, `*.config.toml`, `agents/`, `skills/`, `AGENTS.md`).
 - `secrets/` contains centralized secret templates (`templates/`) and local runtime secret files (`local/`, git-ignored).
 - `codex/skills/.system/` is machine-managed and git-ignored (may vary by OS/Codex version).
 - `.botrc` sources centralized secrets from `secrets/local/*.rc` for your shell.
 - `setup.sh` bootstraps the symlinks and installs hook dependencies.
 
 ## Build, Test, and Development Commands
-- `./setup.sh` creates symlinks in `~/.claude` and `~/.codex`, including custom agent directories, then runs `uv sync` for hook deps.
+- `./setup.sh` creates ordinary Claude/Codex symlinks without rewriting the
+  machine-local Codex user config, then runs `uv sync` for hook dependencies.
+- `bin/install-codex-system-config --apply` performs the only elevated action:
+  install the root-owned `/etc/codex/config.toml` symlink.
+- `uv tool install zotero-mcp-server==0.6.0` installs the runtime behind the
+  shared Zotero route; Linux also requires `secrets/local/zotero.rc`.
 - `cd claude/hooks && uv sync` refreshes Python dependencies after updates.
 - `mkdir -p secrets/local` ensures the centralized local secret directory exists.
 - `cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc` sets up WhatsApp notification secrets.
@@ -21,7 +28,7 @@
 - `cp secrets/templates/linear.rc.example secrets/local/linear.rc` sets up the default `LINEAR_API_KEY` export for shells, hooks, and tracker tooling.
 - `cd claude/hooks && uv run python test_whatsapp.py` sends a manual WhatsApp test message.
 - `cd claude/hooks && uv run python ~/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
-- `~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` tests the same notify wrapper used by `codex/config.toml`.
+- `~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` tests the same notify wrapper used by `codex/config.system.toml`.
 - `source ~/pro/botfiles/.botrc` loads shared Claude/Codex environment variables.
 
 ## Coding Style & Naming Conventions
@@ -43,7 +50,9 @@
 - Keep secrets in `secrets/local/*.rc` only; all runtime secret files must remain untracked.
 - Keep the Linear API key in `secrets/local/linear.rc`; do not read it out of another repo's `.env` at runtime.
 - `.botrc` uses strict cutover and only loads provider/hook secrets from `secrets/local/`.
-- Symlinks target `~/.claude` and `~/.codex`, so validate paths before running `setup.sh`.
+- Keep `/etc/codex/config.toml` linked to `codex/config.system.toml` and
+  `~/.codex/config.toml` as a regular mode-`0600` local overlay; validate paths
+  before setup or migration.
 
 ## Multiple Machine Support
 One of the primary use cases for this repository is to support multiple machines.

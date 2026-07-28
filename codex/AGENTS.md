@@ -86,6 +86,21 @@ When writing scripts, hooks, or runner wrappers that need botfiles env in a non-
 
 On **bash** machines, `BASH_ENV` is set in the effective login file (`~/.bash_profile` > `~/.bash_login` > `~/.profile`, whichever bash reads first) to point to `.botenv`, so children of login shells automatically inherit the core env. On **zsh** machines, `~/.zshenv` sources `.botenv` directly.
 
+## Codex Configuration Layers
+
+- Keep portable authored Codex defaults in
+  `~/pro/botfiles/codex/config.system.toml`; expose that file through the
+  root-owned `/etc/codex/config.toml` symlink.
+- Keep `~/.codex/config.toml` as a regular mode-`0600` machine-local file for
+  project trust, runtime/app state, marketplace materializations, credentials,
+  and host-only integrations.
+- Do not symlink the user config into botfiles, union trust paths across hosts,
+  copy plugin caches, or use a Git clean filter/generated active config.
+- Use `bin/install-codex-system-config` only for the system-link action and the
+  `sync-botfiles-machines` verifier for redacted layer checks.
+- Keep sibling profile files explicit; `CODEX_HOME` is for test isolation, not
+  production host routing.
+
 ## Skills
 
 - Codex skills are stored in `~/pro/botfiles/codex/skills`

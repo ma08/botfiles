@@ -1,4 +1,4 @@
-# Layered on top of config.toml when codex is invoked with `--profile v0`.
+# Layered on top of the native system/user stack with `--profile v0`.
 # Migrated from the legacy `[profiles.v0]` block on 2026-05-26 after
 # codex-cli 0.134.0 dropped support for nested profile tables.
 model = "v0-1.5-md"

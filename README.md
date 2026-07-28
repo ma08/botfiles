@@ -202,6 +202,8 @@ For Mac lid-closed keep-awake workflows, prefer the free Amphetamine menu-bar ap
    cp secrets/templates/codex-azure.rc.example secrets/local/codex-azure.rc
    cp secrets/templates/machine.rc.example secrets/local/machine.rc
    cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc
+   # Required on Linux for Zotero Web API mode; optional on macOS:
+   cp secrets/templates/zotero.rc.example secrets/local/zotero.rc
    # Optional:
    cp secrets/templates/linear.rc.example secrets/local/linear.rc
    cp secrets/templates/claude-vertex.rc.example secrets/local/claude-vertex.rc
@@ -232,15 +234,22 @@ If you prefer manual setup:
 
 ```bash
 # Create symlinks
+mkdir -p ~/.claude ~/.codex ~/.local/bin
 ln -sf ~/pro/botfiles/claude/settings.json ~/.claude/settings.json
 ln -sf ~/pro/botfiles/claude/statusline-simple.sh ~/.claude/statusline-simple.sh
 ln -sf ~/pro/botfiles/claude/hooks ~/.claude/hooks
 ln -sf ~/pro/botfiles/claude/skills ~/.claude/skills
 ln -sf ~/pro/botfiles/claude/agents ~/.claude/agents
-ln -sf ~/pro/botfiles/codex/config.toml ~/.codex/config.toml
+[ -e ~/.codex/config.toml ] || install -m 0600 /dev/null ~/.codex/config.toml
+~/pro/botfiles/bin/install-codex-system-config --apply
+for profile in chatgpt azure openai_api v0; do
+  ln -sf ~/pro/botfiles/codex/${profile}.config.toml ~/.codex/${profile}.config.toml
+done
 ln -sf ~/pro/botfiles/codex/agents ~/.codex/agents
 ln -sf ~/pro/botfiles/codex/skills ~/.codex/skills
 ln -sf ~/pro/botfiles/codex/AGENTS.md ~/.codex/AGENTS.md
+uv tool install zotero-mcp-server==0.6.0
+ln -sf ~/pro/botfiles/bin/zotero-mcp-route ~/.local/bin/zotero-mcp-route
 mkdir -p ~/.config/zellij
 ln -sf ~/pro/botfiles/zellij/config.kdl ~/.config/zellij/config.kdl
 
@@ -292,12 +301,36 @@ export BASH_ENV="$HOME/pro/botfiles/.botenv"
 source ~/pro/botfiles/.botrc
 ```
 
-`setup.sh` configures these entrypoints automatically and symlinks `oracle` / `oracle-mcp` into `~/.local/bin` so command runners like `watch` can resolve them without sourcing `.botrc`.
+`setup.sh` configures these entrypoints automatically and symlinks `oracle`,
+`oracle-mcp`, and `zotero-mcp-route` into `~/.local/bin` so non-interactive
+command runners can resolve them without sourcing `.botrc`.
 
 `setup.sh` also symlinks `~/.claude/agents` to `claude/agents`, `~/.codex/AGENTS.md` to `codex/AGENTS.md`, and `~/.codex/agents` to `codex/agents`.
 
+### Codex configuration layers
+
+Codex uses native system/user precedence:
+
+- `codex/config.system.toml` is the portable authored base;
+- `/etc/codex/config.toml` is a root-owned symlink to that tracked base;
+- `~/.codex/config.toml` is a regular mode-`0600` local overlay for project
+  trust, Desktop/runtime state, marketplace materializations, credentials, and
+  host-only integrations;
+- sibling profile files remain tracked and are selected explicitly with
+  `--profile`.
+
+`setup.sh` checks this boundary but never rewrites the active user config. Run
+`bin/install-codex-system-config --apply` for the narrow elevated symlink
+action. Use the `sync-botfiles-machines` verifier to audit layer ownership and
+effective MCP/plugin support without printing values.
+
+`setup.sh` creates an empty mode-`0600` user overlay only when none exists,
+installs `zotero-mcp-server` 0.6.0 when needed, and checks that the Zotero route
+can launch. Linux uses Zotero Web API mode and therefore requires a populated
+`secrets/local/zotero.rc`; macOS uses local Zotero mode by default.
+
 Codex notify flow:
-- `codex/config.toml` only calls `codex/hooks/run-codex-notify.sh`.
+- `codex/config.system.toml` calls `codex/hooks/run-codex-notify.sh`.
 - `shell/10-uv-bin.sh` resolves `UV_BIN` once for Linux/macOS portability.
 
 ### Codex App Server `request_user_input` Notifications
@@ -438,6 +471,7 @@ cp ~/pro/botfiles/secrets/templates/codex-app-server.rc.example ~/pro/botfiles/s
 cp ~/pro/botfiles/secrets/templates/opencode-azure.rc.example ~/pro/botfiles/secrets/local/opencode-azure.rc
 cp ~/pro/botfiles/secrets/templates/machine.rc.example ~/pro/botfiles/secrets/local/machine.rc
 cp ~/pro/botfiles/secrets/templates/linear.rc.example ~/pro/botfiles/secrets/local/linear.rc
+cp ~/pro/botfiles/secrets/templates/zotero.rc.example ~/pro/botfiles/secrets/local/zotero.rc
 cp ~/pro/botfiles/secrets/templates/claude-hooks.rc.example ~/pro/botfiles/secrets/local/claude-hooks.rc
 ```
 
@@ -803,10 +837,11 @@ botfiles/
 │       ├── codex-openai.rc.example
 │       ├── linear.rc.example
 │       ├── machine.rc.example
-│       └── opencode-azure.rc.example
+│       ├── opencode-azure.rc.example
+│       └── zotero.rc.example
 ├── codex/
 │   ├── AGENTS.md
-│   ├── config.toml
+│   ├── config.system.toml
 │   ├── agents/
 │   │   ├── oracle_awaiter.toml
 │   │   └── reviewer.toml
@@ -887,6 +922,7 @@ cp secrets/templates/codex-openai.rc.example    secrets/local/codex-openai.rc
 cp secrets/templates/deep-research.rc.example   secrets/local/deep-research.rc
 cp secrets/templates/claude-vertex.rc.example   secrets/local/claude-vertex.rc
 cp secrets/templates/opencode-azure.rc.example  secrets/local/opencode-azure.rc
+cp secrets/templates/zotero.rc.example          secrets/local/zotero.rc
 ```
 
 Edit each file and fill in real values. At minimum, create `machine.rc`:

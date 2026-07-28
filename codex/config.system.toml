@@ -1,0 +1,105 @@
+# Portable Codex configuration shared by every botfiles machine.
+#
+# `/etc/codex/config.toml` is a root-owned symlink to this file. The writable
+# `~/.codex/config.toml` is a regular mode-0600 machine-local overlay and owns
+# project trust, runtime/app state, marketplace materializations, credentials,
+# and host-only integrations.
+
+# Keep vanilla `codex` / `codex --yolo` on the persistent local ChatGPT login.
+# `cli_auth_credentials_store = "file"` makes the cache explicit at
+# `$CODEX_HOME/auth.json` (normally `~/.codex/auth.json`) instead of relying on
+# keyring/auto behavior on SSH VMs.
+cli_auth_credentials_store = "file"
+forced_login_method = "chatgpt"
+
+# Rollback option:
+# model = "gpt-5.2-codex"
+model = "gpt-5.6-sol"
+model_provider = "openai"
+model_reasoning_effort = "medium"
+model_verbosity = "low"
+
+# Azure remains available explicitly with `codex --profile azure`; do not set
+# Azure as the top-level provider unless vanilla ChatGPT subscription login is
+# intentionally being bypassed.
+web_search = "live"
+personality = "pragmatic"
+
+# Keep the portable fallback minimal; the Mac Desktop overlay may wrap this
+# command with its app-specific turn-ended notifier.
+notify = [
+  "/bin/bash",
+  "-lc",
+  "~/pro/botfiles/codex/hooks/run-codex-notify.sh \"$1\"",
+  "codex-notify",
+]
+
+file_opener = "cursor"
+history.persistence = "save-all"
+service_tier = "priority"
+approval_policy = "on-request"
+approvals_reviewer = "user"
+sandbox_mode = "workspace-write"
+
+# Profiles live in sibling `<name>.config.toml` files under `~/.codex`.
+# Activate one explicitly with `--profile <name>`.
+
+[tui.keymap.global]
+toggle_vim_mode = "alt-v"
+
+[model_providers.azure]
+name = "Azure OpenAI"
+base_url = "https://ladduu-dev-openai.openai.azure.com/openai/v1"
+env_key = "AZURE_OPENAI_API_KEY"
+wire_api = "responses"
+
+[model_providers.v0]
+name = "v0"
+base_url = "https://api.v0.dev/v1"
+env_key = "V0_API_KEY"
+wire_api = "responses"
+
+[mcp_servers.notion]
+command = "bash"
+args = ["-lc", "exec \"$HOME/pro/botfiles/bin/notion-mcp\""]
+startup_timeout_sec = 120
+
+[mcp_servers.exa]
+url = "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,get_code_context_exa,crawling_exa,company_research_exa,people_search_exa,deep_researcher_start,deep_researcher_check"
+
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+
+[mcp_servers.figma.http_headers]
+X-Figma-Region = "us-east-1"
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+
+[mcp_servers.linear.tools.save_issue]
+approval_mode = "approve"
+
+[mcp_servers.zotero]
+command = "bash"
+args = ["-lc", "exec \"$HOME/.local/bin/zotero-mcp-route\""]
+
+[features]
+goals = true
+steer = true
+shell_snapshot = true
+multi_agent = true
+guardian_approval = true
+
+# https://github.com/openai/codex/issues/10384
+default_mode_request_user_input = true
+
+# Only this evidence-backed subset is installed and supported on both the Mac
+# Desktop runtime and the GCP CLI. Product-managed Mac plugins remain local.
+[plugins."sites@openai-bundled"]
+enabled = true
+
+[plugins."visualize@openai-bundled"]
+enabled = true

@@ -22,10 +22,14 @@ cp secrets/templates/codex-app-server.rc.example secrets/local/codex-app-server.
 cp secrets/templates/codex-openai.rc.example secrets/local/codex-openai.rc
 cp secrets/templates/opencode-azure.rc.example secrets/local/opencode-azure.rc
 cp secrets/templates/machine.rc.example secrets/local/machine.rc
+cp secrets/templates/zotero.rc.example secrets/local/zotero.rc
 cp secrets/templates/claude-hooks.rc.example secrets/local/claude-hooks.rc
 ```
 
 Edit each file and replace placeholder values.
+
+`zotero.rc` is required on Linux for Zotero Web API mode. It is optional on
+macOS when the default local Zotero route is used.
 
 ## File Map
 
@@ -38,6 +42,7 @@ Edit each file and replace placeholder values.
 | `secrets/templates/codex-openai.rc.example` | `secrets/local/codex-openai.rc` | Codex OpenAI provider key |
 | `secrets/templates/opencode-azure.rc.example` | `secrets/local/opencode-azure.rc` | OpenCode Azure resource config |
 | `secrets/templates/machine.rc.example` | `secrets/local/machine.rc` | Shared machine identity (`SYSTEM_NAME`) and SSH alias (`BOT_MACHINE_SSH_ALIAS`) for notifications, task metadata, and screenshot payloads |
+| `secrets/templates/zotero.rc.example` | `secrets/local/zotero.rc` | Zotero MCP Web API credentials and optional local/Web routing overrides |
 | `secrets/templates/claude-hooks.rc.example` | `secrets/local/claude-hooks.rc` | Claude/Codex hook notifications (WhatsApp, Gmail, optional zellij web links) |
 
 ## Security Notes

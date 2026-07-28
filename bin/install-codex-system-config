@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Install or check the root-owned Codex system-layer symlink only.
+
+set -euo pipefail
+
+usage() {
+    printf 'Usage: %s [--source PATH] (--apply | --check)\n' "$0" >&2
+}
+
+script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+source_path="$script_dir/../codex/config.system.toml"
+action=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --source)
+            source_path="${2:?missing --source value}"
+            shift 2
+            ;;
+        --apply)
+            action="apply"
+            shift
+            ;;
+        --check)
+            action="check"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            usage
+            exit 2
+            ;;
+    esac
+done
+
+[[ -n "$action" ]] || {
+    usage
+    exit 2
+}
+[[ -f "$source_path" ]] || {
+    printf 'error: portable Codex config does not exist: %s\n' "$source_path" >&2
+    exit 1
+}
+
+source_dir="$(cd "$(dirname "$source_path")" && pwd -P)"
+source_path="$source_dir/$(basename "$source_path")"
+system_dir="/etc/codex"
+system_path="$system_dir/config.toml"
+
+owner_uid() {
+    if stat -c '%u' "$1" >/dev/null 2>&1; then
+        stat -c '%u' "$1"
+    else
+        stat -f '%u' "$1"
+    fi
+}
+
+check_link() {
+    [[ -L "$system_path" ]] || {
+        printf 'error: Codex system config is not a symlink: %s\n' "$system_path" >&2
+        return 1
+    }
+    [[ "$(readlink "$system_path")" == "$source_path" ]] || {
+        printf 'error: Codex system config points elsewhere: %s\n' "$system_path" >&2
+        return 1
+    }
+    [[ "$(owner_uid "$system_path")" == "0" ]] || {
+        printf 'error: Codex system symlink is not root-owned: %s\n' "$system_path" >&2
+        return 1
+    }
+    printf 'verified=%s -> %s\n' "$system_path" "$source_path"
+}
+
+if [[ "$action" == "check" ]]; then
+    check_link
+    exit
+fi
+
+if [[ "$EUID" -ne 0 ]]; then
+    exec sudo -- "$0" --source "$source_path" --apply
+fi
+
+if [[ -L "$system_path" ]] &&
+   [[ "$(readlink "$system_path")" != "$source_path" ]]; then
+    printf 'error: refusing to replace existing Codex system symlink: %s\n' \
+        "$system_path" >&2
+    printf 'current target: %s\n' "$(readlink "$system_path")" >&2
+    exit 1
+fi
+
+if [[ -e "$system_path" && ! -L "$system_path" ]]; then
+    printf 'error: refusing to replace non-symlink system config: %s\n' \
+        "$system_path" >&2
+    exit 1
+fi
+
+root_group="$(id -gn 0)"
+install -d -m 0755 -o 0 -g "$root_group" "$system_dir"
+ln -sfn "$source_path" "$system_path"
+chown -h 0:"$root_group" "$system_path"
+check_link

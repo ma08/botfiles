@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Route the shared Zotero MCP definition to local Zotero on macOS or Web API on Linux.
+
+set -euo pipefail
+
+env_file="${ZOTERO_ENV_FILE:-$HOME/pro/botfiles/secrets/local/zotero.rc}"
+if [[ -f "$env_file" ]]; then
+    # Machine-local credentials and routing overrides never live in Git.
+    # shellcheck disable=SC1090
+    source "$env_file"
+fi
+
+mode="${ZOTERO_MCP_MODE:-auto}"
+if [[ "$mode" == "auto" ]]; then
+    case "$(uname -s)" in
+        Darwin)
+            mode="local"
+            ;;
+        Linux)
+            mode="web"
+            ;;
+        *)
+            printf 'error: unsupported Zotero host; set ZOTERO_MCP_MODE=local or web\n' >&2
+            exit 1
+            ;;
+    esac
+fi
+
+case "$mode" in
+    local)
+        export ZOTERO_LOCAL=true
+        ;;
+    web)
+        export ZOTERO_LOCAL=false
+        : "${ZOTERO_API_KEY:?ZOTERO_API_KEY is required for Zotero Web API mode}"
+        : "${ZOTERO_LIBRARY_ID:?ZOTERO_LIBRARY_ID is required for Zotero Web API mode}"
+        if [[ "$ZOTERO_API_KEY" == replace_with_* ]] ||
+           [[ "$ZOTERO_LIBRARY_ID" == replace_with_* ]]; then
+            printf 'error: replace the placeholder Zotero Web API credentials\n' >&2
+            exit 1
+        fi
+        ;;
+    *)
+        printf 'error: invalid ZOTERO_MCP_MODE=%s (expected auto, local, or web)\n' \
+            "$mode" >&2
+        exit 1
+        ;;
+esac
+
+export ZOTERO_LIBRARY_TYPE="${ZOTERO_LIBRARY_TYPE:-user}"
+
+server_bin="${ZOTERO_MCP_SERVER_BIN:-$HOME/.local/bin/zotero-mcp}"
+if [[ ! -x "$server_bin" ]]; then
+    printf 'error: Zotero MCP executable is missing or not executable: %s\n' \
+        "$server_bin" >&2
+    printf 'install with: uv tool install zotero-mcp-server==0.6.0\n' >&2
+    exit 1
+fi
+
+if [[ "${1:-}" == "--check" ]]; then
+    if ! "$server_bin" --help >/dev/null 2>&1; then
+        printf 'error: Zotero MCP executable did not pass its launch check: %s\n' \
+            "$server_bin" >&2
+        exit 1
+    fi
+    printf 'zotero_route=%s server=available\n' "$mode"
+    exit 0
+fi
+
+exec "$server_bin" "$@"

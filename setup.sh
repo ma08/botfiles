@@ -151,11 +151,6 @@ backup_existing() {
         mv "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
-    if [ -f "$CODEX_DIR/config.toml" ] && [ ! -L "$CODEX_DIR/config.toml" ]; then
-        echo "  Backing up codex config.toml"
-        mv "$CODEX_DIR/config.toml" "$CODEX_DIR/config.toml.bak.$(date +%Y%m%d%H%M%S)"
-    fi
-
     # Per-profile config files introduced in codex-cli 0.134.0 (replaces the
     # legacy nested `[profiles.*]` tables and top-level `profile = "..."`
     # selector). Each profile lives in `<name>.config.toml` next to config.toml.
@@ -198,6 +193,12 @@ backup_existing() {
         mv "$HOME/.local/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -e "$HOME/.local/bin/zotero-mcp-route" ] && [ ! -L "$HOME/.local/bin/zotero-mcp-route" ]; then
+        echo "  Backing up ~/.local/bin/zotero-mcp-route"
+        mv "$HOME/.local/bin/zotero-mcp-route" \
+            "$HOME/.local/bin/zotero-mcp-route.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     echo ""
 }
 
@@ -222,6 +223,15 @@ safe_symlink() {
     echo "  $label -> $source_path"
 }
 
+ensure_codex_user_config() {
+    local user_config="$CODEX_DIR/config.toml"
+
+    if [ ! -e "$user_config" ] && [ ! -L "$user_config" ]; then
+        install -m 0600 /dev/null "$user_config"
+        echo "  Created empty mode-0600 Codex user overlay: $user_config"
+    fi
+}
+
 # Create symlinks
 create_symlinks() {
     echo "Creating symlinks..."
@@ -241,7 +251,6 @@ create_symlinks() {
     [ -L "$CLAUDE_DIR/statusline-simple.sh" ] && rm "$CLAUDE_DIR/statusline-simple.sh"
     [ -L "$CLAUDE_DIR/hooks" ] && rm "$CLAUDE_DIR/hooks"
     [ -L "$CLAUDE_DIR/skills" ] && rm "$CLAUDE_DIR/skills"
-    [ -L "$CODEX_DIR/config.toml" ] && rm "$CODEX_DIR/config.toml"
     for profile_name in chatgpt azure openai_api v0; do
         [ -L "$CODEX_DIR/${profile_name}.config.toml" ] && rm "$CODEX_DIR/${profile_name}.config.toml"
     done
@@ -270,9 +279,6 @@ create_symlinks() {
     ln -sf "$SCRIPT_DIR/claude/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
     echo "  CLAUDE.md -> $SCRIPT_DIR/claude/CLAUDE.md"
 
-    ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
-    echo "  codex config.toml -> $SCRIPT_DIR/codex/config.toml"
-
     # Per-profile configs (codex-cli 0.134.0+).
     for profile_name in chatgpt azure openai_api v0; do
         ln -sf "$SCRIPT_DIR/codex/${profile_name}.config.toml" "$CODEX_DIR/${profile_name}.config.toml"
@@ -295,6 +301,39 @@ create_symlinks() {
 
     safe_symlink "$SCRIPT_DIR/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp" "~/.local/bin/oracle-mcp"
 
+    safe_symlink "$SCRIPT_DIR/bin/zotero-mcp-route" \
+        "$HOME/.local/bin/zotero-mcp-route" "~/.local/bin/zotero-mcp-route"
+
+    echo ""
+}
+
+check_codex_config_layers() {
+    local portable_config="$SCRIPT_DIR/codex/config.system.toml"
+    local user_config="$CODEX_DIR/config.toml"
+    local system_config="/etc/codex/config.toml"
+
+    echo "Checking Codex configuration layers..."
+
+    if [ -L "$user_config" ]; then
+        echo "  [MIGRATION NEEDED] $user_config is still a legacy symlink."
+        echo "    Preserve and split it before replacing it with a regular mode-0600 local file."
+    elif [ -f "$user_config" ]; then
+        echo "  [OK] machine-local user config is a regular file"
+    elif [ -e "$user_config" ]; then
+        echo "  [WARNING] user config exists but is not a regular file: $user_config"
+    else
+        echo "  [INFO] no machine-local user config exists yet"
+    fi
+
+    if [ -L "$system_config" ] &&
+       [ "$(readlink "$system_config")" = "$portable_config" ]; then
+        echo "  [OK] system config -> $portable_config"
+    else
+        echo "  [ACTION] install the portable system layer with:"
+        echo "    $SCRIPT_DIR/bin/install-codex-system-config --apply"
+    fi
+
+    echo "  [INFO] setup never rewrites the active user config."
     echo ""
 }
 
@@ -303,6 +342,23 @@ install_deps() {
     echo "Installing Python dependencies..."
     cd "$SCRIPT_DIR/claude/hooks"
     uv sync
+    echo ""
+}
+
+install_zotero_mcp() {
+    local server_bin="$HOME/.local/bin/zotero-mcp"
+
+    echo "Checking Zotero MCP runtime..."
+    if [ ! -x "$server_bin" ]; then
+        echo "  Installing zotero-mcp-server 0.6.0 with uv..."
+        uv tool install zotero-mcp-server==0.6.0
+    fi
+
+    if [ ! -x "$server_bin" ]; then
+        echo "ERROR: Zotero MCP executable is unavailable at $server_bin"
+        exit 1
+    fi
+    echo "  [OK] $server_bin"
     echo ""
 }
 
@@ -373,10 +429,30 @@ check_secrets() {
         "Codex App Server notification defaults" \
         "$SCRIPT_DIR/secrets/local/codex-app-server.rc" \
         "$SCRIPT_DIR/secrets/templates/codex-app-server.rc.example"
+    if [ "$(uname -s)" = "Linux" ]; then
+        check_secret_file \
+            "Zotero MCP Web API route (required on Linux)" \
+            "$SCRIPT_DIR/secrets/local/zotero.rc" \
+            "$SCRIPT_DIR/secrets/templates/zotero.rc.example"
+    else
+        check_optional_secret_file \
+            "Zotero MCP local/Web API route" \
+            "$SCRIPT_DIR/secrets/local/zotero.rc" \
+            "$SCRIPT_DIR/secrets/templates/zotero.rc.example"
+    fi
 
     unset -f check_secret_file
     unset -f check_optional_secret_file
 
+    echo ""
+}
+
+validate_zotero_route() {
+    echo "Validating Zotero MCP route..."
+    if ! "$HOME/.local/bin/zotero-mcp-route" --check; then
+        echo "ERROR: Zotero MCP routing is not ready on this machine."
+        exit 1
+    fi
     echo ""
 }
 
@@ -540,22 +616,33 @@ setup_git_identity() {
 
 # Main
 main() {
+    if [ "$EUID" -eq 0 ]; then
+        echo "ERROR: do not run the full setup script as root."
+        echo "Only bin/install-codex-system-config uses elevation for /etc/codex."
+        exit 1
+    fi
+
     check_prerequisites
     setup_git_identity
     check_ssh_workflow_tools
     check_pdf_workflow_tools
     backup_existing
     create_symlinks
+    ensure_codex_user_config
+    check_codex_config_layers
     install_deps
+    install_zotero_mcp
     check_secrets
+    validate_zotero_route
     setup_shell_rc
 
     echo "=== Setup Complete ==="
     echo ""
     echo "Claude Code configuration is now symlinked to botfiles."
-    echo "Codex CLI configuration, skills, and AGENTS.md are now symlinked to botfiles."
+    echo "Codex skills, profiles, and AGENTS.md are now symlinked to botfiles."
+    echo "Existing Codex user config was preserved; a missing local overlay was created."
     echo "Zellij config is now symlinked to botfiles."
-    echo "Oracle wrappers are now symlinked into ~/.local/bin."
+    echo "Oracle and Zotero wrappers are now symlinked into ~/.local/bin."
     echo ""
     echo "Shell bootstrap (two-layer model):"
     echo "  .botenv  -> core env (secrets, PATH, UV_BIN) loaded for ALL shell contexts"

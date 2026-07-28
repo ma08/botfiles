@@ -1,4 +1,4 @@
-# Layered on top of config.toml when codex is invoked with `--profile chatgpt`.
+# Layered on top of the native system/user stack with `--profile chatgpt`.
 # Migrated from the legacy `[profiles.chatgpt]` block on 2026-05-26 after
 # codex-cli 0.134.0 dropped support for both nested `[profiles.*]` tables
 # and the top-level `profile = "..."` selector. New scheme: each profile

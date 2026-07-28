@@ -3,7 +3,7 @@
 # Why this exists:
 # - Codex notify hooks run via non-interactive shells where PATH may differ.
 # - We want a single botfiles config that works on both Linux VMs and macOS.
-# - Centralizing uv lookup here keeps codex/config.toml simple.
+# - Centralizing uv lookup here keeps codex/config.system.toml simple.
 #
 # Resolution order:
 # 1) Respect pre-set UV_BIN (manual override before sourcing .botrc)
