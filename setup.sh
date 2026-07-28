@@ -308,7 +308,9 @@ create_symlinks() {
 }
 
 check_codex_config_layers() {
-    local portable_config="$SCRIPT_DIR/codex/config.system.toml"
+    local portable_dir
+    portable_dir="$(cd "$SCRIPT_DIR/codex" && pwd -P)"
+    local portable_config="$portable_dir/config.system.toml"
     local user_config="$CODEX_DIR/config.toml"
     local system_config="/etc/codex/config.toml"
 
