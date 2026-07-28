@@ -1,6 +1,6 @@
 ---
 name: rename-active-codex-threads
-description: Rename all recently active Codex threads across the local app and connected remote hosts using tracker ID, stable task domain, and current status. Use when the user asks to update, refresh, normalize, or rename active/recent Codex thread names in one batch, or invokes $rename-active-codex-threads.
+description: Rename all recently active Codex threads across the local app and connected remote hosts with native codex_app thread tools, using tracker ID, stable task domain, and current status. Use when the user asks to update, refresh, normalize, or rename active/recent Codex thread names in one batch, or invokes $rename-active-codex-threads.
 ---
 
 # Rename Active Codex Threads
@@ -13,13 +13,13 @@ This is a user-visible batch change. Use a two-phase workflow:
 
 1. Build and validate the readable inventory returned for currently available local and connected-remote hosts.
 2. Attempt every eligible candidate independently and collect decisions for every successful, confident read.
-3. After all candidates have been attempted, call `set_thread_title` for confirmed changes and skip failed or uncertain candidates.
+3. After all candidates have been attempted, call native `codex_app.set_thread_title` for confirmed changes and skip failed or uncertain candidates.
 
 If `list_threads` itself is incomplete, unreadable, or times out, make no title changes anywhere in that run. Otherwise process every host returned as available. A failed or unreadable candidate affects only that thread: skip it, continue with the remaining candidates, and report the failure. Skip offline, unavailable, retired, or unlisted hosts; do not require hardcoded or historically seen hostnames. Do not use a local SQLite/database fallback for a batch run.
 
 ## Naming Contract
 
-Use the `rename-codex-thread` convention:
+Use this naming convention:
 
 ```text
 <tracker id> · <stable domain> · <current status>
@@ -62,7 +62,7 @@ Use the `rename-codex-thread` convention:
 
 ## Write Phase
 
-1. After every eligible candidate has been attempted, call `set_thread_title` only for confirmed material changes from successful reads, using the exact thread ID.
+1. After every eligible candidate has been attempted, call native `codex_app.set_thread_title` only for confirmed material changes from successful reads, using the exact thread ID.
 2. Do not use `--current` in a batch workflow.
 3. Do not use the SQLite fallback or any path that touches activity timestamps.
 4. A title-only change must not be treated as new task activity or used to extend the two-hour candidate window.
