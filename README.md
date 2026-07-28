@@ -326,6 +326,10 @@ Codex uses native system/user precedence:
 action. Use the `sync-botfiles-machines` verifier to audit layer ownership and
 effective MCP/plugin support without printing values.
 
+When a reviewed candidate system link must later move to a landed checkout,
+record its exact current target and pass that path with `--replace-from`. The
+installer refuses a stale or unacknowledged target instead of overwriting it.
+
 `setup.sh` creates an empty mode-`0600` user overlay only when none exists,
 installs `zotero-mcp-server` 0.6.0 when needed, and checks that the Zotero route
 can launch. Linux uses Zotero Web API mode and therefore requires a populated

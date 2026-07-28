@@ -4,17 +4,22 @@
 set -euo pipefail
 
 usage() {
-    printf 'Usage: %s [--source PATH] (--apply | --check)\n' "$0" >&2
+    printf 'Usage: %s [--source PATH] [--replace-from PATH] (--apply | --check)\n' "$0" >&2
 }
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 source_path="$script_dir/../codex/config.system.toml"
+replace_from=""
 action=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --source)
             source_path="${2:?missing --source value}"
+            shift 2
+            ;;
+        --replace-from)
+            replace_from="${2:?missing --replace-from value}"
             shift 2
             ;;
         --apply)
@@ -47,6 +52,12 @@ done
 
 source_dir="$(cd "$(dirname "$source_path")" && pwd -P)"
 source_path="$source_dir/$(basename "$source_path")"
+if [[ -n "$replace_from" ]]; then
+    [[ "$replace_from" == /* ]] || {
+        printf 'error: --replace-from must be the exact absolute symlink target\n' >&2
+        exit 1
+    }
+fi
 system_dir="/etc/codex"
 system_path="$system_dir/config.toml"
 
@@ -80,15 +91,28 @@ if [[ "$action" == "check" ]]; then
 fi
 
 if [[ "$EUID" -ne 0 ]]; then
-    exec sudo -- "$0" --source "$source_path" --apply
+    sudo_args=(--source "$source_path" --apply)
+    if [[ -n "$replace_from" ]]; then
+        sudo_args+=(--replace-from "$replace_from")
+    fi
+    exec sudo -- "$0" "${sudo_args[@]}"
 fi
 
 if [[ -L "$system_path" ]] &&
    [[ "$(readlink "$system_path")" != "$source_path" ]]; then
-    printf 'error: refusing to replace existing Codex system symlink: %s\n' \
-        "$system_path" >&2
-    printf 'current target: %s\n' "$(readlink "$system_path")" >&2
-    exit 1
+    current_target="$(readlink "$system_path")"
+    if [[ -z "$replace_from" ]]; then
+        printf 'error: refusing to replace existing Codex system symlink: %s\n' \
+            "$system_path" >&2
+        printf 'current target: %s\n' "$current_target" >&2
+        printf 'use --replace-from with the exact reviewed current target\n' >&2
+        exit 1
+    fi
+    if [[ "$current_target" != "$replace_from" ]]; then
+        printf 'error: current Codex system target does not match --replace-from\n' >&2
+        exit 1
+    fi
+    printf 'replacing_verified_target=%s\n' "$current_target"
 fi
 
 if [[ -e "$system_path" && ! -L "$system_path" ]]; then

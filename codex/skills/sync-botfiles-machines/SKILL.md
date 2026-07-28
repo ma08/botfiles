@@ -206,8 +206,10 @@ After approval:
 1. Confirm the candidate is clean and based on live remote `main`.
 2. Fast-forward and push `main` without force or a merge commit.
 3. Preserve post-snapshot changes and fast-forward every client checkout.
-4. Repoint system symlinks to each canonical landed checkout and run setup only
-   where needed.
+4. Record each current system-link target, then repoint it to the canonical
+   landed checkout with
+   `install-codex-system-config --replace-from <exact-old-target> --apply`;
+   run setup only where needed.
 5. Run `scripts/verify-pair.sh` and the layer verifier on every host.
 6. Confirm exact `HEAD == main == origin/main`, the accepted config contract,
    and only documented local state.
