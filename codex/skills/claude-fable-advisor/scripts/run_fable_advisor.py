@@ -61,11 +61,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cwd", type=Path, default=Path.cwd(), help="Claude process cwd.")
     parser.add_argument("--model", default="fable", help="Claude model alias or ID.")
     parser.add_argument("--effort", default="max", choices=EFFORT_CHOICES)
-    parser.add_argument("--max-turns", type=int, default=1)
+    parser.add_argument(
+        "--max-turns",
+        type=int,
+        help="Maximum agentic turns. Defaults to 1 without tools and 3 with tools.",
+    )
     parser.add_argument(
         "--tools",
         default="",
-        help='Claude --tools value. Default empty string disables all tools.',
+        help=(
+            'Claude --tools allowlist. Default empty string disables all tools. '
+            'Use values such as "Read,Bash"; prefer --with-tools for the full '
+            "default tool set."
+        ),
+    )
+    parser.add_argument(
+        "--with-tools",
+        action="store_true",
+        help="Enable Claude Code's full default built-in tool set.",
+    )
+    parser.add_argument(
+        "--yolo",
+        action="store_true",
+        help=(
+            "Bypass Claude Code permission checks. Requires --with-tools or a "
+            "non-empty --tools allowlist."
+        ),
     )
     parser.add_argument(
         "--check-only",
@@ -226,9 +247,25 @@ def write_status(output_dir: Path, status: dict[str, object]) -> None:
     (output_dir / "status.json").write_text(json.dumps(status, indent=2, sort_keys=True) + "\n")
 
 
+def resolve_tools(args: argparse.Namespace) -> str:
+    if args.with_tools and args.tools:
+        raise SystemExit(
+            "run_fable_advisor.py: use either --with-tools or --tools, not both"
+        )
+    tools = "default" if args.with_tools else args.tools
+    if args.yolo and not tools:
+        raise SystemExit(
+            "run_fable_advisor.py: --yolo requires --with-tools or a non-empty "
+            "--tools allowlist"
+        )
+    return tools
+
+
 def main() -> int:
     args = parse_args()
     args.cwd = args.cwd.resolve()
+    tools = resolve_tools(args)
+    max_turns = args.max_turns if args.max_turns is not None else (3 if tools else 1)
     output_dir = (args.output_dir or default_output_dir(args.cwd)).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -247,6 +284,9 @@ def main() -> int:
         "outputDir": str(output_dir),
         "model": args.model,
         "effort": args.effort,
+        "tools": tools or "disabled",
+        "yolo": args.yolo,
+        "maxTurns": max_turns,
         "checkOnly": args.check_only,
         "dryRun": args.dry_run,
     }
@@ -280,15 +320,17 @@ def main() -> int:
         "--effort",
         args.effort,
         "--tools",
-        args.tools,
+        tools,
         "--no-session-persistence",
         "--output-format",
         "text",
         "--max-turns",
-        str(args.max_turns),
+        str(max_turns),
         "-p",
         "Respond to the advisory request provided on stdin.",
     ]
+    if args.yolo:
+        command.insert(command.index("--no-session-persistence"), "--dangerously-skip-permissions")
     status["commandPreview"] = " ".join(shlex.quote(part) for part in command) + " < prompt.md"
     status["promptPath"] = str(output_dir / "prompt.md")
     write_status(output_dir, status)

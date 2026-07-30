@@ -22,7 +22,9 @@ Before every live request, use `scripts/run_fable_advisor.py`. The script:
 - refuses unless the status shows `loggedIn=true`, `authMethod=claude.ai`,
   `apiProvider=firstParty`, and a non-empty `subscriptionType`;
 - runs `claude --model fable --effort max -p ...` only after the gate passes;
-- disables Claude tools by default and writes reusable output artifacts.
+- disables Claude tools by default and writes reusable output artifacts;
+- can opt into all default tools with `--with-tools`, a bounded allowlist with
+  `--tools "Read,Bash"`, and full permission bypass with `--yolo`.
 
 Do not use `claude --bare` for this workflow. Bare mode skips OAuth/keychain
 subscription auth and expects API-key or third-party-provider credentials.
@@ -40,7 +42,7 @@ subscription auth and expects API-key or third-party-provider credentials.
 4. Run a route-only check when uncertain:
 
    ```bash
-   python /home/azureuser/pro/botfiles/codex/skills/claude-fable-advisor/scripts/run_fable_advisor.py \
+   uv run python "$HOME/pro/botfiles/codex/skills/claude-fable-advisor/scripts/run_fable_advisor.py" \
      --check-only \
      --output-dir /path/to/artifacts/fable-route-check
    ```
@@ -48,7 +50,7 @@ subscription auth and expects API-key or third-party-provider credentials.
 5. Run the live advisory request:
 
    ```bash
-   python /home/azureuser/pro/botfiles/codex/skills/claude-fable-advisor/scripts/run_fable_advisor.py \
+   uv run python "$HOME/pro/botfiles/codex/skills/claude-fable-advisor/scripts/run_fable_advisor.py" \
      --prompt-file /path/to/fable-prompt.md \
      --file /path/to/relevant-file \
      --output-dir /path/to/artifacts/fable-review
@@ -57,7 +59,25 @@ subscription auth and expects API-key or third-party-provider credentials.
    Add `--dry-run` first when you want to render `prompt.md` and `status.json`
    without making a model request.
 
-6. Read `answer.md`, `status.json`, and `stderr.txt` from the output directory.
+6. Choose the tool mode deliberately:
+
+   - No tools (default): omit both `--with-tools` and `--tools`.
+   - Full default tool set with normal permission handling: add
+     `--with-tools`.
+   - Bounded tool set: add a quoted allowlist such as
+     `--tools "Read,Bash"`.
+   - Full default tools with all permission checks bypassed: add
+     `--with-tools --yolo`.
+
+   `--yolo` maps to Claude Code's `--dangerously-skip-permissions` and is
+   rejected unless tools are enabled. Use it only with explicit user approval
+   or an already-approved implementation scope, from a trusted working
+   directory, with a narrowly bounded prompt. It does not weaken the
+   subscription route gate and never enables a cloud-provider fallback.
+   Tool-enabled runs default to three agentic turns so Fable can call a tool
+   and then return its judgment; override with `--max-turns` when needed.
+
+7. Read `answer.md`, `status.json`, and `stderr.txt` from the output directory.
    Summarize Fable's advice, state what you accept or reject, and verify any
    actionable recommendation locally before changing code.
 
