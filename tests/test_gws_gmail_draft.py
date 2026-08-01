@@ -78,6 +78,22 @@ class GmailDraftHelperTests(unittest.TestCase):
         self.assertEqual(payload["attachments"][0]["name"], "note.txt")
         self.assertEqual(payload["attachments"][0]["contentType"], "text/plain")
 
+    def test_quoted_display_name_with_comma_is_one_recipient(self) -> None:
+        result = run_helper(
+            "personal",
+            "--to",
+            '"Doe, Jane" <jane@example.com>',
+            "--subject",
+            "Display name",
+            "--body",
+            "Hello",
+            "--dry-run",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["to"], ['"Doe, Jane" <jane@example.com>'])
+
     def test_header_injection_is_rejected(self) -> None:
         result = run_helper(
             "columbia",
@@ -104,6 +120,10 @@ class GmailDraftHelperTests(unittest.TestCase):
             args_log = temp_path / "args.log"
             fake_gws.write_text(
                 "#!/bin/sh\n"
+                "if [ \"$2\" = auth ] && [ \"$3\" = status ]; then\n"
+                "  printf '%s\\n' '{\"scopes\":[\"https://www.googleapis.com/auth/gmail.compose\"]}'\n"
+                "  exit 0\n"
+                "fi\n"
                 "printf '%s\\n' \"$@\" > \"$FAKE_GWS_ARGS_LOG\"\n"
                 "printf '%s\\n' '{\"id\":\"draft-1\",\"message\":{\"id\":\"message-1\",\"threadId\":\"thread-1\"}}'\n",
                 encoding="utf-8",
@@ -132,6 +152,43 @@ class GmailDraftHelperTests(unittest.TestCase):
         self.assertEqual(payload["draftId"], "draft-1")
         self.assertEqual(invoked_args[:5], ["work", "gmail", "users", "drafts", "create"])
         self.assertNotIn("send", invoked_args)
+
+    def test_missing_compose_scope_stops_before_draft_create(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            fake_gws = temp_path / "gws-account"
+            create_marker = temp_path / "create-called"
+            fake_gws.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$2\" = auth ] && [ \"$3\" = status ]; then\n"
+                "  printf '%s\\n' '{\"scopes\":[\"https://www.googleapis.com/auth/gmail.readonly\"]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "touch \"$FAKE_GWS_CREATE_MARKER\"\n"
+                "exit 99\n",
+                encoding="utf-8",
+            )
+            fake_gws.chmod(0o700)
+            env = os.environ.copy()
+            env["PATH"] = f"{temp_path}:{env['PATH']}"
+            env["FAKE_GWS_CREATE_MARKER"] = str(create_marker)
+
+            result = run_helper(
+                "columbia",
+                "--to",
+                "self@example.com",
+                "--subject",
+                "Scope test",
+                "--body",
+                "Never create",
+                env=env,
+            )
+
+            self.assertFalse(create_marker.exists())
+
+        self.assertEqual(result.returncode, 77)
+        self.assertIn("missing the required gmail.compose scope", result.stderr)
+        self.assertIn("gws-account columbia auth login --scopes", result.stderr)
 
 
 if __name__ == "__main__":

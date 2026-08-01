@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from email.message import EmailMessage
+from email.utils import formataddr, getaddresses
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
@@ -20,6 +21,14 @@ ACCOUNT_ADDRESSES = {
     "personal": "sourya4@gmail.com",
     "columbia": "sk5057@columbia.edu",
 }
+
+GMAIL_COMPOSE_SCOPE = "https://www.googleapis.com/auth/gmail.compose"
+AUTH_SCOPES = (
+    "https://www.googleapis.com/auth/calendar.readonly,"
+    "https://www.googleapis.com/auth/drive.readonly,"
+    "https://www.googleapis.com/auth/gmail.readonly,"
+    f"{GMAIL_COMPOSE_SCOPE}"
+)
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -55,13 +64,53 @@ def _safe_header(value: str, field: str) -> str:
 
 
 def _addresses(values: list[str] | None, field: str) -> list[str]:
+    raw_values = [_safe_header(value, field) for value in values or []]
     addresses: list[str] = []
-    for value in values or []:
-        for address in value.split(","):
-            normalized = _safe_header(address, field)
-            if normalized:
-                addresses.append(normalized)
+    for display_name, address in getaddresses(raw_values):
+        display_name = _safe_header(display_name, field)
+        address = _safe_header(address, field)
+        if not address:
+            raise ValueError(f"{field} contains an invalid recipient")
+        addresses.append(formataddr((display_name, address)) if display_name else address)
     return addresses
+
+
+def _compose_scope_available(account: str) -> bool:
+    result = subprocess.run(
+        ["gws-account", account, "auth", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(
+            f"gws-gmail-draft: could not verify OAuth scopes for {account} "
+            f"(exit {result.returncode})",
+            file=sys.stderr,
+        )
+        if result.stderr:
+            print(result.stderr.rstrip(), file=sys.stderr)
+        return False
+
+    try:
+        status = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print("gws-gmail-draft: gws auth status returned non-JSON output", file=sys.stderr)
+        return False
+
+    if GMAIL_COMPOSE_SCOPE in status.get("scopes", []):
+        return True
+
+    print(
+        f"gws-gmail-draft: {account} is missing the required gmail.compose scope. "
+        "Reauthorize with:",
+        file=sys.stderr,
+    )
+    print(
+        f"  gws-account {account} auth login --scopes {AUTH_SCOPES}",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _body(args: argparse.Namespace) -> str:
@@ -176,6 +225,9 @@ def main() -> int:
     if shutil.which("gws-account") is None:
         print("gws-gmail-draft: gws-account is not on PATH", file=sys.stderr)
         return 127
+
+    if not _compose_scope_available(args.account):
+        return 77
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii").rstrip("=")
     command = [

@@ -20,7 +20,7 @@ client_secret_file="${HOME}/.config/gws/client_secret.json"
 if [[ ! -f "$credentials_file" ]]; then
   echo "Missing credentials for alias '$alias_name': $credentials_file" >&2
   echo "Initialize the account first with:" >&2
-  echo "  gws auth login --readonly --services drive,gmail" >&2
+  echo "  gws auth login --scopes https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose" >&2
   echo "  gws-save-account $alias_name" >&2
   exit 66
 fi
