@@ -18,6 +18,9 @@ AWS, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
 Before every live request, use `scripts/run_fable_advisor.py`. The script:
 
 - strips known provider/API billing variables from the child environment;
+- runs Claude in safe mode with an explicit empty strict MCP configuration;
+- strips common cloud, GitHub, and app credential environment variables from
+  tool-enabled runs unless `--inherit-credentials` is explicitly supplied;
 - runs `claude auth status --json`;
 - refuses unless the status shows `loggedIn=true`, `authMethod=claude.ai`,
   `apiProvider=firstParty`, and a non-empty `subscriptionType`;
@@ -74,6 +77,9 @@ subscription auth and expects API-key or third-party-provider credentials.
    or an already-approved implementation scope, from a trusted working
    directory, with a narrowly bounded prompt. It does not weaken the
    subscription route gate and never enables a cloud-provider fallback.
+   Safe mode and environment stripping reduce ambient authority but are not a
+   filesystem or network sandbox. Use `--inherit-credentials` only when the
+   approved task explicitly needs those credentials.
    Tool-enabled runs default to three agentic turns so Fable can call a tool
    and then return its judgment; override with `--max-turns` when needed.
 

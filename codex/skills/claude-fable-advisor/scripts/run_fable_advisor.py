@@ -37,6 +37,38 @@ PROVIDER_REMOVE_ENV = {
     "AWS_BEARER_TOKEN_BEDROCK",
 }
 
+EMPTY_MCP_CONFIG = '{"mcpServers":{}}'
+
+AMBIENT_CREDENTIAL_PREFIXES = (
+    "ARM_",
+    "AWS_",
+    "AZURE_",
+    "DATABASE_",
+    "DOCKER_",
+    "GCP_",
+    "GEMINI_",
+    "GH_",
+    "GITHUB_",
+    "GOOGLE_",
+    "HUGGING_FACE_",
+    "LINEAR_",
+    "NOTION_",
+    "OPENAI_",
+    "RENDER_",
+    "SLACK_",
+    "SUPABASE_",
+    "VERCEL_",
+    "VERTEX_",
+)
+
+AMBIENT_CREDENTIAL_NAMES = {
+    "HF_TOKEN",
+    "KUBECONFIG",
+    "NPM_TOKEN",
+    "PGPASSWORD",
+    "PYPI_TOKEN",
+}
+
 EFFORT_CHOICES = ("low", "medium", "high", "xhigh", "max")
 
 
@@ -88,6 +120,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--inherit-credentials",
+        action="store_true",
+        help=(
+            "Allow tool-enabled runs to inherit common cloud, GitHub, and app "
+            "credential environment variables. Disabled by default."
+        ),
+    )
+    parser.add_argument(
         "--check-only",
         action="store_true",
         help="Run the subscription route gate and write status, but do not call Fable.",
@@ -106,10 +146,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def clean_env() -> dict[str, str]:
-    env = os.environ.copy()
+def clean_env(
+    *,
+    strip_ambient_credentials: bool = False,
+    source_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    env = dict(os.environ if source_env is None else source_env)
     for name in PROVIDER_REMOVE_ENV:
         env.pop(name, None)
+    if strip_ambient_credentials:
+        for name in list(env):
+            if name in AMBIENT_CREDENTIAL_NAMES or name.startswith(
+                AMBIENT_CREDENTIAL_PREFIXES
+            ):
+                env.pop(name, None)
     for name, value in PROVIDER_FALSE_ENV.items():
         env[name] = value
     return env
@@ -211,8 +261,10 @@ def auth_gate(
 ) -> tuple[bool, dict[str, object]]:
     command = [
         claude_bin,
-        "--setting-sources",
-        "user",
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        EMPTY_MCP_CONFIG,
         "--settings",
         safe_settings(args.model, args.effort),
         "auth",
@@ -257,7 +309,48 @@ def resolve_tools(args: argparse.Namespace) -> str:
             "run_fable_advisor.py: --yolo requires --with-tools or a non-empty "
             "--tools allowlist"
         )
+    if args.inherit_credentials and not tools:
+        raise SystemExit(
+            "run_fable_advisor.py: --inherit-credentials requires --with-tools "
+            "or a non-empty --tools allowlist"
+        )
     return tools
+
+
+def build_fable_command(
+    claude_bin: str,
+    args: argparse.Namespace,
+    tools: str,
+    max_turns: int,
+) -> list[str]:
+    command = [
+        claude_bin,
+        "--safe-mode",
+        "--strict-mcp-config",
+        "--mcp-config",
+        EMPTY_MCP_CONFIG,
+        "--settings",
+        safe_settings(args.model, args.effort),
+        "--model",
+        args.model,
+        "--effort",
+        args.effort,
+        "--tools",
+        tools,
+        "--no-session-persistence",
+        "--output-format",
+        "text",
+        "--max-turns",
+        str(max_turns),
+        "-p",
+        "Respond to the advisory request provided on stdin.",
+    ]
+    if args.yolo:
+        command.insert(
+            command.index("--no-session-persistence"),
+            "--dangerously-skip-permissions",
+        )
+    return command
 
 
 def main() -> int:
@@ -275,7 +368,8 @@ def main() -> int:
         print(status["error"], file=sys.stderr)
         return 127
 
-    env = clean_env()
+    strip_ambient_credentials = bool(tools) and not args.inherit_credentials
+    env = clean_env(strip_ambient_credentials=strip_ambient_credentials)
     route_ok, auth_status = auth_gate(claude_bin, args, env)
     status: dict[str, object] = {
         "ok": False,
@@ -285,6 +379,9 @@ def main() -> int:
         "effort": args.effort,
         "tools": tools or "disabled",
         "yolo": args.yolo,
+        "ambientCredentials": (
+            "stripped" if strip_ambient_credentials else "inherited"
+        ),
         "maxTurns": max_turns,
         "checkOnly": args.check_only,
         "dryRun": args.dry_run,
@@ -308,28 +405,7 @@ def main() -> int:
     prompt = inline_files(load_prompt(args), args.file, args.cwd, args.max_file_bytes)
     (output_dir / "prompt.md").write_text(prompt)
 
-    command = [
-        claude_bin,
-        "--setting-sources",
-        "user",
-        "--settings",
-        safe_settings(args.model, args.effort),
-        "--model",
-        args.model,
-        "--effort",
-        args.effort,
-        "--tools",
-        tools,
-        "--no-session-persistence",
-        "--output-format",
-        "text",
-        "--max-turns",
-        str(max_turns),
-        "-p",
-        "Respond to the advisory request provided on stdin.",
-    ]
-    if args.yolo:
-        command.insert(command.index("--no-session-persistence"), "--dangerously-skip-permissions")
+    command = build_fable_command(claude_bin, args, tools, max_turns)
     status["commandPreview"] = " ".join(shlex.quote(part) for part in command) + " < prompt.md"
     status["promptPath"] = str(output_dir / "prompt.md")
     write_status(output_dir, status)

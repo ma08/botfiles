@@ -11,9 +11,11 @@ apiProvider=firstParty
 subscriptionType=<paid plan>
 ```
 
-It strips API-key and third-party provider variables from the child process.
-It does not fall back to Bedrock, Vertex, Foundry, Claude Platform on AWS, or
-Console/API billing.
+It runs Claude in safe mode with an explicit empty MCP configuration and strips
+API-key and third-party provider variables from the child process. Tool-enabled
+runs also strip common cloud, GitHub, and app credential environment variables
+by default. It does not fall back to Bedrock, Vertex, Foundry, Claude Platform
+on AWS, or Console/API billing.
 
 ## Choose a mode
 
@@ -163,10 +165,16 @@ uv run python "$RUNNER" \
 Use `--tools "Read"` when Fable only needs file access. Adding `Bash` permits
 arbitrary shell commands; it is not a read-only guarantee.
 
+If a tool-enabled task deliberately needs ambient credentials, add
+`--inherit-credentials`. This is an explicit opt-in and should be paired with a
+narrow allowlist and prompt boundary.
+
 ## Yolo safety
 
 `--yolo` maps to Claude Code's `--dangerously-skip-permissions`. The runner
-rejects it unless tools are enabled, but it is not a sandbox.
+rejects it unless tools are enabled. Safe mode, an empty strict MCP config, and
+credential-environment stripping reduce ambient authority, but they are not a
+sandbox: files and locally authenticated CLIs can still expose capabilities.
 
 Before using it:
 
