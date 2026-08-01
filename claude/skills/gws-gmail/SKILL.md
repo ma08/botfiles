@@ -24,9 +24,11 @@ gws gmail <resource> <method> [flags]
 |---------|-------------|
 | [`+triage`](../gws-gmail-triage/SKILL.md) | Show unread inbox summary (sender, subject, date) |
 | [`+read`](../gws-gmail-read/SKILL.md) | Read a message and extract its body or headers |
+| [`gws-gmail-draft`](../gws-gmail-draft/SKILL.md) | Create an unsent Gmail draft through a named account alias |
 
 For sending, replying, forwarding, or watch setup, inspect the raw Gmail CLI
 resources below with `gws schema` and use `gws gmail <resource> <method>`.
+Draft creation must use `gws-gmail-draft`; do not substitute a send helper.
 
 ## API Resources
 

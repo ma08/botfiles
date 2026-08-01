@@ -177,6 +177,32 @@ sudo apt-get install -y poppler-utils
 
 Keep the curated upstream `codex/skills/pdf` skill unmodified so future upstream pulls stay simple. Install Poppler at the machine level, and for one-off Python PDF work prefer `uv run --with reportlab,pdfplumber,pypdf ...` from a task scratchpad instead of mutating arbitrary project environments.
 
+### Google Workspace multi-account mail
+
+The repo-managed `gws-account` wrapper selects private account exports under
+`~/.config/gws/accounts/` for the `work`, `personal`, and `columbia` aliases.
+Those credential files are machine-local, mode `0600`, and must never be
+committed. Named aliases default their derived token cache to the CLI's
+file-backed encryption mode so non-interactive Mac SSH sessions do not depend
+on GUI keychain access.
+
+Use `gws-gmail-draft` for a consistent unsent-draft workflow across machines,
+including hosts pinned to an older compatible `gws` release:
+
+```bash
+gws-gmail-draft work \
+  --to recipient@example.com \
+  --subject "Follow-up" \
+  --body-file ./draft.txt \
+  --dry-run
+```
+
+Draft creation requires the Gmail `gmail.compose` OAuth scope. Google does not
+offer a general draft-only scope: `gmail.compose` also technically permits
+sending. The helper calls only `users.drafts.create`; sending remains a separate
+explicitly confirmed workflow. See `codex/skills/gws-gmail-draft/SKILL.md` or
+the matching Claude skill for the intent gate and account workflow.
+
 ## Mac Keep-Awake GUI
 
 For Mac lid-closed keep-awake workflows, prefer the free Amphetamine menu-bar app plus its official Power Protect / Enhancer guidance instead of maintaining a custom `pmset` wrapper. See [`docs/mac-keep-awake-amphetamine.md`](docs/mac-keep-awake-amphetamine.md).

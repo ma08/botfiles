@@ -26,6 +26,7 @@ if [[ ! -f "$credentials_file" ]]; then
 fi
 
 mkdir -p "$state_dir"
+chmod 700 "$state_dir"
 
 python3 - "$credentials_file" "$normalized_credentials" <<'PY'
 import json
@@ -50,6 +51,13 @@ fi
 
 export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$normalized_credentials"
 export GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$state_dir"
+if [[ -z "${GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND:-}" ]]; then
+  # Named aliases are designed for non-interactive agent and SSH use. macOS
+  # keychain access can fail in those sessions when a refreshed access token
+  # must be cached, so keep the derived cache private and file-backed by
+  # default. Operators can still override this explicitly.
+  export GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND="${GWS_ACCOUNT_KEYRING_BACKEND:-file}"
+fi
 
 if [[ -z "${GOOGLE_WORKSPACE_PROJECT_ID:-}" && -f "$client_secret_file" ]]; then
   project_id="$(

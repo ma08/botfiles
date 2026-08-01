@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Create a Gmail draft through a named gws account alias; never send it."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import mimetypes
+import shutil
+import subprocess
+import sys
+from email.message import EmailMessage
+from html.parser import HTMLParser
+from pathlib import Path
+from typing import ClassVar
+
+ACCOUNT_ADDRESSES = {
+    "work": "sourya4@trymyzone.com",
+    "personal": "sourya4@gmail.com",
+    "columbia": "sk5057@columbia.edu",
+}
+
+
+class _HTMLTextExtractor(HTMLParser):
+    """Produce a basic plain-text fallback for an HTML draft body."""
+
+    BREAK_TAGS: ClassVar[set[str]] = {"br", "div", "li", "p", "tr"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        del attrs
+        if tag.lower() in self.BREAK_TAGS and self.parts:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in self.BREAK_TAGS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def text(self) -> str:
+        lines = (" ".join(line.split()) for line in "".join(self.parts).splitlines())
+        return "\n".join(line for line in lines if line).strip()
+
+
+def _safe_header(value: str, field: str) -> str:
+    if "\r" in value or "\n" in value:
+        raise ValueError(f"{field} cannot contain line breaks")
+    return value.strip()
+
+
+def _addresses(values: list[str] | None, field: str) -> list[str]:
+    addresses: list[str] = []
+    for value in values or []:
+        for address in value.split(","):
+            normalized = _safe_header(address, field)
+            if normalized:
+                addresses.append(normalized)
+    return addresses
+
+
+def _body(args: argparse.Namespace) -> str:
+    if args.body is not None:
+        return args.body
+    return args.body_file.read_text(encoding="utf-8")
+
+
+def _plain_fallback(html_body: str) -> str:
+    extractor = _HTMLTextExtractor()
+    extractor.feed(html_body)
+    return extractor.text() or "HTML email draft"
+
+
+def _build_message(args: argparse.Namespace) -> tuple[EmailMessage, dict[str, object]]:
+    sender = _safe_header(args.from_address or ACCOUNT_ADDRESSES[args.account], "From")
+    subject = _safe_header(args.subject, "Subject")
+    to = _addresses(args.to, "To")
+    cc = _addresses(args.cc, "Cc")
+    bcc = _addresses(args.bcc, "Bcc")
+    body = _body(args)
+
+    message = EmailMessage()
+    message["From"] = sender
+    if to:
+        message["To"] = ", ".join(to)
+    if cc:
+        message["Cc"] = ", ".join(cc)
+    if bcc:
+        message["Bcc"] = ", ".join(bcc)
+    message["Subject"] = subject
+
+    if args.html:
+        message.set_content(_plain_fallback(body))
+        message.add_alternative(body, subtype="html")
+    else:
+        message.set_content(body)
+
+    attachment_summaries: list[dict[str, object]] = []
+    for attachment in args.attach:
+        if not attachment.is_file():
+            raise FileNotFoundError(f"Attachment not found: {attachment}")
+        content_type, _ = mimetypes.guess_type(attachment.name)
+        content_type = content_type or "application/octet-stream"
+        maintype, subtype = content_type.split("/", 1)
+        payload = attachment.read_bytes()
+        message.add_attachment(
+            payload,
+            maintype=maintype,
+            subtype=subtype,
+            filename=attachment.name,
+        )
+        attachment_summaries.append(
+            {
+                "name": attachment.name,
+                "contentType": content_type,
+                "sizeBytes": len(payload),
+            }
+        )
+
+    summary: dict[str, object] = {
+        "account": args.account,
+        "from": sender,
+        "to": to,
+        "cc": cc,
+        "bccCount": len(bcc),
+        "subject": subject,
+        "bodyKind": "html" if args.html else "text",
+        "bodyBytes": len(body.encode("utf-8")),
+        "attachments": attachment_summaries,
+        "gmailMethod": "users.drafts.create",
+        "willSend": False,
+    }
+    return message, summary
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Create an unsent Gmail draft through a named gws account alias."
+    )
+    parser.add_argument("account", choices=sorted(ACCOUNT_ADDRESSES))
+    parser.add_argument("--to", action="append", help="Recipient(s), repeatable or comma-separated")
+    parser.add_argument("--cc", action="append", help="CC recipient(s), repeatable or comma-separated")
+    parser.add_argument("--bcc", action="append", help="BCC recipient(s), repeatable or comma-separated")
+    parser.add_argument("--subject", required=True)
+    body_group = parser.add_mutually_exclusive_group(required=True)
+    body_group.add_argument("--body", help="Inline body text")
+    body_group.add_argument("--body-file", type=Path, help="UTF-8 body file")
+    parser.add_argument("--html", action="store_true", help="Treat the body as HTML")
+    parser.add_argument("--attach", action="append", type=Path, default=[], help="Attachment path")
+    parser.add_argument("--from-address", help="Configured Gmail send-as address")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Build and validate locally, then print a safe summary without calling Gmail",
+    )
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        message, summary = _build_message(args)
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(f"gws-gmail-draft: {exc}", file=sys.stderr)
+        return 2
+
+    if args.dry_run:
+        print(json.dumps({"status": "dry_run", **summary}, indent=2))
+        return 0
+
+    if shutil.which("gws-account") is None:
+        print("gws-gmail-draft: gws-account is not on PATH", file=sys.stderr)
+        return 127
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii").rstrip("=")
+    command = [
+        "gws-account",
+        args.account,
+        "gmail",
+        "users",
+        "drafts",
+        "create",
+        "--params",
+        json.dumps({"userId": "me"}, separators=(",", ":")),
+        "--json",
+        json.dumps({"message": {"raw": raw}}, separators=(",", ":")),
+        "--format",
+        "json",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        print(
+            f"gws-gmail-draft: Gmail draft creation failed (exit {result.returncode})",
+            file=sys.stderr,
+        )
+        if result.stderr:
+            print(result.stderr.rstrip(), file=sys.stderr)
+        return result.returncode
+
+    try:
+        response = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        print("gws-gmail-draft: Gmail returned a non-JSON response", file=sys.stderr)
+        return 1
+
+    print(
+        json.dumps(
+            {
+                "status": "draft_created",
+                **summary,
+                "draftId": response.get("id"),
+                "messageId": response.get("message", {}).get("id"),
+                "threadId": response.get("message", {}).get("threadId"),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
