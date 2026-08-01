@@ -17,7 +17,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 PROVIDER_FALSE_ENV = {
     "CLAUDE_CODE_USE_BEDROCK": "0",
     "CLAUDE_CODE_USE_MANTLE": "0",
