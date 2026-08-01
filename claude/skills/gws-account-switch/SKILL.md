@@ -18,7 +18,7 @@ Use this alongside `gws-shared`, `gws-gmail`, and `gws-drive` when the user care
 1. Confirm which alias the user wants if it is not already clear.
 2. Check whether `~/.config/gws/accounts/<alias>.json` exists.
 3. If the alias file is missing, tell the user the account must be initialized first:
-   - `gws auth login --readonly --services drive,gmail`
+   - `gws auth login --scopes https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose`
    - `gws-save-account <alias>`
 4. For commands against a specific mailbox, use:
    - `gws-account <alias> gmail +triage`

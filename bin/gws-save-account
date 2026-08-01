@@ -17,7 +17,8 @@ auth_method="$(
 )"
 
 if [[ "$auth_method" == "none" ]]; then
-  echo "No active gws auth session. Run 'gws auth login --readonly --services drive,gmail' first." >&2
+  echo "No active gws auth session. For a draft-enabled alias, run:" >&2
+  echo "  gws auth login --scopes https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose" >&2
   exit 1
 fi
 
