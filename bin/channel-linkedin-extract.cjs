@@ -149,6 +149,39 @@ function slugify(value) {
     .slice(0, 80) || "linkedin-thread";
 }
 
+function parseLinkedInEventUrn(eventUrn) {
+  const normalized = cleanText(eventUrn);
+  if (!normalized) {
+    return { event_urn: null, message_id: null, created_at: null };
+  }
+
+  const encodedMatch = normalized.match(/2-([A-Za-z0-9_-]+)/);
+  if (!encodedMatch) {
+    return { event_urn: normalized, message_id: normalized, created_at: null };
+  }
+
+  try {
+    const decoded = Buffer.from(encodedMatch[1], "base64url").toString("utf8");
+    const millisMatch = decoded.match(/^(\d{13})/);
+    if (!millisMatch) {
+      return { event_urn: normalized, message_id: normalized, created_at: null };
+    }
+    const millis = Number(millisMatch[1]);
+    const earliestPlausible = Date.UTC(2003, 0, 1);
+    const latestPlausible = Date.now() + 24 * 60 * 60 * 1000;
+    if (!Number.isSafeInteger(millis) || millis < earliestPlausible || millis > latestPlausible) {
+      return { event_urn: normalized, message_id: normalized, created_at: null };
+    }
+    return {
+      event_urn: normalized,
+      message_id: normalized,
+      created_at: new Date(millis).toISOString(),
+    };
+  } catch (_error) {
+    return { event_urn: normalized, message_id: normalized, created_at: null };
+  }
+}
+
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -269,7 +302,7 @@ async function collectConversationCards(page, limit) {
 }
 
 async function extractThreadMessages(page, maxMessages) {
-  return await page.evaluate((limit) => {
+  const extracted = await page.evaluate((limit) => {
     const clean = (value) =>
       String(value || "")
         .replace(/\u00a0/g, " ")
@@ -307,14 +340,18 @@ async function extractThreadMessages(page, maxMessages) {
       .filter((href, index, arr) => arr.indexOf(href) === index)
       .slice(0, 5);
 
+    const stableEventNodes = Array.from(
+      document.querySelectorAll("[data-event-urn*='message']")
+    );
     const eventSelectors = [
       "li.msg-s-message-list__event",
       ".msg-s-message-list__event",
       ".msg-s-event-listitem",
       ".msg-s-message-group",
-      "[data-event-urn*='message']",
     ];
-    let nodes = Array.from(document.querySelectorAll(eventSelectors.join(",")));
+    let nodes = stableEventNodes.length
+      ? stableEventNodes
+      : Array.from(document.querySelectorAll(eventSelectors.join(",")));
     if (nodes.length === 0) {
       nodes = Array.from(
         document.querySelectorAll(".msg-s-event-listitem__body, .msg-s-message-list__event-message")
@@ -342,6 +379,10 @@ async function extractThreadMessages(page, maxMessages) {
             ".msg-s-message-list__time-heading",
             ".msg-s-event-listitem__time",
           ]);
+      const eventNode = node.matches("[data-event-urn]")
+        ? node
+        : node.querySelector("[data-event-urn]");
+      const eventUrn = eventNode ? eventNode.getAttribute("data-event-urn") : null;
       const body = allText(node, [
         ".msg-s-event-listitem__body",
         ".msg-s-message-list__event-message",
@@ -351,11 +392,12 @@ async function extractThreadMessages(page, maxMessages) {
       ]);
 
       if (!body) continue;
-      const key = `${sender || ""}|${timestampText || ""}|${body}`;
+      const key = eventUrn || `${sender || ""}|${timestampText || ""}|${body}`;
       if (messages.some((message) => message._key === key)) continue;
       messages.push({
         sender,
         timestamp_text: timestampText,
+        event_urn: eventUrn,
         body,
         _key: key,
       });
@@ -367,6 +409,13 @@ async function extractThreadMessages(page, maxMessages) {
       messages: messages.slice(Math.max(0, messages.length - limit)).map(({ _key, ...message }) => message),
     };
   }, maxMessages);
+  return {
+    ...extracted,
+    messages: extracted.messages.map((message) => ({
+      ...message,
+      ...parseLinkedInEventUrn(message.event_urn),
+    })),
+  };
 }
 
 async function scrollProfile(page, opts) {
@@ -595,9 +644,11 @@ async function runRecent(opts) {
       try {
         await openConversationFromCard(page, card, i, opts);
         const thread = await extractThreadMessages(page, opts.maxMessages);
+        const threadUrl = canonicalLinkedInUrl(page.url());
         conversations.push({
           source: "linkedin",
-          conversation_id: card.href || `recent-${i}`,
+          conversation_id: threadUrl || card.href || `recent-${i}`,
+          thread_url: threadUrl,
           profile_url: thread.profile_urls ? thread.profile_urls[0] || null : null,
           profile_urls: thread.profile_urls || [],
           participant_names: card.participant_names,
@@ -723,6 +774,9 @@ async function runThread(opts) {
     const thread = targetOpened
       ? await extractThreadMessages(page, opts.maxMessages)
       : { thread_title: null, messages: [] };
+    const threadUrl = targetOpened && /\/messaging\/thread\//.test(page.url())
+      ? canonicalLinkedInUrl(page.url())
+      : canonicalLinkedInUrl(opts.threadUrl);
 
     return {
       ok: targetOpened,
@@ -732,19 +786,19 @@ async function runThread(opts) {
       headless: !opts.headed,
       ...login,
       target: targetLabel,
-      thread_url: opts.threadUrl,
+      thread_url: threadUrl,
       profile_url: opts.profileUrl,
       profile_name: cleanText(profileName),
       max_messages: opts.maxMessages,
       conversations: [
         {
           source: "linkedin",
-          conversation_id: opts.threadUrl
-            ? slugify(opts.threadUrl)
+          conversation_id: threadUrl
+            ? threadUrl
             : opts.profileUrl
               ? slugify(opts.profileUrl)
               : slugify(opts.name),
-          thread_url: opts.threadUrl,
+          thread_url: threadUrl,
           profile_url: opts.profileUrl,
           participant_names: cleanText(profileName) ? [cleanText(profileName)] : [],
           thread_title: thread.thread_title,
@@ -922,18 +976,22 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${JSON.stringify(
-      {
-        ok: false,
-        command: process.argv[2] || null,
-        extracted_at: nowIso(),
-        error: error.message,
-      },
-      null,
-      2
-    )}\n`
-  );
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${JSON.stringify(
+        {
+          ok: false,
+          command: process.argv[2] || null,
+          extracted_at: nowIso(),
+          error: error.message,
+        },
+        null,
+        2
+      )}\n`
+    );
+    process.exit(1);
+  });
+}
+
+module.exports = { parseLinkedInEventUrn };
