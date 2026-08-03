@@ -40,6 +40,7 @@ if [ -d "$BOTFILES_ROOT/secrets/local" ]; then
     "$BOTFILES_ROOT/secrets/local/codex-azure.rc" \
     "$BOTFILES_ROOT/secrets/local/codex-openai.rc" \
     "$BOTFILES_ROOT/secrets/local/deep-research.rc" \
+    "$BOTFILES_ROOT/secrets/local/deep-feed.rc" \
     "$BOTFILES_ROOT/secrets/local/opencode-azure.rc" \
     "$BOTFILES_ROOT/secrets/local/claude-hooks.rc"; do
     [ -f "$_botenv_secret" ] && . "$_botenv_secret"

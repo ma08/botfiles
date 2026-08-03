@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+const productionUrl = "https://deep-feed-sourya.ladduu6666.chatgpt.site";
+
+function flag(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return null;
+  const value = process.argv[index + 1];
+  return value && !value.startsWith("--") ? value : null;
+}
+
+function integerFlag(name, required = false) {
+  const value = flag(name);
+  if (value == null && !required) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    console.error(`${name} must be an integer`);
+    process.exit(2);
+  }
+  return parsed;
+}
+
+function usage() {
+  console.error(`Usage:
+  deep-feed-handoff get <handoff-id> --role router|consumer [--url https://...]
+  deep-feed-handoff route <handoff-id> <action> --role router --revision N --idempotency-key KEY [routing flags]
+  deep-feed-handoff fallback <handoff-id> --role consumer --revision N --route-generation N --idempotency-key KEY
+  deep-feed-handoff status <handoff-id> <status> --role consumer --revision N --route-generation N --task-thread-id ID [--result-file PATH]
+
+Routing flags:
+  --route-generation N --router-session-id ID --destination-thread-id ID
+  --destination-host-id ID --destination-title TEXT --destination-url URL
+  --dispatch-attempt-id ID --detail-json JSON`);
+  process.exit(2);
+}
+
+const [command, handoffId, action] = process.argv.slice(2, 5);
+if (!command || !handoffId || !handoffId.startsWith("handoff-")) usage();
+
+const role = flag("--role");
+if (
+  !["router", "consumer"].includes(role)
+  || (command === "route" && role !== "router")
+  || (command === "fallback" && role !== "consumer")
+  || (command === "status" && role !== "consumer")
+) usage();
+
+const tokenName = role === "router"
+  ? "DEEP_FEED_ROUTER_TOKEN"
+  : "DEEP_FEED_CONSUMER_TOKEN";
+const token = process.env[tokenName];
+if (!token) {
+  console.error(`${tokenName} is unavailable; source botfiles .botenv and check secrets/local/deep-feed.rc`);
+  process.exit(1);
+}
+
+const url = flag("--url") ?? productionUrl;
+const headers = {
+  "authorization": `Bearer ${token}`,
+  "content-type": "application/json",
+};
+if (process.env.OAI_SITES_BYPASS_TOKEN) {
+  headers["OAI-Sites-Authorization"] = `Bearer ${process.env.OAI_SITES_BYPASS_TOKEN}`;
+}
+
+let method = "GET";
+let body;
+if (command === "route") {
+  if (!action) usage();
+  const idempotencyKey = flag("--idempotency-key");
+  if (!idempotencyKey) usage();
+  method = "PATCH";
+  body = {
+    action,
+    idempotencyKey,
+    actor: flag("--actor") ?? "codex-router",
+    routerSessionId: flag("--router-session-id") ?? undefined,
+    expectedRevision: integerFlag("--revision", true),
+    expectedRouteGeneration: integerFlag("--route-generation"),
+    destinationThreadId: flag("--destination-thread-id") ?? undefined,
+    destinationHostId: flag("--destination-host-id") ?? undefined,
+    destinationTitle: flag("--destination-title") ?? undefined,
+    destinationUrl: flag("--destination-url") ?? undefined,
+    dispatchAttemptId: flag("--dispatch-attempt-id") ?? undefined,
+    detail: flag("--detail-json") ? JSON.parse(flag("--detail-json")) : undefined,
+  };
+} else if (command === "fallback") {
+  const idempotencyKey = flag("--idempotency-key");
+  if (!idempotencyKey) usage();
+  method = "PATCH";
+  body = {
+    action: "take_fallback",
+    idempotencyKey,
+    actor: flag("--actor") ?? "chief-of-staff-fallback",
+    expectedRevision: integerFlag("--revision", true),
+    expectedRouteGeneration: integerFlag("--route-generation", true),
+  };
+} else if (command === "status") {
+  if (!action) usage();
+  const resultFile = flag("--result-file");
+  method = "PATCH";
+  body = {
+    status: action,
+    actor: flag("--actor") ?? "codex-consumer",
+    taskThreadId: flag("--task-thread-id") ?? undefined,
+    expectedRevision: integerFlag("--revision", true),
+    expectedRouteGeneration: integerFlag("--route-generation", true),
+    result: resultFile ? await readFile(resolve(resultFile), "utf8") : flag("--result"),
+  };
+} else if (command !== "get") {
+  usage();
+}
+
+let response;
+try {
+  response = await fetch(new URL(`/api/handoffs/${encodeURIComponent(handoffId)}`, url), {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+} catch (error) {
+  console.error(`Deep Feed handoff request did not return a receipt: ${error.message}`);
+  process.exit(3);
+}
+const text = await response.text();
+if (!response.ok) {
+  console.error(`Deep Feed handoff request failed (${response.status}): ${text}`);
+  process.exit(1);
+}
+try {
+  console.log(JSON.stringify(JSON.parse(text), null, 2));
+} catch {
+  console.log(text);
+}

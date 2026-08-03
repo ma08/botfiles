@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+
+const productionUrl = "https://deep-feed-sourya.ladduu6666.chatgpt.site";
+const urlIndex = process.argv.indexOf("--url");
+const url = urlIndex >= 0 ? process.argv[urlIndex + 1] : productionUrl;
+if (!url || url.startsWith("--")) {
+  console.error("Usage: deep-feed-agent-state [--url https://...]");
+  process.exit(2);
+}
+const token = process.env.DEEP_FEED_CONSUMER_TOKEN;
+if (!token) {
+  console.error(
+    "DEEP_FEED_CONSUMER_TOKEN is unavailable; source botfiles .botenv and check secrets/local/deep-feed.rc",
+  );
+  process.exit(1);
+}
+const headers = { "authorization": `Bearer ${token}` };
+if (process.env.OAI_SITES_BYPASS_TOKEN) {
+  headers["OAI-Sites-Authorization"] = `Bearer ${process.env.OAI_SITES_BYPASS_TOKEN}`;
+}
+let response;
+try {
+  response = await fetch(new URL("/api/agent-state", url), { headers });
+} catch (error) {
+  console.error(`Deep Feed queue read did not return a receipt: ${error.message}`);
+  process.exit(3);
+}
+const text = await response.text();
+if (!response.ok) {
+  console.error(`Deep Feed queue read failed (${response.status}): ${text}`);
+  process.exit(1);
+}
+console.log(text);

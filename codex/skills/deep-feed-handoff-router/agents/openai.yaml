@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Feed Handoff Router"
+  short_description: "Route a Deep Feed handoff to the right task"
+  default_prompt: "Use $deep-feed-handoff-router to route this durable handoff safely."

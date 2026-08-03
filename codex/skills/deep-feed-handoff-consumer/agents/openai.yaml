@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Feed Handoff Consumer"
+  short_description: "Acknowledge and execute a routed Deep Feed handoff"
+  default_prompt: "Use $deep-feed-handoff-consumer to accept and work this routed handoff."

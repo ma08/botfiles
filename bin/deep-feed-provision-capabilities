@@ -1,0 +1,114 @@
+#!/usr/bin/env node
+
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+
+const botfilesRoot = resolve(import.meta.dirname, "..");
+const defaultDeepFeedEnv = join(homedir(), "pro/lab/deep-feed/.env.local");
+const productionUrl = "https://deep-feed-sourya.ladduu6666.chatgpt.site";
+
+function flag(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return null;
+  const value = process.argv[index + 1];
+  return value && !value.startsWith("--") ? value : null;
+}
+
+function parseEnv(text) {
+  return Object.fromEntries(
+    text.split(/\r?\n/)
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => {
+        const split = line.indexOf("=");
+        return [line.slice(0, split), line.slice(split + 1)];
+      }),
+  );
+}
+
+function shellQuote(value) {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+async function installSecretFile(path, content) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.tmp-${crypto.randomUUID()}`;
+  await writeFile(temporary, content, { encoding: "utf8", mode: 0o600 });
+  await rename(temporary, path);
+  await chmod(path, 0o600);
+}
+
+function run(command, args) {
+  const result = spawnSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (result.status !== 0) {
+    const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`;
+    throw new Error(`${command} failed: ${detail}`);
+  }
+}
+
+const url = flag("--url") ?? productionUrl;
+const envPath = flag("--env-file") ?? defaultDeepFeedEnv;
+const remoteHost = flag("--remote-host") ?? "research-cpu-01-ts";
+const noRemote = process.argv.includes("--no-remote");
+const localEnv = parseEnv(await readFile(envPath, "utf8"));
+const bypassToken = process.env.OAI_SITES_BYPASS_TOKEN
+  ?? localEnv.OAI_SITES_BYPASS_TOKEN;
+const ownerEmail = (process.env.OWNER_EMAILS ?? localEnv.OWNER_EMAILS ?? "")
+  .split(",")[0]?.trim();
+if (!ownerEmail) throw new Error("OWNER_EMAILS is unavailable");
+if (url.startsWith("https://") && !bypassToken) {
+  throw new Error("OAI_SITES_BYPASS_TOKEN is unavailable for the private production site");
+}
+
+const headers = {
+  "content-type": "application/json",
+  "oai-authenticated-user-email": ownerEmail,
+};
+if (bypassToken) headers["OAI-Sites-Authorization"] = `Bearer ${bypassToken}`;
+const response = await fetch(new URL("/api/machine-capabilities", url), {
+  method: "POST",
+  headers,
+  body: JSON.stringify({ scopes: ["router", "consumer"] }),
+});
+const payload = await response.json();
+if (
+  !response.ok
+  || typeof payload?.capabilities?.router !== "string"
+  || typeof payload?.capabilities?.consumer !== "string"
+) {
+  throw new Error(`Capability rotation failed (${response.status})`);
+}
+
+const localContent = [
+  "# Machine-local Deep Feed Plan v6 capabilities. Never commit this file.",
+  `export DEEP_FEED_ROUTER_TOKEN=${shellQuote(payload.capabilities.router)}`,
+  `export DEEP_FEED_CONSUMER_TOKEN=${shellQuote(payload.capabilities.consumer)}`,
+  bypassToken ? `export OAI_SITES_BYPASS_TOKEN=${shellQuote(bypassToken)}` : null,
+  "",
+].filter((line) => line != null).join("\n");
+const localPath = join(botfilesRoot, "secrets/local/deep-feed.rc");
+await installSecretFile(localPath, localContent);
+
+if (!noRemote) {
+  if (!bypassToken) throw new Error("A Sites bypass token is required for the remote consumer");
+  const remoteContent = [
+    "# Machine-local Deep Feed consumer capability. Never commit this file.",
+    `export DEEP_FEED_CONSUMER_TOKEN=${shellQuote(payload.capabilities.consumer)}`,
+    `export OAI_SITES_BYPASS_TOKEN=${shellQuote(bypassToken)}`,
+    "",
+  ].join("\n");
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "deep-feed-capabilities-"));
+  const temporaryFile = join(temporaryDirectory, "deep-feed.rc");
+  try {
+    await writeFile(temporaryFile, remoteContent, { encoding: "utf8", mode: 0o600 });
+    run("ssh", [remoteHost, "mkdir", "-p", "pro/botfiles/secrets/local"]);
+    run("scp", [temporaryFile, `${remoteHost}:pro/botfiles/secrets/local/deep-feed.rc`]);
+    run("ssh", [remoteHost, "chmod", "600", "pro/botfiles/secrets/local/deep-feed.rc"]);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+console.log(`Rotated router and consumer capabilities for ${url}.`);
+console.log(`Installed ${localPath}${noRemote ? "." : ` and remote consumer access on ${remoteHost}.`}`);
