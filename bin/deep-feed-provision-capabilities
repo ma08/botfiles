@@ -22,7 +22,12 @@ function parseEnv(text) {
       .filter((line) => line && !line.startsWith("#") && line.includes("="))
       .map((line) => {
         const split = line.indexOf("=");
-        return [line.slice(0, split), line.slice(split + 1)];
+        const raw = line.slice(split + 1).trim();
+        const value = raw.length >= 2 && raw[0] === raw.at(-1)
+          && (raw[0] === "'" || raw[0] === '"')
+          ? raw.slice(1, -1)
+          : raw;
+        return [line.slice(0, split).replace(/^export\s+/, ""), value];
       }),
   );
 }
@@ -52,11 +57,28 @@ const envPath = flag("--env-file") ?? defaultDeepFeedEnv;
 const remoteHost = flag("--remote-host") ?? "research-cpu-01-ts";
 const noRemote = process.argv.includes("--no-remote");
 const localEnv = parseEnv(await readFile(envPath, "utf8"));
+let existingCapabilityEnv = {};
+try {
+  existingCapabilityEnv = parseEnv(
+    await readFile(join(botfilesRoot, "secrets/local/deep-feed.rc"), "utf8"),
+  );
+} catch {
+  // The first bootstrap intentionally starts without a capability file.
+}
 const bypassToken = process.env.OAI_SITES_BYPASS_TOKEN
   ?? localEnv.OAI_SITES_BYPASS_TOKEN;
+const adminToken = flag("--admin-token")
+  ?? process.env.DEEP_FEED_CAPABILITY_ADMIN_TOKEN
+  ?? existingCapabilityEnv.DEEP_FEED_CAPABILITY_ADMIN_TOKEN
+  ?? localEnv.DEEP_FEED_CAPABILITY_ADMIN_TOKEN;
 const ownerEmail = (process.env.OWNER_EMAILS ?? localEnv.OWNER_EMAILS ?? "")
   .split(",")[0]?.trim();
 if (!ownerEmail) throw new Error("OWNER_EMAILS is unavailable");
+if (!adminToken?.startsWith("df_admin_") || adminToken.length > 300) {
+  throw new Error(
+    "DEEP_FEED_CAPABILITY_ADMIN_TOKEN is unavailable; pass --admin-token for first bootstrap",
+  );
+}
 if (url.startsWith("https://") && !bypassToken) {
   throw new Error("OAI_SITES_BYPASS_TOKEN is unavailable for the private production site");
 }
@@ -64,6 +86,7 @@ if (url.startsWith("https://") && !bypassToken) {
 const headers = {
   "content-type": "application/json",
   "oai-authenticated-user-email": ownerEmail,
+  "x-deep-feed-capability-admin": adminToken,
 };
 if (bypassToken) headers["OAI-Sites-Authorization"] = `Bearer ${bypassToken}`;
 const response = await fetch(new URL("/api/machine-capabilities", url), {
@@ -82,6 +105,7 @@ if (
 
 const localContent = [
   "# Machine-local Deep Feed Plan v6 capabilities. Never commit this file.",
+  `export DEEP_FEED_CAPABILITY_ADMIN_TOKEN=${shellQuote(adminToken)}`,
   `export DEEP_FEED_ROUTER_TOKEN=${shellQuote(payload.capabilities.router)}`,
   `export DEEP_FEED_CONSUMER_TOKEN=${shellQuote(payload.capabilities.consumer)}`,
   bypassToken ? `export OAI_SITES_BYPASS_TOKEN=${shellQuote(bypassToken)}` : null,
