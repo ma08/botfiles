@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Feed Work"
+  short_description: "Handle one Deep Feed card in this task by default."
+  default_prompt: "Use $deep-feed-work to securely bind and handle this Deep Feed card without routing to scheduled tasks."

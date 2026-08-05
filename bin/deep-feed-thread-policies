@@ -1,0 +1,83 @@
+#!/usr/bin/env node
+
+import { readFile, readdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+
+const productionUrl = "https://deep-feed-sourya.ladduu6666.chatgpt.site";
+
+function flag(name) {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return null;
+  const value = process.argv[index + 1];
+  return value && !value.startsWith("--") ? value : null;
+}
+
+function tomlString(text, key) {
+  const match = text.match(new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, "m"));
+  return match?.[1] ?? null;
+}
+
+const token = process.env.DEEP_FEED_ROUTER_TOKEN ?? process.env.DEEP_FEED_CONSUMER_TOKEN;
+if (!token) {
+  console.error(
+    "A Deep Feed router or consumer token is unavailable; source botfiles .botenv and check secrets/local/deep-feed.rc",
+  );
+  process.exit(1);
+}
+
+const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
+const automationRoot = join(codexHome, "automations");
+const entries = [];
+for (const name of await readdir(automationRoot)) {
+  const file = join(automationRoot, name, "automation.toml");
+  let text;
+  try {
+    text = await readFile(file, "utf8");
+  } catch {
+    continue;
+  }
+  const threadId = tomlString(text, "target_thread_id");
+  if (!threadId) continue;
+  entries.push({
+    threadId,
+    source: "automation_inventory",
+    automationId: tomlString(text, "id") ?? basename(dirname(file)),
+    automationStatus: tomlString(text, "status") ?? "UNKNOWN",
+    hostId: "local",
+    title: tomlString(text, "name"),
+  });
+}
+
+if (!entries.length) {
+  console.error(`No scheduled task targets were found under ${automationRoot}`);
+  process.exit(1);
+}
+
+const url = flag("--url") ?? productionUrl;
+const headers = {
+  "authorization": `Bearer ${token}`,
+  "content-type": "application/json",
+};
+if (process.env.OAI_SITES_BYPASS_TOKEN) {
+  headers["OAI-Sites-Authorization"] = `Bearer ${process.env.OAI_SITES_BYPASS_TOKEN}`;
+}
+
+const response = await fetch(new URL("/api/thread-policies", url), {
+  method: "POST",
+  headers,
+  body: JSON.stringify({ entries }),
+});
+const responseText = await response.text();
+if (!response.ok) {
+  console.error(`Deep Feed policy sync failed (${response.status}): ${responseText}`);
+  process.exit(1);
+}
+const result = JSON.parse(responseText);
+const output = flag("--output");
+if (output) await writeFile(resolve(output), `${JSON.stringify(result, null, 2)}\n`, "utf8");
+console.log(JSON.stringify({
+  policyVersion: result.policyVersion,
+  protectedThreads: result.policies?.length ?? 0,
+  output: output ? resolve(output) : null,
+}, null, 2));

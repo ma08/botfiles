@@ -26,14 +26,19 @@ function integerFlag(name, required = false) {
 function usage() {
   console.error(`Usage:
   deep-feed-handoff get <handoff-id> --role router|consumer [--url https://...]
+  deep-feed-handoff bind <handoff-id> --role router --revision N --route-generation N --origin-thread-id ID --policy-file PATH
+  deep-feed-handoff self <handoff-id> --role router --revision N --route-generation N --origin-thread-id ID
   deep-feed-handoff route <handoff-id> <action> --role router --revision N --idempotency-key KEY [routing flags]
-  deep-feed-handoff fallback <handoff-id> --role consumer --revision N --route-generation N --idempotency-key KEY
   deep-feed-handoff status <handoff-id> <status> --role consumer --revision N --route-generation N --task-thread-id ID [--result-file PATH]
 
 Routing flags:
   --route-generation N --router-session-id ID --destination-thread-id ID
   --destination-host-id ID --destination-title TEXT --destination-url URL
-  --dispatch-attempt-id ID --detail-json JSON`);
+  --dispatch-attempt-id ID --detail-json JSON --route-decision-json JSON
+  --policy-file PATH
+
+Origin flags:
+  --origin-thread-id ID --origin-host-id ID --origin-title TEXT`);
   process.exit(2);
 }
 
@@ -43,8 +48,7 @@ if (!command || !handoffId || !handoffId.startsWith("handoff-")) usage();
 const role = flag("--role");
 if (
   !["router", "consumer"].includes(role)
-  || (command === "route" && role !== "router")
-  || (command === "fallback" && role !== "consumer")
+  || (["route", "bind", "self"].includes(command) && role !== "router")
   || (command === "status" && role !== "consumer")
 ) usage();
 
@@ -68,7 +72,43 @@ if (process.env.OAI_SITES_BYPASS_TOKEN) {
 
 let method = "GET";
 let body;
-if (command === "route") {
+const policyFile = flag("--policy-file");
+const policyState = policyFile
+  ? JSON.parse(await readFile(resolve(policyFile), "utf8"))
+  : null;
+const protectedThreadSnapshot = policyState?.policies?.map((entry) => entry.threadId);
+if (command === "bind") {
+  const idempotencyKey = flag("--idempotency-key");
+  const originThreadId = flag("--origin-thread-id");
+  if (!idempotencyKey || !originThreadId || !policyState?.policyVersion) usage();
+  method = "PATCH";
+  body = {
+    action: "bind_origin",
+    idempotencyKey,
+    actor: flag("--actor") ?? "deep-feed-work",
+    expectedRevision: integerFlag("--revision", true),
+    expectedRouteGeneration: integerFlag("--route-generation", true),
+    originThreadId,
+    originHostId: flag("--origin-host-id") ?? undefined,
+    originTitle: flag("--origin-title") ?? undefined,
+    destinationPolicyVersion: policyState.policyVersion,
+    protectedThreadSnapshot,
+  };
+} else if (command === "self") {
+  const idempotencyKey = flag("--idempotency-key");
+  const originThreadId = flag("--origin-thread-id");
+  if (!idempotencyKey || !originThreadId) usage();
+  method = "PATCH";
+  body = {
+    action: "claim_self",
+    idempotencyKey,
+    actor: flag("--actor") ?? "deep-feed-work",
+    expectedRevision: integerFlag("--revision", true),
+    expectedRouteGeneration: integerFlag("--route-generation", true),
+    originThreadId,
+    routeDecision: { ownerChoice: "self", nonScheduledVerified: true },
+  };
+} else if (command === "route") {
   if (!action) usage();
   const idempotencyKey = flag("--idempotency-key");
   if (!idempotencyKey) usage();
@@ -85,18 +125,12 @@ if (command === "route") {
     destinationTitle: flag("--destination-title") ?? undefined,
     destinationUrl: flag("--destination-url") ?? undefined,
     dispatchAttemptId: flag("--dispatch-attempt-id") ?? undefined,
+    destinationPolicyVersion: policyState?.policyVersion,
+    protectedThreadSnapshot,
+    routeDecision: flag("--route-decision-json")
+      ? JSON.parse(flag("--route-decision-json"))
+      : undefined,
     detail: flag("--detail-json") ? JSON.parse(flag("--detail-json")) : undefined,
-  };
-} else if (command === "fallback") {
-  const idempotencyKey = flag("--idempotency-key");
-  if (!idempotencyKey) usage();
-  method = "PATCH";
-  body = {
-    action: "take_fallback",
-    idempotencyKey,
-    actor: flag("--actor") ?? "chief-of-staff-fallback",
-    expectedRevision: integerFlag("--revision", true),
-    expectedRouteGeneration: integerFlag("--route-generation", true),
   };
 } else if (command === "status") {
   if (!action) usage();
