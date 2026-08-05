@@ -72,6 +72,11 @@ reconciliation or destination acknowledgment.
 
 ## Work and report truthfully
 
+- A directly routed consumer invocation preempts unrelated scheduled work in
+  this task. If it arrives during an hourly scan, checkpoint any already-safe
+  collector state without advancing unaccepted cursors, then pause the scan.
+  Do not interleave the handoff with more collection, a heartbeat summary, or
+  unrelated source commentary. The scan may resume in a later turn.
 - Read the canonical `request`, `constraints`, evidence, and links from the API.
   Do not ask the user to repaste the card.
 - Move to `working` only when this task actually begins investigation or
@@ -79,7 +84,13 @@ reconciliation or destination acknowledgment.
 - Collaborate normally with the user. For consequential or external effects,
   prepare the exact preview and obtain fresh approval before acting.
 - If a user decision is required, record `waiting_user` and put the specific
-  question in `--result` before asking it interactively.
+  question plus the concrete choices in `--result`. In the same turn, use
+  `request_user_input` with one focused question and two or three mutually
+  exclusive options; put the recommended option first and explain the effect
+  of each choice. This interactive question is the primary output. Do not hide
+  it in commentary or a heartbeat envelope, and do not continue unrelated work
+  while it is unanswered. If the interactive tool is unavailable, end with a
+  direct `Action needed` message containing the same choices and stop.
 - When a concrete result is ready, record `outcome_ready` with a concise result.
   Record `completed` only when the requested work and relevant verification are
   actually complete.

@@ -76,11 +76,21 @@ holds the lease, report that truthfully and stop.
 5. Never select a second task that could write concurrently to the same shared
    checkout. When uncertain, ask rather than guess.
 
-If one candidate is clearly safe, choose it. If two or three remain plausible,
-record `choice_required`, then use the interactive question tool to show the
-candidate title, host, and one-sentence tradeoff. Do not show private source
-content. If there is no safe candidate, offer to leave the handoff queued for
-the hourly Chief of Staff; record `left_queued` when selected.
+For `routingIntent: auto`, treat `targetThreadId` as a compatibility alias for
+`fallbackThreadId` when those values are equal. It is not an explicit owner
+choice and must not make the persistent Chief-of-Staff task look like a unique
+specialist match. Likewise, a task whose recent turn is a scheduled heartbeat
+must not win automatic routing merely because its project, title, or checkout
+matches. It remains available as the explicit immediate generalist fallback.
+
+If one non-scheduled candidate is clearly safe, choose it. If two or three
+remain plausible, record `choice_required`, then use the interactive question
+tool to show the candidate title, host, and one-sentence tradeoff. Do not show
+private source content. If there is no safe specialist, record
+`choice_required` and ask the owner to choose between **Send to Chief of Staff
+now** (recommended for immediate general help) and **Leave queued for the next
+hourly run**. Dispatch to the exact configured fallback task only after the
+first choice; record `left_queued` only after the second choice.
 
 Every routing write after the claim must include the same literal
 `--router-session-id <router-session-id>` and returned route generation. The
