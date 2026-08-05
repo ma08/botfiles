@@ -111,8 +111,18 @@ interactive question:
 deep-feed-handoff route <handoff-id> choice_required --role router \
   --revision <revision> --route-generation <route-generation> \
   --router-session-id "$CODEX_THREAD_ID" \
+  --destination-thread-id '<thread-id>' --destination-host-id '<host-id>' \
+  --destination-title '<title>' --destination-url 'codex://threads/<thread-id>' \
+  --policy-file '<temp-dir>/policies.json' \
+  --candidate-evidence-json \
+    '{"exactMatchKind":"tracker","exactMatchValue":"ZON-000","nonScheduledVerified":true}' \
   --idempotency-key choice:<handoff-id>:<route-generation>
 ```
+
+Use the correct exact-match kind and value rather than copying the example.
+The server pins this exact candidate, host, policy snapshot, and evidence in the
+choice event. A later dispatch to any other task or with different evidence is
+rejected even when that substituted task is non-scheduled.
 
 - **Continue in the existing task** — recommend only because the exact task is
   already responsible for the tracker or artifact.
@@ -157,8 +167,8 @@ once and reconcile; never overwrite newer state.
 ## 4B. Delegate only after the owner chooses it
 
 Use the current origin ID as `--router-session-id`. Mint one dispatch attempt
-ID. Record `dispatch_started` with the exact destination, the policy file, and
-a route decision naming the strong key:
+ID. Record `dispatch_started` with the same exact destination, policy file, and
+strong key pinned in `choice_required`, plus the owner's route decision:
 
 ```bash
 deep-feed-handoff route <handoff-id> dispatch_started --role router \

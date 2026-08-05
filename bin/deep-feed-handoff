@@ -34,7 +34,8 @@ function usage() {
 Routing flags:
   --route-generation N --router-session-id ID --destination-thread-id ID
   --destination-host-id ID --destination-title TEXT --destination-url URL
-  --dispatch-attempt-id ID --detail-json JSON --route-decision-json JSON
+  --dispatch-attempt-id ID --detail-json JSON --candidate-evidence-json JSON
+  --route-decision-json JSON
   --policy-file PATH
 
 Origin flags:
@@ -127,6 +128,9 @@ if (command === "bind") {
     dispatchAttemptId: flag("--dispatch-attempt-id") ?? undefined,
     destinationPolicyVersion: policyState?.policyVersion,
     protectedThreadSnapshot,
+    candidateEvidence: flag("--candidate-evidence-json")
+      ? JSON.parse(flag("--candidate-evidence-json"))
+      : undefined,
     routeDecision: flag("--route-decision-json")
       ? JSON.parse(flag("--route-decision-json"))
       : undefined,
