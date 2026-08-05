@@ -45,6 +45,10 @@ Reject missing or malformed values.
    positively verified. Do not preempt a scheduled scan. The server enforces
    the same deny independently.
 
+On hosts without a local automation directory, the helper reads the non-empty
+server registry. Missing local files never count as positive non-scheduled
+proof; verify this exact task through native metadata before acknowledging.
+
 Only then acknowledge:
 
 ```bash

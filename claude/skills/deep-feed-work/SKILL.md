@@ -59,8 +59,10 @@ deep-feed-thread-policies --output '<temp-dir>/policies.json'
 ```
 
 The command must succeed and return a non-empty policy version and protected
-task list. If it fails, stop safely; do not continue with an incomplete
-scheduled-task inventory.
+task list. On a host with no local automation directory it reads the server's
+seeded/synchronized protected registry; native metadata must still positively
+prove that any remote candidate is non-scheduled. If the helper returns an
+empty registry or fails, stop safely.
 
 ## 2. Bind this exact task
 

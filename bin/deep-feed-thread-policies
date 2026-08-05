@@ -29,7 +29,13 @@ if (!token) {
 const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
 const automationRoot = join(codexHome, "automations");
 const entries = [];
-for (const name of await readdir(automationRoot)) {
+let automationNames = [];
+try {
+  automationNames = await readdir(automationRoot);
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
+for (const name of automationNames) {
   const file = join(automationRoot, name, "automation.toml");
   let text;
   try {
@@ -49,11 +55,6 @@ for (const name of await readdir(automationRoot)) {
   });
 }
 
-if (!entries.length) {
-  console.error(`No scheduled task targets were found under ${automationRoot}`);
-  process.exit(1);
-}
-
 const url = flag("--url") ?? productionUrl;
 const headers = {
   "authorization": `Bearer ${token}`,
@@ -64,9 +65,9 @@ if (process.env.OAI_SITES_BYPASS_TOKEN) {
 }
 
 const response = await fetch(new URL("/api/thread-policies", url), {
-  method: "POST",
+  method: entries.length ? "POST" : "GET",
   headers,
-  body: JSON.stringify({ entries }),
+  body: entries.length ? JSON.stringify({ entries }) : undefined,
 });
 const responseText = await response.text();
 if (!response.ok) {
@@ -74,10 +75,17 @@ if (!response.ok) {
   process.exit(1);
 }
 const result = JSON.parse(responseText);
+if (!result.policyVersion || !Array.isArray(result.policies) || !result.policies.length) {
+  console.error(
+    `Deep Feed returned no protected scheduled-task registry; local inventory path was ${automationRoot}`,
+  );
+  process.exit(1);
+}
 const output = flag("--output");
 if (output) await writeFile(resolve(output), `${JSON.stringify(result, null, 2)}\n`, "utf8");
 console.log(JSON.stringify({
   policyVersion: result.policyVersion,
   protectedThreads: result.policies?.length ?? 0,
+  localAutomationTargets: entries.length,
   output: output ? resolve(output) : null,
 }, null, 2));
