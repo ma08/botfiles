@@ -12,6 +12,13 @@ These are user-level instructions for the Codex agent shared across all projects
 - If the preference is only for one repo, one task, or a temporary session, keep it in the local project instructions or task notes instead of the global botfiles.
 - Codex thread titles associated with ZON-155 are a deliberate visual-divider exception: begin them with exactly `------- ZON-155`, then retain the normal ` · stable domain · current status` suffix.
 
+## Human Writing Style
+
+- In user-facing prose and drafts, never use em dashes. Rewrite with periods, commas, parentheses, or colons. Preserve them only inside exact quotations, source text, code, identifiers, or data that must remain unchanged.
+- Write plainly and naturally. Lead with the concrete point, use contractions when they fit, vary sentence length, and match the user's own voice when a writing sample is available.
+- Remove common AI writing patterns: formulaic openings and closings, vague attribution, promotional inflation, canned transitions, forced three-part lists, conspicuous synonym cycling, excessive headings or bold text, and overly uniform sentence rhythm.
+- Do not simulate humanity with invented anecdotes, fake opinions, unnecessary slang, or deliberate mistakes. Preserve the meaning, facts, and precision of the original.
+
 ## GitHub Authorship
 
 - Any GitHub write performed by a coding agent, including new or edited issues, PRs, reviews, comments, or similar changes, should use the authenticated human developer account provided by the default GitHub auth flow rather than a separate bot identity.
