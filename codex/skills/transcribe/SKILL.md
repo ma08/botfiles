@@ -18,17 +18,17 @@ Transcribe audio and video files to text using speech-to-text providers (current
 
 ### Single file
 ```bash
-uv run scripts/transcribe.py --input recording.mp4
+uv run ~/pro/personal_os/scripts/transcribe.py --input recording.mp4
 ```
 
 ### Directory of files
 ```bash
-uv run scripts/transcribe.py --input /path/to/videos/ --output-dir /path/to/output/
+uv run ~/pro/personal_os/scripts/transcribe.py --input /path/to/videos/ --output-dir /path/to/output/
 ```
 
 ### With domain context and terms
 ```bash
-uv run scripts/transcribe.py --input meeting.m4a \
+uv run ~/pro/personal_os/scripts/transcribe.py --input meeting.m4a \
   --context "Board meeting Q4 review" \
   --terms "EBITDA,YoY,ARR,Zone,Simply South"
 ```
@@ -62,6 +62,8 @@ For multi-file runs (unless `--no-combined`):
 ## Requirements
 
 - `SONIOX_API_KEY` must be set in the environment or in `~/pro/personal_os/.env`
+- Keep the machine-local `.env` mode `0600`; never copy the key into task artifacts or source control.
+- Use the canonical `~/pro/personal_os/scripts/transcribe.py` path so the command works regardless of the current directory.
 - Get an API key at https://console.soniox.com
 
 ## Typical Workflow
@@ -75,7 +77,7 @@ For multi-file runs (unless `--no-combined`):
 
 **Meeting recording:**
 ```bash
-uv run scripts/transcribe.py -i ~/Downloads/standup-2026-02-05.m4a \
+uv run ~/pro/personal_os/scripts/transcribe.py -i ~/Downloads/standup-2026-02-05.m4a \
   -o context/daily/2026-02-05/standup/ \
   --context "Daily standup meeting, Zone team" \
   --terms "Zone,ZonEye,Simply South,Vinoz"
@@ -83,7 +85,7 @@ uv run scripts/transcribe.py -i ~/Downloads/standup-2026-02-05.m4a \
 
 **Batch factory tour videos:**
 ```bash
-uv run scripts/transcribe.py -i /path/to/factory-videos/ \
+uv run ~/pro/personal_os/scripts/transcribe.py -i /path/to/factory-videos/ \
   -o context/daily/2026-02-05/factory-tour/ \
   --context "Factory tour at candy manufacturing facility" \
   --terms "tempering,enrobing,fondant,ganache"
