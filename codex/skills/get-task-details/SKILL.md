@@ -4,12 +4,19 @@ description: >-
   Print rich task details for the current task context: status file path,
   primary tracker URL, machine name, coding agent/session id, transcript
   path, zellij session, zellij link, and a short task recap. Replaces the
-  old get-task-status-file interface.
+  old get-task-status-file interface. Use reorient-myself instead when the
+  user wants a first-principles audit of whether the task is on the right track.
 ---
 
 # Get Task Details
 
 Resolve task status path and metadata in one read-only command.
+
+## Scope Boundary
+
+Use this skill for factual operational orientation: which task is active, where its durable context lives, and what its recorded state says. Do not turn the three-line recap into a strategic audit.
+
+When the user asks whether the task is pursuing the right objective, wants blind spots challenged, or needs a paste-ready recovery prompt, use `reorient-myself` instead. That skill may use this output as evidence.
 
 ## Invocation
 
