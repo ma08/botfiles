@@ -17,7 +17,7 @@ Create Gmail drafts through `gws-gmail-draft`. The helper calls only Gmail `user
 
 - `work` → `sourya4@trymyzone.com`
 - `personal` → `sourya4@gmail.com`
-- `columbia` → `sk5057@columbia.edu`
+- `columbia` → authenticated mailbox `sk5057@columbia.edu`; default visible From address `sourya.kakarla@columbia.edu`
 
 If the intended mailbox is unclear, ask which alias to use before creating the draft.
 
@@ -25,10 +25,11 @@ If the intended mailbox is unclear, ask which alias to use before creating the d
 
 1. Read `../gws-shared/SKILL.md` and `../gws-account-switch/SKILL.md`.
 2. Confirm `~/.config/gws/accounts/<alias>.json` exists without printing it.
-3. Prefer a body file for long or sensitive content so it is not exposed in process arguments.
-4. Run `--dry-run` first and review the safe summary.
-5. If Gmail intent is explicit, run the same command without `--dry-run`.
-6. Report the account alias, recipients, subject, and returned draft ID. State clearly that nothing was sent.
+3. For the `columbia` alias, default the visible From address to the accepted send-as identity `sourya.kakarla@columbia.edu`. Use `sk5057@columbia.edu` only when the user explicitly asks for it or the context specifically requires the primary mailbox identity.
+4. Prefer a body file for long or sensitive content so it is not exposed in process arguments.
+5. Run `--dry-run` first and review the safe summary, including the resolved From address.
+6. If Gmail intent is explicit, run the same command without `--dry-run`.
+7. Report the account alias, resolved From address, recipients, subject, and returned draft ID. State clearly that nothing was sent.
 
 ## Examples
 

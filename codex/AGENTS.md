@@ -25,6 +25,12 @@ These are user-level instructions for the Codex agent shared across all projects
 - Add a short byline in the written GitHub content naming the coding agent. Preferred examples: `_Written by Codex via the developer's authenticated GitHub account._` and `_Written by Claude Code via the developer's authenticated GitHub account._`
 - If a GitHub action has no natural body field, put the attribution in the nearest editable text field or a companion comment. When editing existing agent-authored GitHub content, preserve or refresh the byline so the latest agent remains visible.
 
+## Google Workspace Sender Defaults
+
+- The `columbia` gws account alias authenticates the `sk5057@columbia.edu` mailbox, but outbound drafts and messages from that mailbox should default to the verified send-as address `sourya.kakarla@columbia.edu` in most scenarios.
+- Use `sk5057@columbia.edu` as the visible From address only when the user explicitly requests it or the specific context requires the primary mailbox identity.
+- Before relying on the Columbia send-as identity on a newly configured machine/account, verify that Gmail reports it as accepted. Sending remains separately approval-gated.
+
 ## Manual Linear Workflow Policy
 
 - For manual Codex or Claude worker sessions outside Symphony automation, use this shared Linear workflow policy unless the repo or task has an explicit local override.

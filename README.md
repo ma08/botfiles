@@ -200,8 +200,11 @@ gws-gmail-draft work \
 Draft creation requires the Gmail `gmail.compose` OAuth scope. Google does not
 offer a general draft-only scope: `gmail.compose` also technically permits
 sending. The helper calls only `users.drafts.create`; sending remains a separate
-explicitly confirmed workflow. See `codex/skills/gws-gmail-draft/SKILL.md` or
-the matching Claude skill for the intent gate and account workflow.
+explicitly confirmed workflow. It refreshes the selected alias token locally
+and places the encoded MIME message in the HTTPS request body, not a command
+argument, so normal Gmail-size attachments do not hit the operating system's
+per-argument limit. See `codex/skills/gws-gmail-draft/SKILL.md` or the matching
+Claude skill for the intent gate and account workflow.
 
 ## Mac Keep-Awake GUI
 

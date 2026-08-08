@@ -2,15 +2,38 @@
 
 from __future__ import annotations
 
+import base64
+import importlib.machinery
+import importlib.util
 import json
 import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HELPER = REPO_ROOT / "bin" / "gws-gmail-draft"
+LOADER = importlib.machinery.SourceFileLoader("gws_gmail_draft", str(HELPER))
+SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
+assert SPEC
+MODULE = importlib.util.module_from_spec(SPEC)
+LOADER.exec_module(MODULE)
+
+
+class FakeResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        del args
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
 
 
 def run_helper(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -24,6 +47,28 @@ def run_helper(*args: str, env: dict[str, str] | None = None) -> subprocess.Comp
 
 
 class GmailDraftHelperTests(unittest.TestCase):
+    def _write_credentials(
+        self,
+        directory: Path,
+        *,
+        mode: int = 0o600,
+        token_uri: str = "https://oauth2.googleapis.com/token",
+    ) -> Path:
+        path = directory / "work.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "client_id": "test-client",
+                    "client_secret": "test-secret",
+                    "refresh_token": "test-refresh",
+                    "token_uri": token_uri,
+                }
+            ),
+            encoding="utf-8",
+        )
+        path.chmod(mode)
+        return path
+
     def test_plain_text_dry_run_is_draft_only(self) -> None:
         result = run_helper(
             "personal",
@@ -94,6 +139,36 @@ class GmailDraftHelperTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["to"], ['"Doe, Jane" <jane@example.com>'])
 
+    def test_columbia_defaults_to_verified_send_as_address(self) -> None:
+        result = run_helper(
+            "columbia",
+            "--subject",
+            "Columbia sender",
+            "--body",
+            "Hello",
+            "--dry-run",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["from"], "sourya.kakarla@columbia.edu")
+
+    def test_columbia_primary_mailbox_address_can_be_requested(self) -> None:
+        result = run_helper(
+            "columbia",
+            "--from-address",
+            "sk5057@columbia.edu",
+            "--subject",
+            "Columbia primary sender",
+            "--body",
+            "Hello",
+            "--dry-run",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["from"], "sk5057@columbia.edu")
+
     def test_header_injection_is_rejected(self) -> None:
         result = run_helper(
             "columbia",
@@ -109,49 +184,72 @@ class GmailDraftHelperTests(unittest.TestCase):
 
     def test_source_contains_no_send_api_route(self) -> None:
         source = HELPER.read_text(encoding="utf-8")
-        self.assertNotIn('"drafts",\n        "send"', source)
-        self.assertNotIn('"messages",\n        "send"', source)
-        self.assertIn('"drafts",\n        "create"', source)
+        self.assertIn("/gmail/v1/users/me/drafts", source)
+        self.assertNotIn("/drafts/send", source)
+        self.assertNotIn("/messages/send", source)
 
-    def test_live_path_invokes_only_drafts_create(self) -> None:
+    def test_large_message_payload_is_sent_in_https_body(self) -> None:
+        raw = base64.urlsafe_b64encode(b"x" * 238_296).decode("ascii")
+        captured: dict[str, object] = {}
+
+        def opener(request: object, timeout: int) -> FakeResponse:
+            captured["request"] = request
+            captured["timeout"] = timeout
+            return FakeResponse(
+                {
+                    "id": "draft-1",
+                    "message": {"id": "message-1", "threadId": "thread-1"},
+                }
+            )
+
+        response = MODULE._gmail_create_draft("test-access-token", raw, opener=opener)
+        request = captured["request"]
+        body = json.loads(request.data)
+
+        self.assertEqual(response["id"], "draft-1")
+        self.assertEqual(request.full_url, MODULE.GMAIL_DRAFTS_URL)
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(request.get_header("Authorization"), "Bearer test-access-token")
+        self.assertEqual(body, {"message": {"raw": raw}})
+        self.assertGreater(len(request.data), 300_000)
+        self.assertEqual(captured["timeout"], 60)
+
+    def test_credential_file_must_be_private(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            fake_gws = temp_path / "gws-account"
-            args_log = temp_path / "args.log"
-            fake_gws.write_text(
-                "#!/bin/sh\n"
-                "if [ \"$2\" = auth ] && [ \"$3\" = status ]; then\n"
-                "  printf '%s\\n' '{\"scopes\":[\"https://www.googleapis.com/auth/gmail.compose\"]}'\n"
-                "  exit 0\n"
-                "fi\n"
-                "printf '%s\\n' \"$@\" > \"$FAKE_GWS_ARGS_LOG\"\n"
-                "printf '%s\\n' '{\"id\":\"draft-1\",\"message\":{\"id\":\"message-1\",\"threadId\":\"thread-1\"}}'\n",
-                encoding="utf-8",
-            )
-            fake_gws.chmod(0o700)
-            env = os.environ.copy()
-            env["PATH"] = f"{temp_path}:{env['PATH']}"
-            env["FAKE_GWS_ARGS_LOG"] = str(args_log)
+            directory = Path(temp_dir)
+            self._write_credentials(directory, mode=0o644)
+            with (
+                mock.patch.dict(os.environ, {"GWS_ACCOUNTS_DIR": temp_dir}),
+                self.assertRaisesRegex(
+                    MODULE.DraftCreationError, "permissions are too broad"
+                ),
+            ):
+                MODULE._load_credentials("work")
 
-            result = run_helper(
-                "work",
-                "--to",
-                "self@example.com",
-                "--subject",
-                "Route test",
-                "--body",
-                "Never send",
-                env=env,
-            )
+    def test_token_refresh_rejects_unapproved_endpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            self._write_credentials(directory, token_uri="https://example.com/token")
+            with (
+                mock.patch.dict(os.environ, {"GWS_ACCOUNTS_DIR": temp_dir}),
+                self.assertRaisesRegex(
+                    MODULE.DraftCreationError, "not an approved Google HTTPS endpoint"
+                ),
+            ):
+                MODULE._access_token("work")
 
-            invoked_args = args_log.read_text(encoding="utf-8").splitlines()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["status"], "draft_created")
-        self.assertEqual(payload["draftId"], "draft-1")
-        self.assertEqual(invoked_args[:5], ["work", "gmail", "users", "drafts", "create"])
-        self.assertNotIn("send", invoked_args)
+    def test_token_refresh_requires_access_token(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            self._write_credentials(directory)
+            with (
+                mock.patch.dict(os.environ, {"GWS_ACCOUNTS_DIR": temp_dir}),
+                mock.patch.object(MODULE, "urlopen", return_value=FakeResponse({})),
+                self.assertRaisesRegex(
+                    MODULE.DraftCreationError, "returned no access token"
+                ),
+            ):
+                MODULE._access_token("work")
 
     def test_missing_compose_scope_stops_before_draft_create(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

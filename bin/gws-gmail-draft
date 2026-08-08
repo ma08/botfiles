@@ -7,7 +7,9 @@ import argparse
 import base64
 import json
 import mimetypes
+import os
 import shutil
+import stat
 import subprocess
 import sys
 from email.message import EmailMessage
@@ -15,11 +17,14 @@ from email.utils import formataddr, getaddresses
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlparse
+from urllib.request import Request, urlopen
 
 ACCOUNT_ADDRESSES = {
     "work": "sourya4@trymyzone.com",
     "personal": "sourya4@gmail.com",
-    "columbia": "sk5057@columbia.edu",
+    "columbia": "sourya.kakarla@columbia.edu",
 }
 
 GMAIL_COMPOSE_SCOPE = "https://www.googleapis.com/auth/gmail.compose"
@@ -29,6 +34,12 @@ AUTH_SCOPES = (
     "https://www.googleapis.com/auth/gmail.readonly,"
     f"{GMAIL_COMPOSE_SCOPE}"
 )
+GMAIL_DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
+ALLOWED_TOKEN_HOSTS = {"accounts.google.com", "oauth2.googleapis.com"}
+
+
+class DraftCreationError(RuntimeError):
+    """A safe-to-report failure while obtaining auth or creating a draft."""
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -111,6 +122,100 @@ def _compose_scope_available(account: str) -> bool:
         file=sys.stderr,
     )
     return False
+
+
+def _credential_path(account: str) -> Path:
+    accounts_dir = Path(
+        os.environ.get(
+            "GWS_ACCOUNTS_DIR",
+            Path.home() / ".config" / "gws" / "accounts",
+        )
+    )
+    return accounts_dir / f"{account}.json"
+
+
+def _load_credentials(account: str) -> dict[str, str]:
+    path = _credential_path(account)
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+        if mode & 0o077:
+            raise DraftCreationError(
+                f"credential file permissions are too broad ({mode:04o}); expected 0600: {path}"
+            )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise DraftCreationError(f"credential file not found: {path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DraftCreationError(f"could not read credential file: {path}") from exc
+
+    required = ("client_id", "client_secret", "refresh_token", "token_uri")
+    missing = [field for field in required if not payload.get(field)]
+    if missing:
+        raise DraftCreationError(
+            f"credential file is missing required fields: {', '.join(missing)}"
+        )
+    return {field: str(payload[field]) for field in required}
+
+
+def _access_token(account: str) -> str:
+    credentials = _load_credentials(account)
+    token_uri = credentials["token_uri"]
+    parsed_uri = urlparse(token_uri)
+    if parsed_uri.scheme != "https" or parsed_uri.hostname not in ALLOWED_TOKEN_HOSTS:
+        raise DraftCreationError("credential token_uri is not an approved Google HTTPS endpoint")
+
+    request = Request(
+        token_uri,
+        data=urlencode(
+            {
+                "client_id": credentials["client_id"],
+                "client_secret": credentials["client_secret"],
+                "refresh_token": credentials["refresh_token"],
+                "grant_type": "refresh_token",
+            }
+        ).encode("ascii"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read())
+    except HTTPError as exc:
+        raise DraftCreationError(f"OAuth token refresh failed (HTTP {exc.code})") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise DraftCreationError("OAuth token refresh failed") from exc
+
+    access_token = payload.get("access_token")
+    if not access_token:
+        raise DraftCreationError("OAuth token refresh returned no access token")
+    return str(access_token)
+
+
+def _gmail_create_draft(
+    access_token: str,
+    raw: str,
+    *,
+    opener=urlopen,
+) -> dict[str, object]:
+    request = Request(
+        GMAIL_DRAFTS_URL,
+        data=json.dumps({"message": {"raw": raw}}, separators=(",", ":")).encode(
+            "utf-8"
+        ),
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "User-Agent": "gws-gmail-draft/1",
+        },
+        method="POST",
+    )
+    try:
+        with opener(request, timeout=60) as response:
+            return json.loads(response.read())
+    except HTTPError as exc:
+        raise DraftCreationError(f"Gmail draft creation failed (HTTP {exc.code})") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise DraftCreationError("Gmail draft creation failed") from exc
 
 
 def _body(args: argparse.Namespace) -> str:
@@ -229,35 +334,11 @@ def main() -> int:
     if not _compose_scope_available(args.account):
         return 77
 
-    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii").rstrip("=")
-    command = [
-        "gws-account",
-        args.account,
-        "gmail",
-        "users",
-        "drafts",
-        "create",
-        "--params",
-        json.dumps({"userId": "me"}, separators=(",", ":")),
-        "--json",
-        json.dumps({"message": {"raw": raw}}, separators=(",", ":")),
-        "--format",
-        "json",
-    ]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        print(
-            f"gws-gmail-draft: Gmail draft creation failed (exit {result.returncode})",
-            file=sys.stderr,
-        )
-        if result.stderr:
-            print(result.stderr.rstrip(), file=sys.stderr)
-        return result.returncode
-
     try:
-        response = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        print("gws-gmail-draft: Gmail returned a non-JSON response", file=sys.stderr)
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii").rstrip("=")
+        response = _gmail_create_draft(_access_token(args.account), raw)
+    except DraftCreationError as exc:
+        print(f"gws-gmail-draft: {exc}", file=sys.stderr)
         return 1
 
     print(

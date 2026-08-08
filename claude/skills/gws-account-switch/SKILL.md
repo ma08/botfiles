@@ -11,7 +11,7 @@ Use this alongside `gws-shared`, `gws-gmail`, and `gws-drive` when the user care
 
 - `work` -> `sourya4@trymyzone.com`
 - `personal` -> `sourya4@gmail.com`
-- `columbia` -> `sk5057@columbia.edu`
+- `columbia` -> authenticated mailbox `sk5057@columbia.edu`; normal outbound From identity `sourya.kakarla@columbia.edu`
 
 ## Workflow
 
@@ -34,6 +34,7 @@ Use this alongside `gws-shared`, `gws-gmail`, and `gws-drive` when the user care
 - `gws-save-account` exports the currently active decrypted credentials into `~/.config/gws/accounts/<alias>.json`.
 - On this machine, the saved aliases are expected to carry both Gmail read and Drive read scopes.
 - Draft-enabled aliases additionally need `gmail.compose`; this scope also technically permits sending.
+- The `columbia` credential still targets the `sk5057@columbia.edu` mailbox, while new drafts should normally use its accepted default send-as address `sourya.kakarla@columbia.edu` in the From header.
 - Prefer read-only Gmail and Drive flows unless the user explicitly asks to create a Gmail draft or perform another mutation.
 - A vague request to “draft an email” means local text only. Gmail creation requires explicit Gmail-draft intent.
 - Sending remains separate and always requires explicit confirmation.
