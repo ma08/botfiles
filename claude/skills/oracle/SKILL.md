@@ -1,23 +1,26 @@
 ---
 name: oracle
-description: Use the @steipete/oracle CLI to bundle a prompt plus the right files and get a second-model review (API or browser) for debugging, refactors, design checks, or cross-validation.
+description: Use the @steipete/oracle CLI for debugging, refactors, design checks, and cross-validation, preferring the GCP-backed `oracle-vm` route for agent-driven prompt and literal text/source reviews while preserving explicit host-local Oracle workflows.
 ---
 
 # Oracle (CLI) — best use
 
 Oracle bundles your prompt + selected files into one “one-shot” request so another model can answer with real repo context (API or browser automation). Treat outputs as advisory: verify against the codebase + tests.
 
-## Main use case (browser, ChatGPT GPT‑5.6 Sol + Pro)
+## Main use case (VM-first browser, ChatGPT GPT‑5.6 Sol + Pro)
 
-Default workflow here: use the local `oracle` wrapper with ChatGPT GPT‑5.6 Sol and the account/UI Intelligence effort set to Pro. Pro is a separate ChatGPT effort, not a `gpt-5.6-pro` CLI identifier. This is the “human in the loop” path: it can take ~10 minutes to ~1 hour; expect a stored session you can reattach to or harvest.
+Default agent workflow here: use `oracle-vm` for prompts plus literal text or source files when `research-cpu-01-ts` and its remote wrapper are healthy. It runs the supported Oracle wrapper on the GCP VM with ChatGPT GPT‑5.6 Sol and the account/UI Intelligence effort set to Pro. Pro is a separate ChatGPT effort, not a `gpt-5.6-pro` CLI identifier. This is the human-in-the-loop path: it can take about 10 minutes to 1 hour; expect a stored session you can reattach to or harvest.
+
+Plain `oracle` remains host-local. Use it for an explicit local request, a VM outage, Mac-only browser context, or inputs that `oracle-vm` safely refuses. Do not transparently reinterpret a manual `oracle` command as an SSH request.
 
 Recommended defaults:
 
+- Agent route: `oracle-vm -p "<task>" [--file <literal-text-file> ...]`; it preflights SSH and the remote wrapper, stages only supported files with protected permissions, creates a slug when needed, and prints same-session reattach and harvest commands. It defaults `ORACLE_SOURCE_MAIN=1` for both primary and recovery commands so they prefer the same pinned implementation.
 - Engine: browser (`--engine browser`)
 - Model: `--model gpt-5.6-sol` with `--browser-model-strategy select`; the signed-in ChatGPT profile supplies the separate Pro effort.
 - Browser mode: reuse `--remote-chrome 127.0.0.1:9223` when the supported login desktop is already running; otherwise use manual login with `--browser-manual-login --browser-chrome-path "$HOME/pro/botfiles/bin/oracle-chrome-linux"`.
-- Local package route: for no-model browser requests, the wrapper prefers the pinned source build at `~/pro/lab/tools/oracle-main` commit `ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18` (upstream PR #320) when it is present and verified. If unavailable, npm latest may be used only with the same GPT-5.6 Sol target. Use `ORACLE_SOURCE_MAIN=0` to force npm, `ORACLE_SOURCE_MAIN=require` to require the pinned build, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route.
-- Verification: confirm the browser/session evidence shows GPT-5.6 Sol and Pro. If the foreground detector misses a visibly completed answer, run `oracle session <slug> --harvest` against the same bound tab before declaring failure.
+- Local package route: `oracle-vm` and no-model browser requests through plain `oracle` prefer the pinned source build at `~/pro/lab/tools/oracle-main` commit `ea8b1b57f140f2c641a2a8a9cc1dd10bd03bdb18` (upstream PR #320) when it is present and verified. If unavailable, npm latest may be used only with the same requested model and engine. Use `ORACLE_SOURCE_MAIN=0` to force npm, `ORACLE_SOURCE_MAIN=require` to require the pinned build, and `ORACLE_SOURCE_MAIN_VERBOSE=1` to print the selected route.
+- Verification: confirm the browser/session evidence shows GPT-5.6 Sol and Pro. If the foreground detector misses a visibly completed answer, use `oracle-vm session <slug> --harvest` for a VM-routed run or `oracle session <slug> --harvest` for an explicit local run before declaring failure.
 - Attachments: directories/globs + excludes; avoid secrets. For text/code-heavy context, prefer compact prompts or inline delivery (`--browser-inline-files` / `--browser-attachments never`) before upload mode; reserve uploads/bundles for PDFs, images, binaries, or file sets that truly cannot fit inline.
 - Fallback: do not silently downgrade no-model work to GPT-5.5/5.4 or switch it to an API route. Fix or surface browser/profile/canary issues and retry GPT-5.6 Sol + Pro. Honor another model or engine only when the user explicitly requests it.
 
@@ -25,7 +28,7 @@ Recommended defaults:
 
 1. Pick a tight file set (fewest files that still contain the truth).
 2. Preview what you’re about to send (`--dry-run` + `--files-report` when needed).
-3. Run with the local `oracle` wrapper so it selects ChatGPT GPT‑5.6 Sol + Pro by default; use API only when explicitly requested.
+3. Run with `oracle-vm` when its preflight succeeds so the GCP wrapper selects ChatGPT GPT‑5.6 Sol + Pro by default. Use plain `oracle` deliberately for the local exceptions above. Use API only when explicitly requested.
 4. If the run detaches/timeouts, reattach to or harvest the stored session; don’t start a duplicate run.
 
 ## ChatGPT Project routing
@@ -61,21 +64,29 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 ## Commands (preferred)
 
 - Show help (once/session):
+  - `oracle-vm --help`
   - `oracle --help`
   - `ORACLE_SOURCE_MAIN_VERBOSE=1 oracle --version`
 
-- Preview (no tokens):
+- Preview routing and inputs (no model run):
+  - `oracle-vm --route-preview -p "<task>" --file path/to/file`
+  - `oracle-vm --dry-run summary -p "<task>" --file path/to/file`
   - `oracle --dry-run summary -p "<task>" --file "src/**" --file "!**/*.test.*"`
   - `oracle --dry-run full -p "<task>" --file "src/**"`
 
 - Token/cost sanity:
   - `oracle --dry-run summary --files-report -p "<task>" --file "src/**"`
 
-- Browser run through the local wrapper (main path; long-running is normal):
-  - `oracle -p "<task>" --file "src/**"`
+- VM-first browser run (main agent path; long-running is normal):
+  - `oracle-vm -p "<task>" --file path/to/file`
 
-- Text/code browser run that avoids ChatGPT attachment upload readiness:
+- Explicit local text/code browser run:
   - `oracle -p "<task>" --browser-inline-files --file "src/**"`
+
+- Remote session recovery:
+  - `oracle-vm status --hours 72`
+  - `oracle-vm session <slug> --render`
+  - `oracle-vm session <slug> --harvest`
 
 - Explicit default browser run:
   - `oracle --engine browser --remote-chrome 127.0.0.1:9223 --model gpt-5.6-sol --browser-model-strategy select -p "<task>" --file "src/**"`
@@ -94,6 +105,8 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 ## Attaching files (`--file`)
 
 `--file` accepts files, directories, and globs. You can pass it multiple times; entries can be comma-separated.
+
+That full grammar applies to host-local `oracle`. `oracle-vm` v1 intentionally accepts only repeated literal regular text/source files. It rejects directories, globs, exclusions, comma lists, symlinks, common secret-shaped filenames, binary files, files over 1 MiB, and bundles over 8 MiB. Create a minimal sanitized text file or use explicit local `oracle` when an unsupported input is genuinely required.
 
 - Include:
   - `--file "src/**"` (directory glob)
@@ -118,7 +131,7 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 
 ## Engines (API vs browser)
 
-- The local wrapper forces no-model requests onto the GPT-5.6 Sol + Pro browser route. Explicit engine/model requests remain authoritative.
+- The botfiles wrapper on the selected host forces no-model requests onto the GPT-5.6 Sol + Pro browser route. Explicit engine/model requests remain authoritative.
 - Browser engine supports GPT + Gemini only; use `--engine api` for Claude/Grok/Codex or multi-model runs.
 - **API runs require explicit user consent** before starting because they incur usage costs.
 - Browser attachments:
@@ -132,11 +145,13 @@ Before using that VM route, probe `http://127.0.0.1:9223/json/version`. If unava
 
 - Stored under `~/.oracle/sessions` (override with `ORACLE_HOME_DIR`).
 - Browser runs save durable files under `~/.oracle/sessions/<id>/artifacts/`, including `transcript.md`, Deep Research reports, and downloaded ChatGPT-generated images when available.
-- Runs may detach or take a long time (browser + GPT‑5.6 Sol + Pro often does). If the CLI times out: don’t re-run; reattach or harvest.
-  - List: `oracle status --hours 72`
-  - Attach: `oracle session <id> --render`
-  - Harvest: `oracle session <id> --harvest`
+- Runs may detach or take a long time (browser + GPT‑5.6 Sol + Pro often does). If the CLI times out, do not re-run; reattach or harvest.
+  - VM list: `oracle-vm status --hours 72`
+  - VM attach: `oracle-vm session <id> --render`
+  - VM harvest: `oracle-vm session <id> --harvest`
+  - Explicit local equivalents use plain `oracle`.
 - Use `--slug "<3-5 words>"` to keep session IDs readable.
+- `oracle-vm` creates a timestamped slug when a primary run omits one and prints `oracle-vm session <slug> --render|--harvest` commands for the same GCP session.
 - Duplicate prompt guard exists; use `--force` only when you truly want a fresh run.
 
 ## Prompt template (high signal)

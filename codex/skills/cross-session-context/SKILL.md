@@ -13,6 +13,11 @@ inspect another live tracked task/session from the current session. When running
 inside Codex Desktop and the target is a Codex Desktop thread, use the app
 thread tools as the Desktop transport.
 
+If the purpose is to inspect or recover a Mac UI worker result, use the exact
+worker host and task IDs recorded by `mac-ui-worker`; never resolve that worker
+by title alone. The receipt must also match the declared `iab` or
+`computer-use` surface.
+
 ## Invocation
 
 ```text
@@ -69,6 +74,8 @@ Codex Desktop thread path, when `codex_app` tools are available:
   Codex Desktop thread.
 - If multiple task homes match, stop and surface the candidates instead of
   guessing.
+- A Mac UI worker is bound to one exact source task. Reading it for result
+  recovery does not authorize rebinding it or sending unrelated work.
 
 See `~/pro/botfiles/docs/cross-session-orchestration-contract.md` for the
 shared contract.

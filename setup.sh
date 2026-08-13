@@ -193,6 +193,11 @@ backup_existing() {
         mv "$HOME/.local/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
+    if [ -e "$HOME/.local/bin/oracle-vm" ] && [ ! -L "$HOME/.local/bin/oracle-vm" ]; then
+        echo "  Backing up ~/.local/bin/oracle-vm"
+        mv "$HOME/.local/bin/oracle-vm" "$HOME/.local/bin/oracle-vm.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+
     if [ -e "$HOME/.local/bin/zotero-mcp-route" ] && [ ! -L "$HOME/.local/bin/zotero-mcp-route" ]; then
         echo "  Backing up ~/.local/bin/zotero-mcp-route"
         mv "$HOME/.local/bin/zotero-mcp-route" \
@@ -300,6 +305,8 @@ create_symlinks() {
     safe_symlink "$SCRIPT_DIR/bin/oracle" "$HOME/.local/bin/oracle" "~/.local/bin/oracle"
 
     safe_symlink "$SCRIPT_DIR/bin/oracle-mcp" "$HOME/.local/bin/oracle-mcp" "~/.local/bin/oracle-mcp"
+
+    safe_symlink "$SCRIPT_DIR/bin/oracle-vm" "$HOME/.local/bin/oracle-vm" "~/.local/bin/oracle-vm"
 
     safe_symlink "$SCRIPT_DIR/bin/zotero-mcp-route" \
         "$HOME/.local/bin/zotero-mcp-route" "~/.local/bin/zotero-mcp-route"
@@ -686,7 +693,7 @@ main() {
     echo "Codex skills, profiles, and AGENTS.md are now symlinked to botfiles."
     echo "Existing Codex user config was preserved; a missing local overlay was created."
     echo "Zellij config is now symlinked to botfiles."
-    echo "Oracle and Zotero wrappers are now symlinked into ~/.local/bin."
+    echo "Oracle, Oracle VM, and Zotero wrappers are now symlinked into ~/.local/bin."
     echo ""
     echo "Shell bootstrap (two-layer model):"
     echo "  .botenv  -> core env (secrets, PATH, UV_BIN) loaded for ALL shell contexts"

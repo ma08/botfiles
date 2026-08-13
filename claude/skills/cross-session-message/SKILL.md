@@ -12,6 +12,10 @@ another live zellij-backed task/session with a bounded instruction. When running
 inside Codex Desktop and the target is a Codex Desktop thread, use the app
 thread tools as the Desktop transport.
 
+For UI-only work routed to the Mac in-app Browser or native Computer Use, use
+`mac-ui-worker` instead of treating a generic cross-session message as a UI-job
+protocol.
+
 ## Invocation
 
 ```text
@@ -65,6 +69,9 @@ Codex Desktop thread path, when `codex_app` tools are available:
   supported bridge.
 - Use this for bounded prompt delivery, status pings, or resumable instructions
   only. It is not a remote-control channel.
+- A `mac-ui-worker/v1` request must use the exact recorded source and worker
+  IDs, a unique job ID, exactly one declared surface, and the protocol envelope.
+  Do not send UI jobs by title or to a shared worker guessed from history.
 
 See `~/pro/botfiles/docs/cross-session-orchestration-contract.md` for the
 shared contract.

@@ -56,6 +56,32 @@ state as a prompt-injection API. Those may be valid for read-only diagnostics or
 label management when a dedicated skill says so, but they are not a standard way
 to make a Desktop thread receive a new human prompt.
 
+## Mac UI Worker Route
+
+Use `mac-ui-worker` when a Codex Desktop source task needs UI-only work through
+the Mac task-scoped in-app Browser or native Computer Use.
+
+- Bind one Mac-local worker to the exact source host and task IDs.
+- Reuse that worker only for serial jobs from the same source task. Give every
+  logical job a unique job ID.
+- Declare exactly one surface per job: `iab` or `computer-use`. Split mixed
+  workflows into successive serial jobs for the same worker.
+- Store source and worker task IDs durably. Titles are labels, not addresses.
+- Create a worker only with explicit user authorization and native Desktop
+  project/task tools.
+- Keep login, MFA, credentials, fresh exact persistent-mutation approval, and
+  any native Computer Use handoff in the worker task.
+- Return sanitized receipts to the exact source task and keep a recoverable copy
+  in the worker.
+- Fail closed when Desktop transport or the declared surface is unavailable.
+  Do not substitute SQLite or log writes, switch UI surfaces, or use another
+  automation mechanism.
+
+This route has no singleton dispatcher, shared worker pool, queue, lease, or
+same-source parallel execution in v1. See
+`~/pro/botfiles/codex/skills/mac-ui-worker/references/protocol-v1.md` for
+the message contract.
+
 ## Message Send
 
 `send-zellij-message` is preview-first and bounded for zellij-backed terminal

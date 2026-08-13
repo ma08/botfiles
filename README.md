@@ -302,7 +302,7 @@ Botfiles uses a two-layer shell environment model:
 - PATH additions (`$BOTFILES_ROOT/bin`, `~/.local/bin`, Homebrew/Linuxbrew bins, `/usr/local/bin`)
 - Core env: `BOTFILES_ROOT`, `EDITOR`, `VISUAL`, `TERM`, `UV_BIN`
 - Safe to source from any context: SSH commands, cron, systemd, agent exec
-- Exposes repo-managed executables like `oracle` and `oracle-mcp` to non-interactive shells
+- Exposes repo-managed executables like `oracle`, `oracle-vm`, and `oracle-mcp` to non-interactive shells
 
 **`.botrc` (interactive layer)**
 - Sources `.botenv` first (idempotent via double-source guard)
@@ -333,8 +333,11 @@ source ~/pro/botfiles/.botrc
 ```
 
 `setup.sh` configures these entrypoints automatically and symlinks `oracle`,
-`oracle-mcp`, and `zotero-mcp-route` into `~/.local/bin` so non-interactive
+`oracle-vm`, `oracle-mcp`, and `zotero-mcp-route` into `~/.local/bin` so non-interactive
 command runners can resolve them without sourcing `.botrc`.
+
+Use `oracle-vm` for agent-initiated prompt and supported text/source reviews on
+the canonical GCP Oracle environment. Plain `oracle` remains host-local.
 
 `setup.sh` also symlinks `~/.claude/agents` to `claude/agents`, `~/.codex/AGENTS.md` to `codex/AGENTS.md`, and `~/.codex/agents` to `codex/agents`.
 
@@ -845,6 +848,7 @@ botfiles/
 ├── setup.sh
 ├── bin/
 │   ├── oracle
+│   ├── oracle-vm
 │   ├── oracle-mcp
 │   ├── start-zellij-session-for-task
 │   ├── get-cross-session-context

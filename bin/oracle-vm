@@ -1,0 +1,412 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_source="${BASH_SOURCE[0]}"
+while [ -L "${script_source}" ]; do
+  script_dir="$(cd "$(dirname "${script_source}")" && pwd)"
+  script_source="$(readlink "${script_source}")"
+  case "${script_source}" in
+    /*) ;;
+    *) script_source="${script_dir}/${script_source}" ;;
+  esac
+done
+
+script_dir="$(cd "$(dirname "${script_source}")" && pwd)"
+botfiles_root="$(cd "${script_dir}/.." && pwd)"
+
+# shellcheck disable=SC1091
+. "${botfiles_root}/.botenv"
+
+usage() {
+  cat <<'EOF'
+Usage: oracle-vm [route options] [oracle arguments]
+
+Route options:
+  --local                 Run the host-local botfiles Oracle wrapper.
+  --vm-host HOST          Override the SSH alias (default: research-cpu-01-ts).
+  --route-preview         Validate and print the route without staging or running.
+  -h, --help              Show this help.
+
+V1 file contract:
+  - Supports repeated --file PATH with literal regular text/source files only.
+  - Rejects directories, globs, exclusions, symlinks, common secret files,
+    binary files, files over 1 MiB, and bundles over 8 MiB.
+  - Preserves all non-route Oracle arguments, including explicit model/engine.
+
+Examples:
+  oracle-vm -p "Review this design" --file docs/design.md
+  oracle-vm --route-preview -p "Review" --file src/main.py
+  oracle-vm session my-review-slug --harvest
+  oracle-vm --local -p "Use Mac-local browser state"
+EOF
+}
+
+die() {
+  printf 'oracle-vm: %s\n' "$*" >&2
+  exit 2
+}
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+  esac
+  return 1
+}
+
+on_canonical_vm() {
+  local short_hostname
+
+  if is_truthy "${ORACLE_VM_FORCE_REMOTE:-}"; then
+    return 1
+  fi
+  short_hostname="$(hostname -s 2>/dev/null || true)"
+  [ "${SYSTEM_NAME:-}" = "research-cpu-01" ] || return 1
+  [ "${BOT_MACHINE_SSH_ALIAS:-}" = "research-cpu-01-ts" ] || return 1
+  [ "$short_hostname" = "research-cpu-01" ] || return 1
+  return 0
+}
+
+contains_glob_or_list_syntax() {
+  case "$1" in
+    !*|*,*|*'*'*|*'?'*|*'['*) return 0 ;;
+  esac
+  return 1
+}
+
+looks_secret_shaped() {
+  local name
+  name="${1##*/}"
+  case "$name" in
+    .env|.env.*|*.pem|*.p12|*.pfx|*.key|id_rsa*|id_ed25519*|authorized_keys|credentials.json|service-account*.json)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+validate_text_file() {
+  local path="$1"
+  local size
+
+  contains_glob_or_list_syntax "$path" &&
+    die "--file accepts one literal path at a time; globs, exclusions, and comma lists are unsupported: $path"
+  case "$path" in
+    *$'\n'*|*$'\r'*) die "attachment paths may not contain line breaks" ;;
+  esac
+  case "$path" in
+    /*) ;;
+    *) path="${PWD}/${path}" ;;
+  esac
+  [ -e "$path" ] || die "file does not exist: $path"
+  [ ! -L "$path" ] || die "symlink attachments are unsupported: $path"
+  [ -f "$path" ] || die "only literal regular files are supported; stage a sanitized file instead: $path"
+  [ -r "$path" ] || die "file is not readable: $path"
+  looks_secret_shaped "$path" &&
+    die "secret-shaped attachment name is refused; create an explicitly sanitized copy: $path"
+
+  size="$(wc -c < "$path" | tr -d '[:space:]')"
+  [ -n "$size" ] || die "could not determine file size: $path"
+  [ "$size" -le 1048576 ] || die "file exceeds the 1 MiB v1 limit: $path"
+  if [ "$size" -gt 0 ] && ! LC_ALL=C grep -Iq -- . "$path"; then
+    die "binary or non-text attachment is unsupported: $path"
+  fi
+
+  ORACLE_VM_VALIDATED_PATH="$path"
+  ORACLE_VM_VALIDATED_SIZE="$size"
+}
+
+route="vm"
+route_preview=0
+vm_host="${ORACLE_VM_HOST:-research-cpu-01-ts}"
+oracle_args=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --local)
+      route="local"
+      shift
+      ;;
+    --vm-host)
+      [ "$#" -ge 2 ] || die "--vm-host requires a value"
+      vm_host="$2"
+      shift 2
+      ;;
+    --vm-host=*)
+      vm_host="${1#--vm-host=}"
+      shift
+      ;;
+    --route-preview)
+      route_preview=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      oracle_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+local_wrapper="${ORACLE_VM_LOCAL_WRAPPER:-${botfiles_root}/bin/oracle}"
+[ -x "$local_wrapper" ] || die "local Oracle wrapper is not executable: $local_wrapper"
+
+forward_args=()
+local_files=()
+file_count=0
+total_bytes=0
+slug=""
+expect_slug=0
+index=0
+
+while [ "$index" -lt "${#oracle_args[@]}" ]; do
+  arg="${oracle_args[$index]}"
+  if [ "$expect_slug" -eq 1 ]; then
+    slug="$arg"
+    expect_slug=0
+    forward_args+=("$arg")
+    index=$((index + 1))
+    continue
+  fi
+
+  case "$arg" in
+    --file)
+      next_index=$((index + 1))
+      [ "$next_index" -lt "${#oracle_args[@]}" ] || die "--file requires a path"
+      file_path="${oracle_args[$next_index]}"
+      validate_text_file "$file_path"
+      file_path="$ORACLE_VM_VALIDATED_PATH"
+      file_count=$((file_count + 1))
+      total_bytes=$((total_bytes + ORACLE_VM_VALIDATED_SIZE))
+      [ "$total_bytes" -le 8388608 ] || die "attachment bundle exceeds the 8 MiB v1 limit"
+      local_files+=("$file_path")
+      forward_args+=("--file" "__ORACLE_VM_FILE_${file_count}__")
+      index=$((index + 2))
+      ;;
+    --file=*)
+      file_path="${arg#--file=}"
+      validate_text_file "$file_path"
+      file_path="$ORACLE_VM_VALIDATED_PATH"
+      file_count=$((file_count + 1))
+      total_bytes=$((total_bytes + ORACLE_VM_VALIDATED_SIZE))
+      [ "$total_bytes" -le 8388608 ] || die "attachment bundle exceeds the 8 MiB v1 limit"
+      local_files+=("$file_path")
+      forward_args+=("--file" "__ORACLE_VM_FILE_${file_count}__")
+      index=$((index + 1))
+      ;;
+    --slug)
+      expect_slug=1
+      forward_args+=("$arg")
+      index=$((index + 1))
+      ;;
+    --slug=*)
+      slug="${arg#--slug=}"
+      forward_args+=("$arg")
+      index=$((index + 1))
+      ;;
+    *)
+      forward_args+=("$arg")
+      index=$((index + 1))
+      ;;
+  esac
+done
+
+[ "$expect_slug" -eq 0 ] || die "--slug requires a value"
+
+is_subcommand=0
+case "${oracle_args[0]:-}" in
+  serve|bridge|tui|session|status|restart) is_subcommand=1 ;;
+esac
+
+# Keep primary runs and later session/status commands on the same preferred
+# implementation. An explicit caller override still wins.
+oracle_source_main_mode="${ORACLE_SOURCE_MAIN:-1}"
+
+creates_session=1
+if [ "$is_subcommand" -eq 1 ] || [ "$route_preview" -eq 1 ]; then
+  creates_session=0
+fi
+explicit_model_or_engine=0
+for arg in "${oracle_args[@]}"; do
+  case "$arg" in
+    --dry-run|--dry-run=*|--render|--copy|--copy-markdown)
+      creates_session=0
+      ;;
+    --engine|--engine=*|--model|--model=*|--models|--models=*|-e|-e*|-m|-m*)
+      explicit_model_or_engine=1
+      ;;
+  esac
+done
+
+if [ "$creates_session" -eq 1 ] && [ -z "$slug" ]; then
+  slug="oracle-vm-$(date -u '+%Y%m%d-%H%M%S')"
+  forward_args+=("--slug" "$slug")
+  generated_slug=1
+else
+  generated_slug=0
+fi
+
+has_attachment_mode=0
+if [ "$file_count" -gt 0 ]; then
+  for arg in "${forward_args[@]}"; do
+    case "$arg" in
+      --browser-inline-files|--browser-attachments|--browser-attachments=*)
+        has_attachment_mode=1
+        ;;
+    esac
+  done
+  if [ "$has_attachment_mode" -eq 0 ] && [ "$explicit_model_or_engine" -eq 0 ]; then
+    forward_args+=("--browser-inline-files")
+  fi
+fi
+
+local_exec_args=("${oracle_args[@]}")
+if [ "$generated_slug" -eq 1 ]; then
+  local_exec_args+=("--slug" "$slug")
+fi
+if [ "$file_count" -gt 0 ] && [ "$has_attachment_mode" -eq 0 ] &&
+  [ "$explicit_model_or_engine" -eq 0 ]; then
+  local_exec_args+=("--browser-inline-files")
+fi
+
+if [ "$route" = "local" ] || on_canonical_vm; then
+  if [ "$route_preview" -eq 1 ]; then
+    printf 'route=%s\n' "$([ "$route" = "local" ] && printf 'explicit-local' || printf 'canonical-vm-local')"
+    printf 'wrapper=%s\n' "$local_wrapper"
+    printf 'oracle_source_main=%s\n' "$oracle_source_main_mode"
+    printf 'files=%s\n' "$file_count"
+    printf 'bytes=%s\n' "$total_bytes"
+    if [ "$creates_session" -eq 1 ] && [ -n "$slug" ]; then
+      printf 'slug=%s\n' "$slug"
+    fi
+    exit 0
+  fi
+  export ORACLE_SOURCE_MAIN="$oracle_source_main_mode"
+  exec "$local_wrapper" "${local_exec_args[@]}"
+fi
+
+case "$vm_host" in
+  ''|*[!A-Za-z0-9._-]*) die "invalid SSH host alias: $vm_host" ;;
+esac
+
+ssh_bin="${ORACLE_VM_SSH_BIN:-ssh}"
+scp_bin="${ORACLE_VM_SCP_BIN:-scp}"
+command -v "$ssh_bin" >/dev/null 2>&1 || die "SSH command is unavailable: $ssh_bin"
+command -v "$scp_bin" >/dev/null 2>&1 || die "SCP command is unavailable: $scp_bin"
+
+connect_timeout="${ORACLE_VM_CONNECT_TIMEOUT:-5}"
+case "$connect_timeout" in
+  ''|*[!0-9]*) die "ORACLE_VM_CONNECT_TIMEOUT must be an integer" ;;
+esac
+ssh_options=(-o BatchMode=yes -o "ConnectTimeout=${connect_timeout}")
+
+set +e
+remote_home="$($ssh_bin "${ssh_options[@]}" "$vm_host" 'set -e; test -x "$HOME/pro/botfiles/bin/oracle"; printf "%s" "$HOME"' 2>/dev/null)"
+preflight_status=$?
+set -e
+[ "$preflight_status" -eq 0 ] || die "VM preflight failed for $vm_host; no local fallback was started"
+case "$remote_home" in
+  /*) ;;
+  *) die "VM preflight returned an invalid home directory" ;;
+esac
+case "$remote_home" in
+  *$'\n'*) die "VM preflight returned ambiguous output" ;;
+esac
+
+if [ "$route_preview" -eq 1 ]; then
+  printf 'route=vm-ssh\n'
+  printf 'host=%s\n' "$vm_host"
+  printf 'remote_wrapper=%s/pro/botfiles/bin/oracle\n' "$remote_home"
+  printf 'oracle_source_main=%s\n' "$oracle_source_main_mode"
+  printf 'files=%s\n' "$file_count"
+  printf 'bytes=%s\n' "$total_bytes"
+  if [ "$creates_session" -eq 1 ] && [ -n "$slug" ]; then
+    printf 'slug=%s\n' "$slug"
+  fi
+  exit 0
+fi
+
+remote_wrapper="${remote_home}/pro/botfiles/bin/oracle"
+remote_dir=""
+
+cleanup_remote() {
+  [ -n "$remote_dir" ] || return 0
+  case "$remote_dir" in
+    "${remote_home}/.cache/oracle-vm/run."*) ;;
+    *)
+      printf 'oracle-vm: refusing cleanup of unexpected remote path: %s\n' "$remote_dir" >&2
+      return 1
+      ;;
+  esac
+  printf -v quoted_remote_dir '%q' "$remote_dir"
+  "$ssh_bin" "${ssh_options[@]}" "$vm_host" "rm -rf -- ${quoted_remote_dir}" >/dev/null 2>&1 ||
+    printf 'oracle-vm: warning: protected staging remains at %s:%s\n' "$vm_host" "$remote_dir" >&2
+}
+
+if [ "$file_count" -gt 0 ]; then
+  remote_cache="${remote_home}/.cache/oracle-vm"
+  printf -v quoted_remote_cache '%q' "$remote_cache"
+  printf -v quoted_template '%q' "${remote_cache}/run.XXXXXXXX"
+  remote_dir="$($ssh_bin "${ssh_options[@]}" "$vm_host" "umask 077; mkdir -p ${quoted_remote_cache}; chmod 700 ${quoted_remote_cache}; mktemp -d ${quoted_template}")"
+  case "$remote_dir" in
+    "${remote_home}/.cache/oracle-vm/run."*) ;;
+    *) die "remote staging returned an unexpected path" ;;
+  esac
+  trap cleanup_remote EXIT INT TERM
+
+  remote_files=()
+  file_index=0
+  for local_file in "${local_files[@]}"; do
+    file_index=$((file_index + 1))
+    base_name="${local_file##*/}"
+    safe_name="$(printf '%s' "$base_name" | tr -c 'A-Za-z0-9._-' '_')"
+    remote_file="${remote_dir}/$(printf '%04d' "$file_index")-${safe_name}"
+    "$scp_bin" -q "${ssh_options[@]}" -- "$local_file" "${vm_host}:${remote_file}"
+    printf -v quoted_remote_file '%q' "$remote_file"
+    "$ssh_bin" "${ssh_options[@]}" "$vm_host" "chmod 600 ${quoted_remote_file}"
+    remote_files+=("$remote_file")
+  done
+
+  resolved_args=()
+  for arg in "${forward_args[@]}"; do
+    case "$arg" in
+      __ORACLE_VM_FILE_*__)
+        marker_index="${arg#__ORACLE_VM_FILE_}"
+        marker_index="${marker_index%__}"
+        resolved_args+=("${remote_files[$((marker_index - 1))]}")
+        ;;
+      *) resolved_args+=("$arg") ;;
+    esac
+  done
+else
+  resolved_args=("${forward_args[@]}")
+fi
+
+remote_workdir="${remote_dir:-$remote_home}"
+printf -v quoted_workdir '%q' "$remote_workdir"
+printf -v quoted_wrapper '%q' "$remote_wrapper"
+printf -v quoted_source_main '%q' "$oracle_source_main_mode"
+remote_command="cd ${quoted_workdir} && export ORACLE_SOURCE_MAIN=${quoted_source_main}; exec ${quoted_wrapper}"
+for arg in "${resolved_args[@]}"; do
+  printf -v quoted_arg '%q' "$arg"
+  remote_command+=" ${quoted_arg}"
+done
+
+printf 'oracle-vm: route=%s host=%s files=%s bytes=%s\n' "vm-ssh" "$vm_host" "$file_count" "$total_bytes" >&2
+if [ "$creates_session" -eq 1 ] && [ -n "$slug" ]; then
+  printf 'oracle-vm: slug=%s\n' "$slug" >&2
+  printf 'oracle-vm: reattach: oracle-vm session %q --render\n' "$slug" >&2
+  printf 'oracle-vm: harvest:  oracle-vm session %q --harvest\n' "$slug" >&2
+fi
+
+set +e
+"$ssh_bin" "${ssh_options[@]}" "$vm_host" "$remote_command"
+oracle_status=$?
+set -e
+
+cleanup_remote
+trap - EXIT INT TERM
+exit "$oracle_status"
