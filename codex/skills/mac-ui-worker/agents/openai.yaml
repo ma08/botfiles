@@ -1,4 +1,4 @@
 interface:
   display_name: "Mac UI Worker"
-  short_description: "Route Mac Browser and Computer Use jobs"
-  default_prompt: "Use $mac-ui-worker to route this bounded Mac UI job through the declared in-app Browser or Computer Use surface and return a sanitized receipt."
+  short_description: "Route Mac UI jobs with direct collaboration"
+  default_prompt: "Use $mac-ui-worker to send one complete bounded Mac UI job, collaborate with me directly in the worker, and reserve source callbacks for declared dependencies and the sanitized receipt."

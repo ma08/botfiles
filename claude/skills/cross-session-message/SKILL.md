@@ -16,6 +16,14 @@ For UI-only work routed to the Mac in-app Browser or native Computer Use, use
 `mac-ui-worker` instead of treating a generic cross-session message as a UI-job
 protocol.
 
+Within an accepted Mac UI job, do not use this skill to relay routine
+clarification, login, MFA, credential entry, approval, or handoff between the
+worker and source. Those checkpoints stay between Sourya and the worker by
+default. The only approval exception is an exact, visibly pre-declared,
+single-use source delegation. Cross-task sends must match a callback,
+dependency result, correction, cancellation, or terminal receipt allowed by
+the complete initial `mac-ui-worker/v1` envelope.
+
 ## Invocation
 
 ```text
@@ -72,6 +80,9 @@ Codex Desktop thread path, when `codex_app` tools are available:
 - A `mac-ui-worker/v1` request must use the exact recorded source and worker
   IDs, a unique job ID, exactly one declared surface, and the protocol envelope.
   Do not send UI jobs by title or to a shared worker guessed from history.
+- A later generic message cannot broaden an active Mac UI job. Value-safe
+  corrections use the exact protocol correction envelope; material expansion
+  requires a new complete request and job ID.
 
 See `~/pro/botfiles/docs/cross-session-orchestration-contract.md` for the
 shared contract.
