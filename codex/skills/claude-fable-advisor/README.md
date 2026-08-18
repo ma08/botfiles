@@ -3,12 +3,21 @@
 Use Claude Fable 5 as a subscription-backed external advisor for plans,
 architecture, debugging strategy, reviews, and completion checks.
 
-The bundled runner refuses to call Fable unless Claude Code reports:
+The bundled runner refuses to call Fable unless Claude Code reports either a
+paid stored subscription login:
 
 ```text
 authMethod=claude.ai
 apiProvider=firstParty
 subscriptionType=<paid plan>
+```
+
+or the runner-specific long-lived subscription credential:
+
+```text
+authMethod=oauth_token
+apiProvider=firstParty
+oauthCredentialSource=token-file|environment
 ```
 
 It runs Claude in safe mode with an explicit empty MCP configuration and strips
@@ -17,11 +26,19 @@ runs also strip common cloud, GitHub, and app credential environment variables
 by default. It does not fall back to Bedrock, Vertex, Foundry, Claude Platform
 on AWS, or Console/API billing.
 
+For stable non-interactive subscription authentication, the runner
+automatically reads a long-lived OAuth token from the git-ignored,
+machine-local file at
+`$BOTFILES_ROOT/secrets/local/claude-fable-oauth-token`. It does not export that
+token globally, so ordinary interactive Claude sessions retain their normal
+`/login` credentials and full capabilities.
+
 ## Choose a mode
 
 | Mode | Flags | Good for |
 | --- | --- | --- |
 | No tools | none | Plans, decisions, attached documents, independent critique |
+| Read-only review | `--read-only-review` | Comprehensive repository assessment without edit tools or permission bypass |
 | Selected tools | `--tools "Read,Bash"` | Code review, diagnostics, targeted repository inspection |
 | Full tools | `--with-tools` | Broad repository exploration with normal permission handling |
 | Full tools + yolo | `--with-tools --yolo` | Approved work in an isolated, trusted environment |
@@ -47,9 +64,10 @@ judgment you want, what evidence Fable may inspect, and which tool mode to use.
 
 ### Review code
 
-> Use Fable with `Read,Bash` tools to review this branch for correctness,
+> Use Fable with `--read-only-review` to inspect this branch for correctness,
 > security regressions, behavior changes, and missing tests. It may inspect
-> files and run tests, but must not edit anything.
+> source and Git history, but it must not edit files or run commands that write
+> caches or artifacts.
 
 ### Diagnose a difficult bug
 
@@ -106,6 +124,17 @@ Set a short runner variable:
 RUNNER="$HOME/pro/botfiles/codex/skills/claude-fable-advisor/scripts/run_fable_advisor.py"
 ```
 
+Configure the runner-only token once from a private terminal:
+
+```bash
+uv run python \
+  "$HOME/pro/botfiles/codex/skills/claude-fable-advisor/scripts/setup_fable_oauth_token.py"
+```
+
+The helper runs `claude setup-token`, then accepts the displayed token through
+a hidden prompt and stores it with mode `0600`. Never paste the token into an
+agent conversation, command argument, task artifact, or tracked file.
+
 Check the subscription route without using Fable quota:
 
 ```bash
@@ -142,6 +171,22 @@ uv run python "$RUNNER" \
   --output-dir /path/to/artifacts/fable-review
 ```
 
+Run a comprehensive repository review without edit tools or permission bypass:
+
+```bash
+uv run python "$RUNNER" \
+  --cwd /path/to/repository \
+  --prompt-file /path/to/fable-prompt.md \
+  --read-only-review \
+  --output-dir /path/to/artifacts/fable-read-only-review
+```
+
+This preset exposes `Read`, `Glob`, `Grep`, and `Bash`, but `Bash` is placed in
+`dontAsk` mode with only selected inspection-only Git commands pre-approved. It
+defaults to 12 turns and rejects `--yolo`, `--inherit-credentials`,
+`--with-tools`, and custom `--tools`. The runner prepends a no-write,
+no-network, no-provider-access boundary to the prompt.
+
 Run with the full default tool set and normal permissions:
 
 ```bash
@@ -164,6 +209,11 @@ uv run python "$RUNNER" \
 
 Use `--tools "Read"` when Fable only needs file access. Adding `Bash` permits
 arbitrary shell commands; it is not a read-only guarantee.
+
+Prefer `--read-only-review` over adding bare `Bash` for repository assessment.
+Its command allowlist and prompt are procedural controls, not an OS-level
+sandbox. Keep the working directory trusted and verify that pre/post Git state
+and file hashes are unchanged when the review is release-critical.
 
 If a tool-enabled task deliberately needs ambient credentials, add
 `--inherit-credentials`. This is an explicit opt-in and should be paired with a
@@ -197,7 +247,10 @@ Every live run writes:
 - `answer.md` — Fable's response
 - `stderr.txt` — Claude Code diagnostics
 - `status.json` — route gate, model, effort, tools, yolo state, command
-  metadata, exit code, and artifact paths
+  metadata, redacted OAuth credential source, exit code, and artifact paths
+
+Read-only reviews also record `readOnlyReview`, `permissionMode`, and the exact
+`allowedTools` list in `status.json`.
 
 Keep these in the active task's artifact folder when Fable informs a durable
 decision.
