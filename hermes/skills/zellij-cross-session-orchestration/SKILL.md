@@ -104,7 +104,12 @@ Behavior to preserve:
 - run preview first and inspect the resolved target
 - add `--execute` only once the target looks correct
 - use `--submit enter` only when intentional
-- long or multiline Codex payloads may need an extra delayed confirm Enter; the helper handles this automatically
+- require `composer_preflight: safe_empty` before execution and
+  `outcome: delivered` plus `delivered: true` before claiming a forwarded turn
+- treat `executed`, verified staging, and an Enter action as intermediate states,
+  not delivery
+- long or multiline Codex payloads receive an extra delayed confirm Enter only
+  when the intended payload remains visibly staged after the first Enter
 - refuse ambiguous tab selection or cross-machine targets unless the user intentionally does local debug work with explicit `--zellij-session`
 - use this only for bounded prompt delivery, status pings, or resumable instructions; it is not a remote-control channel
 
@@ -132,7 +137,13 @@ When using these helpers, verify with:
 - JSON output when available for structured inspection
 - remote-target project-root existence before assuming launch succeeded
 - when tracker/task-slug lookup returns `no_match` but you have a concrete session name from a Linear activation comment, retry `get-cross-session-context` with `--zellij-session <session>` for diagnostic live-session inspection only
-- for `send-zellij-message`, always do the JSON dry-run preview first; if preview resolves but `--execute` fails, treat the write as not delivered and record the exact helper/zellij failure before choosing a fallback durable note
+- for `send-zellij-message`, always do the JSON dry-run preview first; if preview
+  is unsafe, execution fails, or delivery remains unverified, treat the message
+  as not delivered and record the exact receipt before choosing a fallback
+  durable note
+- manual fallback means attach and inspect the exact pane, then let the human
+  decide how to handle an existing draft or selector. Do not clear, append to,
+  or submit unknown composer state through the helper
 
 ## Observed debug pitfall
 

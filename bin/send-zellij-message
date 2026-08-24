@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Preview or send a bounded message into a known local zellij session/tab."""
+
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import re
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from session_orchestration_common import (
@@ -21,6 +26,27 @@ from session_orchestration_common import (
 SUBMIT_CHOICES = ("none", "enter")
 CODEX_SECONDARY_ENTER_THRESHOLD_CHARS = 1024
 CODEX_SECONDARY_ENTER_DELAY_SECONDS = 1.0
+DELIVERY_VERIFY_TIMEOUT_SECONDS = 10.0
+DELIVERY_VERIFY_POLL_SECONDS = 0.5
+ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+SEPARATOR_RE = re.compile(r"^[\s─━-]{3,}$")
+
+
+@dataclass(frozen=True)
+class AgentPane:
+    pane_id: str
+    agent: str
+    tab_name: str
+    terminal_command: str
+    pane_command: str
+    cursor_x: int | None = None
+
+
+@dataclass(frozen=True)
+class ComposerInspection:
+    state: str
+    detail: str
+    composer_text: str = ""
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         default="none",
         help=(
             "Whether to send an Enter byte after writing the text. "
-            "`enter` is best-effort and should be used explicitly."
+            "`enter` is explicit and delivery is verified separately."
         ),
     )
     parser.add_argument(
@@ -41,13 +67,441 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Actually perform the zellij write. Without this flag the command is a dry run.",
     )
-    parser.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable text.")
+    parser.add_argument(
+        "--replace-claude-suggestion",
+        action="store_true",
+        help=(
+            "Explicitly permit replacing a Claude Code autocomplete suggestion only when "
+            "the visible text starts at an otherwise empty composer and the terminal cursor "
+            "remains at the empty-prompt position. Real drafts still fail closed."
+        ),
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Emit JSON instead of human-readable text."
+    )
     return parser.parse_args()
 
 
 def fail(message: str) -> int:
     print(message, file=sys.stderr)
     return 2
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_RE.sub("", text)
+
+
+def compact_text(text: str) -> str:
+    return "".join(text.split())
+
+
+def command_agent(command: str) -> str:
+    normalized = (command or "").lower()
+    if re.search(r"(^|[/\s])claude(?:$|[\s.-])", normalized):
+        return "claude"
+    if re.search(r"(^|[/\s])codex(?:$|[\s.-])", normalized):
+        return "codex"
+    return TRACKER_KIND_NONE
+
+
+def session_state_in_listing(listing: str, session_name: str) -> str:
+    for line in listing.splitlines():
+        fields = line.split()
+        if not fields or fields[0] != session_name:
+            continue
+        return "exited" if "(EXITED" in line else "active"
+    return "missing"
+
+
+def select_zellij_runtime_namespace(session_name: str) -> str:
+    """Prefer the existing environment, else recover a live systemd zellij socket."""
+    if os.environ.get("XDG_RUNTIME_DIR") or session_name == TRACKER_KIND_NONE:
+        return ""
+    _, default_stdout, _ = run_local_command(
+        ["zellij", "list-sessions", "--no-formatting"], timeout_seconds=10
+    )
+    default_state = session_state_in_listing(default_stdout, session_name)
+    if default_state == "active":
+        return ""
+
+    runtime_dir = f"/run/user/{os.getuid()}"
+    code, runtime_stdout, _ = run_local_command(
+        [
+            "env",
+            f"XDG_RUNTIME_DIR={runtime_dir}",
+            "zellij",
+            "list-sessions",
+            "--no-formatting",
+        ],
+        timeout_seconds=10,
+    )
+    if code != 0 or session_state_in_listing(runtime_stdout, session_name) != "active":
+        return ""
+    os.environ["XDG_RUNTIME_DIR"] = runtime_dir
+    return (
+        f"Selected live zellij namespace {runtime_dir}; the default namespace "
+        f"reported `{session_name}` as {default_state}."
+    )
+
+
+def pane_cursor_x(row: dict) -> int | None:
+    coordinates = row.get("cursor_coordinates_in_pane")
+    if not isinstance(coordinates, list) or len(coordinates) != 2:
+        return None
+    return coordinates[0] if isinstance(coordinates[0], int) else None
+
+
+def read_pane_cursor_x(session_name: str, pane_id: str) -> tuple[int | None, str]:
+    code, stdout, stderr = run_local_command(
+        [
+            "zellij",
+            "-s",
+            session_name,
+            "action",
+            "list-panes",
+            "--all",
+            "--json",
+        ],
+        timeout_seconds=10,
+    )
+    if code != 0:
+        return None, (stderr or stdout).strip() or "failed to read pane cursor"
+    try:
+        rows = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        return None, f"invalid zellij pane inventory: {exc}"
+    expected_id = pane_id.removeprefix("terminal_")
+    for row in rows:
+        if row.get("is_plugin"):
+            continue
+        if str(row.get("id")) == expected_id:
+            cursor_x = pane_cursor_x(row)
+            if cursor_x is None:
+                return None, "target pane does not expose cursor coordinates"
+            return cursor_x, ""
+    return None, "target pane disappeared during composer probe"
+
+
+def resolve_agent_pane(
+    session_name: str,
+    selected_tab_name: str,
+    expected_agent: str,
+) -> tuple[AgentPane | None, str]:
+    code, stdout, stderr = run_local_command(
+        [
+            "zellij",
+            "-s",
+            session_name,
+            "action",
+            "list-panes",
+            "--all",
+            "--command",
+            "--state",
+            "--tab",
+            "--json",
+        ],
+        timeout_seconds=10,
+    )
+    if code != 0:
+        return None, (stderr or stdout).strip() or "failed to list zellij panes"
+    try:
+        rows = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        return None, f"invalid zellij pane inventory: {exc}"
+
+    candidate_rows: list[dict] = []
+    identified: list[AgentPane] = []
+    for row in rows:
+        if row.get("is_plugin") or row.get("exited") or row.get("is_held"):
+            continue
+        if row.get("is_suppressed") or not row.get("is_selectable", True):
+            continue
+        if selected_tab_name and row.get("tab_name") != selected_tab_name:
+            continue
+        candidate_rows.append(row)
+        terminal_command = str(row.get("terminal_command") or "")
+        pane_command = str(row.get("pane_command") or "")
+        detected = command_agent(terminal_command)
+        if detected == TRACKER_KIND_NONE:
+            detected = command_agent(pane_command)
+        if detected == TRACKER_KIND_NONE:
+            continue
+        identified.append(
+            AgentPane(
+                pane_id=f"terminal_{row['id']}",
+                agent=detected,
+                tab_name=str(row.get("tab_name") or ""),
+                terminal_command=terminal_command,
+                pane_command=pane_command,
+                cursor_x=pane_cursor_x(row),
+            )
+        )
+
+    normalized_expected = (expected_agent or "").strip().lower()
+    if normalized_expected in {"claude", "codex"}:
+        expected_matches = [
+            pane for pane in identified if pane.agent == normalized_expected
+        ]
+        if len(expected_matches) == 1:
+            return expected_matches[0], ""
+        if len(expected_matches) > 1:
+            return (
+                None,
+                f"multiple {normalized_expected} panes exist in the selected tab",
+            )
+        screen_matches: list[AgentPane] = []
+        for row in candidate_rows:
+            pane_id = f"terminal_{row['id']}"
+            screen, screen_error = dump_agent_screen(session_name, pane_id, full=True)
+            if screen_error or not screen_identifies_agent(normalized_expected, screen):
+                continue
+            screen_matches.append(
+                AgentPane(
+                    pane_id=pane_id,
+                    agent=normalized_expected,
+                    tab_name=str(row.get("tab_name") or ""),
+                    terminal_command=str(row.get("terminal_command") or ""),
+                    pane_command=str(row.get("pane_command") or ""),
+                    cursor_x=pane_cursor_x(row),
+                )
+            )
+        if len(screen_matches) == 1:
+            return screen_matches[0], ""
+        if len(screen_matches) > 1:
+            return (
+                None,
+                f"multiple panes display an active {normalized_expected} UI in the selected tab",
+            )
+        return None, (
+            f"task metadata expects {normalized_expected}, but no unique matching agent pane "
+            "exists in the selected tab"
+        )
+
+    if len(identified) == 1:
+        return identified[0], ""
+    if not identified:
+        screen_matches: list[AgentPane] = []
+        for row in candidate_rows:
+            pane_id = f"terminal_{row['id']}"
+            screen, screen_error = dump_agent_screen(session_name, pane_id, full=True)
+            if screen_error:
+                continue
+            matching_agents = [
+                agent
+                for agent in ("claude", "codex")
+                if screen_identifies_agent(agent, screen)
+            ]
+            if len(matching_agents) != 1:
+                continue
+            screen_matches.append(
+                AgentPane(
+                    pane_id=pane_id,
+                    agent=matching_agents[0],
+                    tab_name=str(row.get("tab_name") or ""),
+                    terminal_command=str(row.get("terminal_command") or ""),
+                    pane_command=str(row.get("pane_command") or ""),
+                    cursor_x=pane_cursor_x(row),
+                )
+            )
+        if len(screen_matches) == 1:
+            return screen_matches[0], ""
+        if len(screen_matches) > 1:
+            return (
+                None,
+                "multiple panes display a supported agent UI in the selected tab",
+            )
+        return (
+            None,
+            "no supported Claude Code or Codex pane was identified in the selected tab",
+        )
+    return None, "multiple supported agent panes exist in the selected tab"
+
+
+def dump_agent_screen(
+    session_name: str, pane_id: str, *, full: bool = False
+) -> tuple[str, str]:
+    command = [
+        "zellij",
+        "-s",
+        session_name,
+        "action",
+        "dump-screen",
+        "--ansi",
+        "--pane-id",
+        pane_id,
+    ]
+    if full:
+        command.append("--full")
+    code, stdout, stderr = run_local_command(command, timeout_seconds=10)
+    if code != 0:
+        return "", (stderr or stdout).strip() or "failed to dump agent pane"
+    return stdout, ""
+
+
+def _claude_composer(screen: str, *, cursor_x: int | None = None) -> ComposerInspection:
+    lines = strip_ansi(screen).splitlines()
+    prompt_indexes = [index for index, line in enumerate(lines) if "❯" in line]
+    if not prompt_indexes:
+        return ComposerInspection(
+            "unavailable", "Claude composer prompt is not visible"
+        )
+    prompt_index = prompt_indexes[-1]
+    separator_index = None
+    for index in range(prompt_index + 1, len(lines)):
+        if SEPARATOR_RE.fullmatch(lines[index]):
+            separator_index = index
+            break
+    if separator_index is None:
+        return ComposerInspection(
+            "ambiguous", "Claude composer boundary is not visible"
+        )
+
+    prompt_line = lines[prompt_index].split("❯", 1)[1].replace("\u00a0", " ")
+    continuation = lines[prompt_index + 1 : separator_index]
+    composer_text = "\n".join([prompt_line, *continuation]).strip()
+    if composer_text:
+        prompt_prefix = lines[prompt_index].split("❯", 1)[0] + "❯ "
+        empty_cursor_x = len(prompt_prefix) + 1
+        if cursor_x == empty_cursor_x:
+            return ComposerInspection(
+                "suggestion",
+                "Claude shows text while the cursor remains at the empty-prompt position; "
+                "replacement requires explicit --replace-claude-suggestion opt-in",
+                composer_text,
+            )
+        return ComposerInspection(
+            "nonempty", "Claude composer contains pre-existing text", composer_text
+        )
+    return ComposerInspection("empty", "Claude composer is visibly empty")
+
+
+def _first_visible_codex_input_is_dim(raw_line: str) -> bool | None:
+    marker_index = raw_line.find("›")
+    if marker_index < 0:
+        return None
+    suffix = raw_line[marker_index + 1 :]
+    dim = False
+    position = 0
+    for match in ANSI_RE.finditer(suffix):
+        visible = suffix[position : match.start()]
+        for char in visible:
+            if not char.isspace():
+                return dim
+        code = match.group(0)
+        if code.endswith("m"):
+            body = code[2:-1]
+            values = [int(value) if value else 0 for value in body.split(";")]
+            if 0 in values or 22 in values:
+                dim = False
+            if 2 in values:
+                dim = True
+        position = match.end()
+    for char in suffix[position:]:
+        if not char.isspace():
+            return dim
+    return None
+
+
+def _codex_composer(screen: str) -> ComposerInspection:
+    raw_lines = screen.splitlines()
+    prompt_lines = [line for line in raw_lines if "›" in strip_ansi(line)]
+    if not prompt_lines:
+        return ComposerInspection("unavailable", "Codex composer prompt is not visible")
+    raw_prompt = prompt_lines[-1]
+    first_visible_is_dim = _first_visible_codex_input_is_dim(raw_prompt)
+    plain_prompt = strip_ansi(raw_prompt).split("›", 1)[1].strip()
+    if first_visible_is_dim is True:
+        return ComposerInspection(
+            "empty", "Codex empty-composer placeholder is visible"
+        )
+    if first_visible_is_dim is False:
+        return ComposerInspection(
+            "nonempty", "Codex composer contains pre-existing text", plain_prompt
+        )
+    return ComposerInspection(
+        "ambiguous", "Codex composer content could not be classified"
+    )
+
+
+def inspect_composer(
+    agent: str, screen: str, *, cursor_x: int | None = None
+) -> ComposerInspection:
+    if agent == "claude":
+        return _claude_composer(screen, cursor_x=cursor_x)
+    if agent == "codex":
+        return _codex_composer(screen)
+    return ComposerInspection("unsupported", f"unsupported coding agent: {agent}")
+
+
+def screen_identifies_agent(agent: str, screen: str) -> bool:
+    plain = strip_ansi(screen)
+    if agent == "claude":
+        composer = _claude_composer(screen)
+        has_active_composer = (
+            composer.state in {"empty", "nonempty"} and "tokens" in plain
+        )
+        return "Claude Code" in plain or has_active_composer
+    if agent == "codex":
+        composer = _codex_composer(screen)
+        has_model_footer = bool(
+            re.search(r"\bgpt-[\w.-]+\b", plain, flags=re.IGNORECASE)
+        )
+        return composer.state in {"empty", "nonempty"} and has_model_footer
+    return False
+
+
+def message_visible(screen: str, message_text: str) -> bool:
+    return message_occurrence_count(screen, message_text) > 0
+
+
+def message_occurrence_count(screen: str, message_text: str) -> int:
+    compact_message = compact_text(message_text)
+    if not compact_message:
+        return 0
+    plain = strip_ansi(screen)
+    plain = re.sub(r"\s{2,}gpt-[^\n]+", "", plain)
+    return compact_text(plain).count(compact_message)
+
+
+def agent_is_busy(screen: str) -> bool:
+    tail = "\n".join(strip_ansi(screen).splitlines()[-15:]).lower()
+    return any(
+        marker in tail
+        for marker in (
+            "esc to interrupt",
+            "esc to cancel",
+            "ctrl+c to cancel",
+            "ctrl-c to cancel",
+        )
+    )
+
+
+def build_phases() -> dict[str, str]:
+    return {
+        "target_resolution": "resolved",
+        "agent_pane": "pending",
+        "composer_preflight": "pending",
+        "suggestion_probe": "not_requested",
+        "text_staging": "not_attempted",
+        "submit_action": "not_requested",
+        "delivery": "not_requested",
+    }
+
+
+def emit_payload(payload: dict, *, as_json: bool) -> None:
+    if as_json:
+        print(json_dump(payload))
+        return
+    print(f"Outcome: {payload['outcome']}")
+    print(f"Zellij Session: {payload['zellij_session']}")
+    print(f"Selected Tab: {payload['selected_tab_name']}")
+    print(f"Agent Pane: {payload.get('agent_pane_id', TRACKER_KIND_NONE)}")
+    print(f"Agent: {payload.get('agent', TRACKER_KIND_NONE)}")
+    for phase, state in payload["phases"].items():
+        print(f"{phase.replace('_', ' ').title()}: {state}")
+    print(f"Message Preview: {payload['message_preview']}")
+    if payload.get("actionable_receipt"):
+        print(f"Action: {payload['actionable_receipt']}")
 
 
 def explicit_zellij_result(args: argparse.Namespace, resolution_result: dict) -> dict:
@@ -96,8 +550,13 @@ def explicit_zellij_result(args: argparse.Namespace, resolution_result: dict) ->
     }
 
 
-def should_send_codex_confirm_enter(message_text: str, client_commands: list[str]) -> bool:
-    needs_confirm = "\n" in message_text or len(message_text) >= CODEX_SECONDARY_ENTER_THRESHOLD_CHARS
+def should_send_codex_confirm_enter(
+    message_text: str, client_commands: list[str]
+) -> bool:
+    needs_confirm = (
+        "\n" in message_text
+        or len(message_text) >= CODEX_SECONDARY_ENTER_THRESHOLD_CHARS
+    )
     if not needs_confirm:
         return False
     for running_command in client_commands:
@@ -137,6 +596,9 @@ def main() -> int:
 
     primary = result["primary"]
     metadata = primary["metadata"]
+    runtime_notice = select_zellij_runtime_namespace(
+        metadata.get("zellij_session", TRACKER_KIND_NONE)
+    )
     session = inspect_session_target(
         metadata.get("zellij_session", TRACKER_KIND_NONE),
         tracker_human_id=metadata.get("tracker_human_id", TRACKER_KIND_NONE),
@@ -145,14 +607,19 @@ def main() -> int:
 
     session_name = session.session_name
     if session_name == TRACKER_KIND_NONE:
-        return fail("send-zellij-message: target does not expose a zellij session name.")
+        return fail(
+            "send-zellij-message: target does not expose a zellij session name."
+        )
 
     if session.state == "exited":
         return fail(f"send-zellij-message: zellij session `{session_name}` is exited.")
 
     target_machine = metadata.get("machine", TRACKER_KIND_NONE)
     current_machine = result.get("current_machine", TRACKER_KIND_NONE)
-    if target_machine not in {TRACKER_KIND_NONE, current_machine} and not args.zellij_session:
+    if (
+        target_machine not in {TRACKER_KIND_NONE, current_machine}
+        and not args.zellij_session
+    ):
         return fail(
             "send-zellij-message: target task resolves to a different machine "
             f"(`{target_machine}`); run this helper on that machine or use an explicit local "
@@ -179,6 +646,8 @@ def main() -> int:
         "selected_tab_name": selected_tab_name or TRACKER_KIND_NONE,
         "submit": args.submit,
         "execute": args.execute,
+        "replace_claude_suggestion": args.replace_claude_suggestion,
+        "zellij_runtime_dir": os.environ.get("XDG_RUNTIME_DIR", TRACKER_KIND_NONE),
         "message_length": len(args.text),
         "message_preview": truncate_preview(args.text),
         "secondary_submit_enter": should_send_codex_confirm_enter(
@@ -186,88 +655,355 @@ def main() -> int:
             [client.running_command for client in session.clients],
         ),
         "warnings": session.warnings,
+        "phases": build_phases(),
+        "outcome": "preview",
+        "executed": False,
+        "probe_executed": False,
+        "delivered": False,
     }
+    if runtime_notice:
+        payload["warnings"].append(runtime_notice)
+
+    expected_agent = metadata.get("coding_agent", TRACKER_KIND_NONE)
+    pane, pane_error = resolve_agent_pane(
+        session_name, selected_tab_name, expected_agent
+    )
+    if not pane:
+        payload["phases"]["agent_pane"] = "unsafe"
+        payload["outcome"] = "unsafe_target"
+        payload["actionable_receipt"] = (
+            f"No mutation occurred. Resolve the target pane manually: {pane_error}"
+        )
+        emit_payload(payload, as_json=args.json)
+        return 2
+    payload["phases"]["agent_pane"] = "resolved"
+    payload["agent_pane_id"] = pane.pane_id
+    payload["agent"] = pane.agent
+    payload["secondary_submit_enter"] = should_send_codex_confirm_enter(
+        args.text,
+        [pane.terminal_command, pane.pane_command],
+    )
+
+    preflight_screen, screen_error = dump_agent_screen(session_name, pane.pane_id)
+    if screen_error:
+        payload["phases"]["composer_preflight"] = "unverified"
+        payload["outcome"] = "unsafe_composer"
+        payload["actionable_receipt"] = (
+            f"No mutation occurred. Inspect the target manually: {screen_error}"
+        )
+        emit_payload(payload, as_json=args.json)
+        return 2
+    preflight = (
+        ComposerInspection("busy", f"{pane.agent} is processing an active turn")
+        if agent_is_busy(preflight_screen)
+        else inspect_composer(pane.agent, preflight_screen, cursor_x=pane.cursor_x)
+    )
+    suggestion_candidate = (
+        pane.agent == "claude"
+        and preflight.state == "suggestion"
+        and args.replace_claude_suggestion
+    )
+    composer_safe = preflight.state == "empty"
+    payload["composer_state"] = preflight.state
+    payload["composer_detail"] = preflight.detail
+    payload["phases"]["composer_preflight"] = (
+        "suggestion_probe_required"
+        if suggestion_candidate
+        else "safe_empty"
+        if preflight.state == "empty"
+        else f"unsafe_{preflight.state}"
+    )
 
     if not args.execute:
-        if args.json:
-            print(json_dump(payload))
-        else:
-            print("Dry Run: no zellij actions were executed.")
-            print(f"Resolution Source: {payload['resolution_source']}")
-            print(f"Query: {payload['query']}")
-            print(f"Target Machine: {payload['target_machine']}")
-            print(f"Zellij Session: {payload['zellij_session']}")
-            print(f"Zellij State: {payload['zellij_state']}")
-            print(f"Selected Tab: {payload['selected_tab_name']}")
-            print(f"Submit Mode: {payload['submit']}")
-            print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
-            print(f"Message Length: {payload['message_length']}")
-            print(f"Message Preview: {payload['message_preview']}")
-            if session.tab_names:
-                print(f"Tab Names: {', '.join(session.tab_names)}")
-            if session.warnings:
-                print("Warnings:")
-                for warning in session.warnings:
-                    print(f"  - {warning}")
+        payload["outcome"] = (
+            "preview_probe_required"
+            if suggestion_candidate
+            else "preview_safe"
+            if composer_safe
+            else "preview_unsafe"
+        )
+        if preflight.state == "suggestion" and not args.replace_claude_suggestion:
+            payload["actionable_receipt"] = (
+                "Execution would fail closed. If this is visibly Claude Code autocomplete, "
+                "repeat the preview with --replace-claude-suggestion. Do not use that flag for "
+                "a real draft whose cursor was moved to the start."
+            )
+        elif suggestion_candidate:
+            payload["actionable_receipt"] = (
+                "No mutation occurred. Execution with the same explicit flag will first send "
+                "a non-text end-of-line cursor probe. A buffered draft fails closed and its "
+                "cursor is restored; only an empty buffer behind autocomplete may proceed."
+            )
+        elif not composer_safe:
+            payload["actionable_receipt"] = (
+                "Execution would fail closed. Inspect and manually resolve the existing or "
+                "ambiguous composer state; the helper will not clear, append to, or submit it."
+            )
+        emit_payload(payload, as_json=args.json)
         return 0
 
-    if selected_tab_name:
+    if suggestion_candidate:
+        payload["probe_executed"] = True
+        payload["phases"]["suggestion_probe"] = "running"
         code, _, stderr = run_local_command(
-            ["zellij", "-s", session_name, "action", "go-to-tab-name", selected_tab_name],
+            [
+                "zellij",
+                "-s",
+                session_name,
+                "action",
+                "write",
+                "--pane-id",
+                pane.pane_id,
+                "5",
+            ],
             timeout_seconds=10,
         )
         if code != 0:
-            return fail(
-                "send-zellij-message: failed to focus the target tab "
-                f"`{selected_tab_name}`: {(stderr or '').strip() or 'unknown error'}"
+            payload["phases"]["suggestion_probe"] = "failed"
+            payload["outcome"] = "unverified"
+            payload["actionable_receipt"] = (
+                "No text was written and no Enter was sent. The Claude suggestion cursor probe "
+                f"failed: {(stderr or '').strip() or 'unknown error'}"
             )
+            emit_payload(payload, as_json=args.json)
+            return 4
+        probe_cursor_x, cursor_error = read_pane_cursor_x(session_name, pane.pane_id)
+        probe_screen, probe_error = dump_agent_screen(session_name, pane.pane_id)
+        probe_inspection = (
+            inspect_composer(pane.agent, probe_screen, cursor_x=probe_cursor_x)
+            if not cursor_error and not probe_error
+            else None
+        )
+        suggestion_proven = (
+            probe_inspection is not None
+            and probe_inspection.state == "suggestion"
+            and probe_cursor_x == pane.cursor_x
+            and compact_text(probe_inspection.composer_text)
+            == compact_text(preflight.composer_text)
+        )
+        if suggestion_proven:
+            payload["phases"]["suggestion_probe"] = "verified_empty_buffer"
+            payload["phases"]["composer_preflight"] = "safe_claude_suggestion_override"
+            composer_safe = True
+        elif probe_cursor_x is not None and probe_cursor_x != pane.cursor_x:
+            restore_code, _, restore_stderr = run_local_command(
+                [
+                    "zellij",
+                    "-s",
+                    session_name,
+                    "action",
+                    "write",
+                    "--pane-id",
+                    pane.pane_id,
+                    "1",
+                ],
+                timeout_seconds=10,
+            )
+            restored_screen, restored_error = dump_agent_screen(
+                session_name, pane.pane_id
+            )
+            restored_cursor_x, restored_cursor_error = read_pane_cursor_x(
+                session_name, pane.pane_id
+            )
+            restored = (
+                restore_code == 0
+                and not restored_error
+                and not restored_cursor_error
+                and restored_cursor_x == pane.cursor_x
+                and compact_text(
+                    inspect_composer(pane.agent, restored_screen).composer_text
+                )
+                == compact_text(preflight.composer_text)
+            )
+            payload["phases"]["suggestion_probe"] = (
+                "buffered_draft_cursor_restored"
+                if restored
+                else "buffered_draft_restore_unverified"
+            )
+            payload["outcome"] = "unsafe_composer" if restored else "unverified"
+            payload["actionable_receipt"] = (
+                "No text was written and no Enter was sent. The cursor probe detected a real "
+                "buffered Claude draft and restored its cursor without changing its text."
+                if restored
+                else "No text was written and no Enter was sent. A buffered Claude draft was "
+                "detected, but cursor restoration could not be verified: "
+                f"{(restore_stderr or restored_cursor_error or '').strip() or 'inspect the pane manually'}."
+            )
+            emit_payload(payload, as_json=args.json)
+            return 3 if restored else 4
+        else:
+            payload["phases"]["suggestion_probe"] = "unverified"
+            payload["outcome"] = "unverified"
+            payload["actionable_receipt"] = (
+                "No text was written and no Enter was sent. The Claude suggestion probe could "
+                "not prove an empty input buffer. Inspect the pane manually. "
+                f"{cursor_error or probe_error}"
+            )
+            emit_payload(payload, as_json=args.json)
+            return 4
+
+    if not composer_safe:
+        payload["outcome"] = "unsafe_composer"
+        payload["actionable_receipt"] = (
+            "No mutation occurred. Inspect and manually resolve the target composer. The helper "
+            "will not clear, append to, or submit pre-existing or ambiguous text."
+        )
+        emit_payload(payload, as_json=args.json)
+        return 3
 
     code, _, stderr = run_local_command(
-        ["zellij", "-s", session_name, "action", "write-chars", args.text],
+        [
+            "zellij",
+            "-s",
+            session_name,
+            "action",
+            "write-chars",
+            "--pane-id",
+            pane.pane_id,
+            args.text,
+        ],
         timeout_seconds=10,
     )
     if code != 0:
-        return fail(
-            "send-zellij-message: failed to write message text: "
+        payload["phases"]["text_staging"] = "failed"
+        payload["outcome"] = "unverified"
+        payload["actionable_receipt"] = (
+            "No Enter was sent. The pane write failed: "
             f"{(stderr or '').strip() or 'unknown error'}"
         )
+        emit_payload(payload, as_json=args.json)
+        return 4
+    payload["executed"] = True
+
+    staged_screen, stage_error = dump_agent_screen(
+        session_name, pane.pane_id, full=True
+    )
+    staged_inspection = (
+        inspect_composer(pane.agent, staged_screen) if not stage_error else None
+    )
+    if (
+        stage_error
+        or not staged_inspection
+        or staged_inspection.state != "nonempty"
+        or not message_visible(staged_screen, args.text)
+    ):
+        payload["phases"]["text_staging"] = "unverified"
+        payload["outcome"] = "unverified"
+        payload["actionable_receipt"] = (
+            "The helper wrote only into a composer that passed preflight, but could not verify "
+            "the staged payload. It did not send Enter. Inspect the disposable or target lane "
+            "manually before taking further action."
+        )
+        emit_payload(payload, as_json=args.json)
+        return 4
+    payload["phases"]["text_staging"] = "verified"
+    staged_occurrence_count = message_occurrence_count(staged_screen, args.text)
 
     if args.submit == "enter":
         code, _, stderr = run_local_command(
-            ["zellij", "-s", session_name, "action", "write", "13"],
+            [
+                "zellij",
+                "-s",
+                session_name,
+                "action",
+                "write",
+                "--pane-id",
+                pane.pane_id,
+                "13",
+            ],
             timeout_seconds=10,
         )
         if code != 0:
-            return fail(
-                "send-zellij-message: failed to send Enter byte: "
-                f"{(stderr or '').strip() or 'unknown error'}"
+            payload["phases"]["submit_action"] = "failed"
+            payload["phases"]["delivery"] = "unverified"
+            payload["outcome"] = "unverified"
+            payload["actionable_receipt"] = (
+                "Text was staged in a composer that passed preflight, but Enter failed: "
+                f"{(stderr or '').strip() or 'unknown error'}. Inspect manually before retrying."
             )
+            emit_payload(payload, as_json=args.json)
+            return 4
+        payload["phases"]["submit_action"] = "sent"
 
         # Long or multiline prompts can remain staged in Codex after the first
         # Enter. A delayed confirm Enter submits that specific case without
         # affecting short single-line messages.
         if payload["secondary_submit_enter"]:
             time.sleep(CODEX_SECONDARY_ENTER_DELAY_SECONDS)
-            code, _, stderr = run_local_command(
-                ["zellij", "-s", session_name, "action", "write", "13"],
-                timeout_seconds=10,
+            confirm_screen, confirm_error = dump_agent_screen(
+                session_name, pane.pane_id
             )
-            if code != 0:
-                return fail(
-                    "send-zellij-message: failed to send Codex confirm Enter byte: "
-                    f"{(stderr or '').strip() or 'unknown error'}"
+            confirm_composer = (
+                inspect_composer(pane.agent, confirm_screen)
+                if not confirm_error
+                else None
+            )
+            if (
+                confirm_composer
+                and confirm_composer.state == "nonempty"
+                and message_visible(confirm_composer.composer_text, args.text)
+            ):
+                code, _, stderr = run_local_command(
+                    [
+                        "zellij",
+                        "-s",
+                        session_name,
+                        "action",
+                        "write",
+                        "--pane-id",
+                        pane.pane_id,
+                        "13",
+                    ],
+                    timeout_seconds=10,
                 )
+                if code != 0:
+                    payload["phases"]["submit_action"] = "confirm_failed"
+                    payload["phases"]["delivery"] = "unverified"
+                    payload["outcome"] = "unverified"
+                    payload["actionable_receipt"] = (
+                        "The first Enter left the intended Codex text staged, but the confirm "
+                        "Enter failed: "
+                        f"{(stderr or '').strip() or 'unknown error'}. Inspect manually."
+                    )
+                    emit_payload(payload, as_json=args.json)
+                    return 4
+                payload["phases"]["submit_action"] = "confirm_sent"
 
-    payload["executed"] = True
-    if args.json:
-        print(json_dump(payload))
-    else:
-        print("Executed bounded zellij write.")
-        print(f"Zellij Session: {payload['zellij_session']}")
-        print(f"Selected Tab: {payload['selected_tab_name']}")
-        print(f"Submit Mode: {payload['submit']}")
-        print(f"Secondary Submit Confirm: {payload['secondary_submit_enter']}")
-        print(f"Message Preview: {payload['message_preview']}")
+        deadline = time.monotonic() + DELIVERY_VERIFY_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            viewport_screen, viewport_error = dump_agent_screen(
+                session_name, pane.pane_id
+            )
+            full_screen, full_error = dump_agent_screen(
+                session_name, pane.pane_id, full=True
+            )
+            if not viewport_error and not full_error:
+                post_composer = inspect_composer(pane.agent, viewport_screen)
+                still_staged = post_composer.state == "nonempty" and message_visible(
+                    post_composer.composer_text, args.text
+                )
+                if (
+                    message_occurrence_count(full_screen, args.text)
+                    >= staged_occurrence_count
+                ) and (agent_is_busy(viewport_screen) or not still_staged):
+                    payload["phases"]["delivery"] = "verified_new_turn"
+                    payload["outcome"] = "delivered"
+                    payload["delivered"] = True
+                    emit_payload(payload, as_json=args.json)
+                    return 0
+            time.sleep(DELIVERY_VERIFY_POLL_SECONDS)
+
+        payload["phases"]["delivery"] = "unverified"
+        payload["outcome"] = "unverified"
+        payload["actionable_receipt"] = (
+            "Enter was sent only after safe-empty preflight and verified staging, but no new agent "
+            "turn could be verified. Do not claim delivery. Inspect the lane manually before retrying."
+        )
+        emit_payload(payload, as_json=args.json)
+        return 4
+
+    payload["outcome"] = "staged"
+    emit_payload(payload, as_json=args.json)
     return 0
 
 

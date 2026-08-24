@@ -109,17 +109,57 @@ sessions:
 
 - dry-run is the default
 - `--execute` is required to perform a write
-- `--submit enter` is explicit and best-effort
+- `--submit enter` is explicit
+- preview resolves one supported Claude Code or Codex pane and performs a
+  read-only composer preflight
+- execution is allowed when that composer is visibly empty. Claude Code
+  autocomplete is the only exception, requires explicit
+  `--replace-claude-suggestion`, and begins as `preview_probe_required` when
+  visible suggestion text leaves the cursor at the empty-prompt position.
+  Execution sends a non-text end-of-line cursor probe. A real buffered draft
+  moves the cursor, is restored without changing text, and is blocked before
+  any text write or Enter. Only a stable empty buffer behind autocomplete may
+  proceed. Busy, ambiguous, interactive, or unsupported states fail closed
+- writes and Enter bytes target the resolved pane id instead of whichever pane
+  happens to be focused
+- staging is verified before Enter; delivery is verified only when the staged
+  text is observed as a new agent turn
 - for Codex sessions, long or multiline payloads get a delayed confirm Enter
-  after the first Enter because a single immediate Enter can leave the prompt
-  staged in the composer instead of submitting it
+  only when the intended text remains visibly staged after the first Enter
 - message text is length-limited and control-character checked
 - cross-machine sends are rejected unless the caller intentionally uses an
   explicit local `--zellij-session` override for debug work
 - multi-tab sessions require `--tab-name` unless the helper can deterministically
   choose the tab from `[TRACKER-ID]` or a single-tab session
+- a non-interactive shell with no `XDG_RUNTIME_DIR` keeps an active default
+  zellij namespace. If the exact target is missing or exited there but live in
+  `/run/user/<uid>`, the helper selects that systemd namespace and records it in
+  the receipt
+- when process-command metadata is unavailable, a unique wrapped Claude or
+  Codex UI may be resolved from a read-only screen fingerprint. Multiple,
+  unsupported, or ambiguous matches fail closed
 
 This helper is for bounded prompt delivery, not remote control.
+
+Structured receipts expose separate target resolution, agent-pane resolution,
+composer preflight, text staging, submit action, and delivery phases. Valid
+outcomes include `preview_safe`, `preview_unsafe`, `unsafe_composer`, `staged`,
+`delivered`, and `unverified`. Callers may claim forwarding only for
+`outcome: delivered` with `delivered: true`; `executed: true` merely records that
+a mutation occurred.
+
+If composer safety or delivery cannot be verified, automated retries stop. The
+manual fallback is to attach to the resolved session, inspect the exact pane,
+and let the human decide how to handle the existing draft, selector, or unknown
+state. The helper must not clear, append to, or submit that state.
+
+The Claude suggestion override is operator-confirmed and preview-first. Do not
+use it for a real draft. The flagged preview reports
+`preview_probe_required`; execution may stage text only after
+`suggestion_probe: verified_empty_buffer` and
+`composer_preflight: safe_claude_suggestion_override`. Keep the payload short
+enough to remain fully visible during staging verification. An unverified
+staged payload receives no Enter.
 
 For Codex Desktop threads, `send_message_to_thread` is the actual send. Preview
 means resolving the target thread, surfacing ambiguity, and reading the thread
