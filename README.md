@@ -206,6 +206,45 @@ argument, so normal Gmail-size attachments do not hit the operating system's
 per-argument limit. See `codex/skills/gws-gmail-draft/SKILL.md` or the matching
 Claude skill for the intent gate and account workflow.
 
+Use `gws-calendar-safe` for every Calendar write across the same three aliases.
+It separates exact preview from apply, rejects external attendee changes,
+requires ETag-matched writes, and keeps deletion and recurring-series changes
+behind explicit high-impact confirmations. Before reauthorizing an existing
+alias, run `gws-calendar-safe auth-plan --account <alias>` so all non-Calendar
+scopes are preserved while the Calendar portion becomes exactly
+`calendar.events` plus `calendar.calendarlist.readonly`. Never use a raw
+`gws calendar` mutation as a substitute. After exact approval, run only the
+staged, identity-verifying `authorizationCommand` returned by the plan. See
+`codex/skills/gws-calendar-safe/SKILL.md` or the matching Claude skill.
+
+### Apple Reminders bridge
+
+Use `apple-reminders-safe` for bounded Apple Reminders reads and every write.
+The portable wrapper calls a verified EventKit helper locally on macOS and uses
+the `sourya-mac` SSH alias from GCP. It reports Mac reachability, TCC state,
+fetch completeness, truncation, and unverified cloud freshness separately.
+
+The helper is built from `macos/apple-reminders-native/` and installed only on
+the Mac at a fixed machine-local path:
+
+```bash
+install-apple-reminders-native
+apple-reminders-safe status
+```
+
+The first command builds, ad-hoc signs, hashes, and installs the native helper.
+It does not request Reminders access. Replacing an existing helper requires
+`--replace` because a new ad-hoc code requirement may require a new macOS TCC
+grant. Do not copy TCC databases, Reminder exports, or iCloud credentials to
+GCP.
+
+Every write separates preview from apply, preserves unspecified fields, and
+requires one explicit list. Deletion has an additional exact confirmation.
+Store private request and preview files under
+`~/.local/state/apple-reminders-safe/`, never in a repository. See
+`codex/skills/apple-reminders-safe/SKILL.md` or the matching Claude skill for
+the exact commands and Deep Feed read-only collection contract.
+
 ## Mac Keep-Awake GUI
 
 For Mac lid-closed keep-awake workflows, prefer the free Amphetamine menu-bar app plus its official Power Protect / Enhancer guidance instead of maintaining a custom `pmset` wrapper. See [`docs/mac-keep-awake-amphetamine.md`](docs/mac-keep-awake-amphetamine.md).

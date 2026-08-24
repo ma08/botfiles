@@ -15,12 +15,14 @@ state_root="${GWS_ACCOUNT_STATE_DIR:-$HOME/.config/gws/account-state}"
 state_dir="$state_root/$alias_name"
 normalized_credentials="$state_dir/credentials.json"
 token_cache="$state_dir/token_cache.json"
+encrypted_credentials="$state_dir/credentials.enc"
+credentials_fingerprint_file="$state_dir/credentials.sha256"
 client_secret_file="${HOME}/.config/gws/client_secret.json"
 
 if [[ ! -f "$credentials_file" ]]; then
   echo "Missing credentials for alias '$alias_name': $credentials_file" >&2
   echo "Initialize the account first with:" >&2
-  echo "  gws auth login --scopes https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose" >&2
+  echo "  gws auth login --scopes https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose" >&2
   echo "  gws-save-account $alias_name" >&2
   exit 66
 fi
@@ -45,8 +47,31 @@ PY
 
 chmod 600 "$normalized_credentials"
 
-if [[ -f "$token_cache" && "$credentials_file" -nt "$token_cache" ]]; then
-  rm -f "$token_cache"
+credentials_fingerprint="$(
+  python3 - "$credentials_file" <<'PY'
+import hashlib
+import pathlib
+import sys
+
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+stored_credentials_fingerprint=""
+if [[ -f "$credentials_fingerprint_file" ]]; then
+  IFS= read -r stored_credentials_fingerprint < "$credentials_fingerprint_file" || true
+fi
+
+if [[ "$stored_credentials_fingerprint" != "$credentials_fingerprint" ]]; then
+  # Both files are derived authentication state. Discard them whenever the
+  # authoritative named-account credential changes, including after rollback.
+  rm -f "$token_cache" "$encrypted_credentials"
+  fingerprint_tmp="$state_dir/.credentials.sha256.$$"
+  (
+    umask 077
+    printf '%s\n' "$credentials_fingerprint" > "$fingerprint_tmp"
+    chmod 600 "$fingerprint_tmp"
+    mv -f "$fingerprint_tmp" "$credentials_fingerprint_file"
+  )
 fi
 
 export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$normalized_credentials"

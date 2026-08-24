@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Google Calendar"
+  short_description: "Preview and apply guarded Calendar writes"
+  default_prompt: "Use $gws-calendar-safe to preview a self-only Google Calendar change."

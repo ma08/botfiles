@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Verify and invoke the fixed-path Apple Reminders EventKit helper.
+
+set -euo pipefail
+
+BUNDLE_ID="com.trymyzone.personal-os.apple-reminders-native"
+INSTALL_DIR="${APPLE_REMINDERS_NATIVE_INSTALL_DIR:-$HOME/.local/libexec/personal-os}"
+BINARY_PATH="$INSTALL_DIR/apple-reminders-native"
+MANIFEST_PATH="$INSTALL_DIR/apple-reminders-native.manifest.json"
+
+fail_json() {
+    message="$1"
+    code="${2:-NATIVE_INSTALL_INVALID}"
+    escaped_message="$(/usr/bin/printf '%s' "$message" \
+        | /usr/bin/sed 's/\\/\\\\/g; s/"/\\"/g')"
+    /usr/bin/printf '{"protocolVersion":1,"nativeVersion":"unknown","status":"error","error":{"code":"%s","message":"%s"}}\n' \
+        "$code" "$escaped_message" >&2
+    exit 78
+}
+
+[ "$(/usr/bin/uname -s)" = "Darwin" ] || \
+    fail_json "the Apple Reminders native helper can run only on macOS" "MAC_REQUIRED"
+[ -f "$BINARY_PATH" ] && [ ! -L "$BINARY_PATH" ] || \
+    fail_json "the installed Apple Reminders helper is missing or is not a regular file"
+[ -x "$BINARY_PATH" ] || \
+    fail_json "the installed Apple Reminders helper is not executable"
+[ -f "$MANIFEST_PATH" ] && [ ! -L "$MANIFEST_PATH" ] || \
+    fail_json "the Apple Reminders helper manifest is missing or is not a regular file"
+
+BINARY_MODE="$(/usr/bin/stat -f '%Lp' "$BINARY_PATH")"
+MANIFEST_MODE="$(/usr/bin/stat -f '%Lp' "$MANIFEST_PATH")"
+case "$BINARY_MODE" in
+    *[2367][0-9]|*[0-9][2367]) fail_json "the installed helper is group- or world-writable" ;;
+esac
+[ "$MANIFEST_MODE" = "600" ] || \
+    fail_json "the helper manifest mode is not exactly 0600"
+
+EXPECTED_HASH="$(/usr/bin/plutil -extract binarySha256 raw -o - "$MANIFEST_PATH" 2>/dev/null || true)"
+EXPECTED_ID="$(/usr/bin/plutil -extract bundleIdentifier raw -o - "$MANIFEST_PATH" 2>/dev/null || true)"
+[ "$EXPECTED_ID" = "$BUNDLE_ID" ] || fail_json "the helper manifest has an unexpected bundle identifier"
+[ -n "$EXPECTED_HASH" ] || fail_json "the helper manifest has no binary hash"
+ACTUAL_HASH="$(/usr/bin/shasum -a 256 "$BINARY_PATH" | /usr/bin/awk '{print $1}')"
+[ "$ACTUAL_HASH" = "$EXPECTED_HASH" ] || fail_json "the installed helper hash does not match its manifest"
+/usr/bin/codesign --verify --strict "$BINARY_PATH" 2>/dev/null || \
+    fail_json "the installed helper code signature is invalid"
+ACTUAL_ID="$(/usr/bin/codesign -dv --verbose=4 "$BINARY_PATH" 2>&1 \
+    | /usr/bin/sed -n 's/^Identifier=//p')"
+[ "$ACTUAL_ID" = "$BUNDLE_ID" ] || fail_json "the installed helper has an unexpected bundle identifier"
+
+exec "$BINARY_PATH" "$@"

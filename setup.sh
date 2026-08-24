@@ -117,6 +117,37 @@ check_pdf_workflow_tools() {
     echo ""
 }
 
+# Check the optional Mac-native Apple Reminders bridge without invoking EventKit.
+check_apple_reminders_tools() {
+    echo "Checking Apple Reminders bridge..."
+    echo ""
+    echo "=== Apple Reminders Bridge (optional) ==="
+
+    if [[ "$OSTYPE" != darwin* ]]; then
+        echo "  [INFO] Native helper is Mac-only; this host uses sourya-mac over SSH."
+        echo ""
+        return
+    fi
+
+    if command -v xcrun &> /dev/null && xcrun --find swift &> /dev/null; then
+        echo "  [OK] Swift toolchain"
+    else
+        echo "  [MISSING] Xcode Swift toolchain"
+        echo "    Install Xcode Command Line Tools before building the native helper."
+    fi
+
+    local reminders_binary="$HOME/.local/libexec/personal-os/apple-reminders-native"
+    local reminders_manifest="$HOME/.local/libexec/personal-os/apple-reminders-native.manifest.json"
+    if [ -f "$reminders_binary" ] && [ -f "$reminders_manifest" ]; then
+        echo "  [OK] Native helper and hash manifest are present."
+        echo "  [INFO] Run apple-reminders-safe status to verify TCC separately."
+    else
+        echo "  [MISSING] Native helper is not installed."
+        echo "    Review, then run: install-apple-reminders-native"
+    fi
+    echo ""
+}
+
 # Backup existing files (if not already symlinks)
 backup_existing() {
     echo "Checking for existing files to backup..."
@@ -676,6 +707,7 @@ main() {
     setup_git_identity
     check_ssh_workflow_tools
     check_pdf_workflow_tools
+    check_apple_reminders_tools
     backup_existing
     create_symlinks
     ensure_codex_user_config

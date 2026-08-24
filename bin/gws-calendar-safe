@@ -1,0 +1,2270 @@
+#!/usr/bin/env python3
+"""Preview and apply guarded Google Calendar changes through named gws aliases."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from collections.abc import Callable
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlparse
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+ACCOUNT_ADDRESSES = {
+    "work": "sourya4@trymyzone.com",
+    "personal": "sourya4@gmail.com",
+    "columbia": "sk5057@columbia.edu",
+}
+
+CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+CALENDAR_LIST_SCOPE = (
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
+)
+CALENDAR_READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+CALENDAR_SCOPE_PREFIX = "https://www.googleapis.com/auth/calendar"
+CALENDAR_API_ROOT = "https://www.googleapis.com/calendar/v3"
+ALLOWED_TOKEN_HOSTS = {"accounts.google.com", "oauth2.googleapis.com"}
+WRITE_ACCESS_ROLES = {"owner", "writer", "writerWithoutPrivateAccess"}
+NOTIFICATION_MODES = {"none", "all"}
+PREVIEW_KIND = "gws-calendar-safe-preview"
+PREVIEW_SCHEMA_VERSION = 1
+PREVIEW_TTL_MINUTES = 20
+
+CREATE_FIELDS = {
+    "summary",
+    "description",
+    "location",
+    "start",
+    "end",
+    "recurrence",
+    "visibility",
+    "transparency",
+    "colorId",
+    "reminders",
+    "conference",
+    "idempotencyKey",
+    "attendees",
+}
+PATCH_FIELDS = {
+    "summary",
+    "description",
+    "location",
+    "start",
+    "end",
+    "recurrence",
+    "visibility",
+    "transparency",
+    "colorId",
+    "reminders",
+    "conference",
+    "attendees",
+}
+COPIED_SERIES_FIELDS = {
+    "summary",
+    "description",
+    "location",
+    "start",
+    "end",
+    "recurrence",
+    "visibility",
+    "transparency",
+    "colorId",
+    "reminders",
+    "attendees",
+    "guestsCanInviteOthers",
+    "guestsCanModify",
+    "guestsCanSeeOtherGuests",
+    "extendedProperties",
+    "attachments",
+    "source",
+}
+IMMUTABLE_SPLIT_COPY_FIELDS = {
+    "guestsCanInviteOthers",
+    "guestsCanModify",
+    "guestsCanSeeOtherGuests",
+    "extendedProperties",
+    "attachments",
+    "source",
+}
+CREATE_API_FIELDS = {
+    "id",
+    "summary",
+    "description",
+    "location",
+    "start",
+    "end",
+    "recurrence",
+    "visibility",
+    "transparency",
+    "colorId",
+    "reminders",
+    "conferenceData",
+    "attendees",
+}
+PATCH_API_FIELDS = {
+    "summary",
+    "description",
+    "location",
+    "start",
+    "end",
+    "recurrence",
+    "visibility",
+    "transparency",
+    "colorId",
+    "reminders",
+    "conferenceData",
+}
+SPLIT_CREATE_API_FIELDS = COPIED_SERIES_FIELDS | {"id", "conferenceData"}
+
+
+class CalendarSafeError(RuntimeError):
+    """A safe-to-report validation, authorization, or Calendar API failure."""
+
+
+class CalendarDriftError(CalendarSafeError):
+    """The resource changed after preview and must be previewed again."""
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _sha256(value: Any) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _rfc3339(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_rfc3339(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise CalendarSafeError(f"invalid RFC3339 timestamp: {value}") from exc
+    if parsed.tzinfo is None:
+        raise CalendarSafeError(f"timestamp must include an offset: {value}")
+    return parsed
+
+
+def _credential_path(account: str) -> Path:
+    root = Path(
+        os.environ.get(
+            "GWS_ACCOUNTS_DIR",
+            Path.home() / ".config" / "gws" / "accounts",
+        )
+    )
+    return root / f"{account}.json"
+
+
+def _load_credentials(account: str) -> dict[str, str]:
+    path = _credential_path(account)
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+        if mode & 0o077:
+            raise CalendarSafeError(
+                f"credential file permissions are too broad ({mode:04o}); "
+                f"expected 0600: {path}"
+            )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CalendarSafeError(f"credential file not found: {path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CalendarSafeError(f"could not read credential file: {path}") from exc
+
+    payload.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+    required = ("client_id", "client_secret", "refresh_token", "token_uri")
+    missing = [field for field in required if not payload.get(field)]
+    if missing:
+        raise CalendarSafeError(
+            f"credential file is missing required fields: {', '.join(missing)}"
+        )
+    return {field: str(payload[field]) for field in required}
+
+
+def _access_token(account: str, *, opener: Callable[..., Any] = urlopen) -> str:
+    credentials = _load_credentials(account)
+    token_uri = credentials["token_uri"]
+    parsed_uri = urlparse(token_uri)
+    if parsed_uri.scheme != "https" or parsed_uri.hostname not in ALLOWED_TOKEN_HOSTS:
+        raise CalendarSafeError(
+            "credential token_uri is not an approved Google HTTPS endpoint"
+        )
+
+    request = Request(
+        token_uri,
+        data=urlencode(
+            {
+                "client_id": credentials["client_id"],
+                "client_secret": credentials["client_secret"],
+                "refresh_token": credentials["refresh_token"],
+                "grant_type": "refresh_token",
+            }
+        ).encode("ascii"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with opener(request, timeout=30) as response:
+            payload = json.loads(response.read())
+    except HTTPError as exc:
+        raise CalendarSafeError(
+            f"OAuth token refresh failed (HTTP {exc.code})"
+        ) from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise CalendarSafeError("OAuth token refresh failed") from exc
+    token = payload.get("access_token")
+    if not token:
+        raise CalendarSafeError("OAuth token refresh returned no access token")
+    return str(token)
+
+
+def _validate_auth_status_payload(
+    payload: Any, account: str
+) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise CalendarSafeError("gws auth status returned a non-object payload")
+    expected_user = ACCOUNT_ADDRESSES[account]
+    actual_user = str(payload.get("user", ""))
+    if actual_user.lower() != expected_user.lower():
+        raise CalendarSafeError(
+            f"alias {account} maps to {actual_user or 'an unknown account'}, "
+            f"not {expected_user}"
+        )
+    return payload
+
+
+def _auth_status(account: str) -> dict[str, Any]:
+    result = subprocess.run(
+        ["gws-account", account, "auth", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise CalendarSafeError(
+            f"could not verify OAuth scopes for {account} "
+            f"(exit {result.returncode})"
+        )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise CalendarSafeError(
+            "gws auth status returned non-JSON output"
+        ) from exc
+    return _validate_auth_status_payload(payload, account)
+
+
+def _scope_status(account: str) -> set[str]:
+    payload = _auth_status(account)
+    return {str(scope) for scope in payload.get("scopes", [])}
+
+
+def _require_write_scopes(account: str) -> None:
+    scopes = _scope_status(account)
+    required = {CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE}
+    calendar_scopes = {
+        scope for scope in scopes if scope.startswith(CALENDAR_SCOPE_PREFIX)
+    }
+    missing = sorted(required - calendar_scopes)
+    unexpected = sorted(calendar_scopes - required)
+    if not missing and not unexpected:
+        return
+    details: list[str] = []
+    if missing:
+        details.append(f"missing: {', '.join(missing)}")
+    if unexpected:
+        details.append(f"unexpected Calendar scopes: {', '.join(unexpected)}")
+    raise CalendarSafeError(
+        f"{account} does not have the exact approved Calendar scope set "
+        f"({'; '.join(details)}). Run: gws-calendar-safe auth-plan "
+        f"--account {account}"
+    )
+
+
+def _auth_plan(account: str) -> dict[str, Any]:
+    current = _scope_status(account)
+    preserved = sorted(
+        scope for scope in current if not scope.startswith(CALENDAR_SCOPE_PREFIX)
+    )
+    requested = sorted(
+        set(preserved) | {CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE}
+    )
+    plan = {
+        "account": account,
+        "accountEmail": ACCOUNT_ADDRESSES[account],
+        "currentScopes": sorted(current),
+        "preservedNonCalendarScopes": preserved,
+        "requestedCalendarScopes": [CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE],
+        "removedCalendarScopes": sorted(
+            scope for scope in current if scope.startswith(CALENDAR_SCOPE_PREFIX)
+        ),
+        "requestedScopes": requested,
+        "humanActionRequired": True,
+    }
+    approval_hash = _sha256(plan)
+    plan["approvalHash"] = approval_hash
+    plan["authorizationCommand"] = [
+        "gws-calendar-safe",
+        "authorize",
+        "--account",
+        account,
+        "--approval-hash",
+        approval_hash,
+    ]
+    return plan
+
+
+def _authorization_environment(
+    staging_dir: Path, credentials: dict[str, str]
+) -> dict[str, str]:
+    environment = os.environ.copy()
+    for name in (
+        "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE",
+        "GOOGLE_WORKSPACE_CLI_TOKEN",
+    ):
+        environment.pop(name, None)
+    environment.update(
+        {
+            "GOOGLE_WORKSPACE_CLI_CONFIG_DIR": str(staging_dir),
+            "GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND": "file",
+            "GOOGLE_WORKSPACE_CLI_CLIENT_ID": credentials["client_id"],
+            "GOOGLE_WORKSPACE_CLI_CLIENT_SECRET": credentials["client_secret"],
+        }
+    )
+    return environment
+
+
+def _parse_gws_json(result: subprocess.CompletedProcess[str], label: str) -> Any:
+    if result.returncode != 0:
+        raise CalendarSafeError(f"{label} failed (exit {result.returncode})")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise CalendarSafeError(f"{label} returned invalid JSON") from exc
+
+
+def _atomic_restore_credential(
+    backup_path: Path, credentials_path: Path, staging_dir: Path
+) -> None:
+    restore_path = staging_dir / f".{credentials_path.name}.restore"
+    shutil.copy2(backup_path, restore_path)
+    restore_path.chmod(0o600)
+    os.replace(restore_path, credentials_path)
+    credentials_path.chmod(0o600)
+
+
+def authorize_account(account: str, approval_hash: str) -> dict[str, Any]:
+    plan = _auth_plan(account)
+    if approval_hash != plan["approvalHash"]:
+        raise CalendarSafeError(
+            "authorization approval hash does not match the current scope plan"
+        )
+    credentials_path = _credential_path(account)
+    credentials = _load_credentials(account)
+    accounts_dir = credentials_path.parent
+    accounts_dir.mkdir(parents=True, exist_ok=True)
+    accounts_dir.chmod(0o700)
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=f".reauth-{account}-", dir=accounts_dir)
+    )
+    staging_dir.chmod(0o700)
+    backup_dir = accounts_dir / "backups"
+    backup_dir.mkdir(mode=0o700, exist_ok=True)
+    backup_dir.chmod(0o700)
+    timestamp = _now().strftime("%Y%m%dT%H%M%SZ")
+    backup_path = backup_dir / f"{account}.json.before-calendar-{timestamp}"
+    requested_scopes = [str(scope) for scope in plan["requestedScopes"]]
+    environment = _authorization_environment(staging_dir, credentials)
+    replaced = False
+    try:
+        login = subprocess.run(
+            ["gws", "auth", "login", "--scopes", ",".join(requested_scopes)],
+            env=environment,
+            check=False,
+        )
+        if login.returncode != 0:
+            raise CalendarSafeError(
+                f"interactive gws authorization failed (exit {login.returncode})"
+            )
+        status_result = subprocess.run(
+            ["gws", "auth", "status"],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        staged_status = _validate_auth_status_payload(
+            _parse_gws_json(status_result, "staged authorization verification"),
+            account,
+        )
+        staged_scopes = {str(scope) for scope in staged_status.get("scopes", [])}
+        if staged_scopes != set(requested_scopes):
+            missing = sorted(set(requested_scopes) - staged_scopes)
+            unexpected = sorted(staged_scopes - set(requested_scopes))
+            raise CalendarSafeError(
+                "staged authorization scopes differ from the approved plan "
+                f"(missing={missing}, unexpected={unexpected})"
+            )
+        export_result = subprocess.run(
+            ["gws", "auth", "export", "--unmasked"],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        exported = _parse_gws_json(export_result, "credential export")
+        if not isinstance(exported, dict):
+            raise CalendarSafeError("credential export returned a non-object payload")
+        exported.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+        required = {"client_id", "client_secret", "refresh_token", "token_uri"}
+        if any(not exported.get(field) for field in required):
+            raise CalendarSafeError("credential export omitted a required OAuth field")
+        candidate_path = staging_dir / f"{account}.json"
+        candidate_path.write_text(
+            json.dumps(exported, separators=(",", ":")), encoding="utf-8"
+        )
+        candidate_path.chmod(0o600)
+        if backup_path.exists():
+            raise CalendarSafeError(
+                f"refusing to overwrite existing credential backup: {backup_path}"
+            )
+        shutil.copy2(credentials_path, backup_path)
+        backup_path.chmod(0o600)
+        os.replace(candidate_path, credentials_path)
+        credentials_path.chmod(0o600)
+        replaced = True
+        verified = _auth_status(account)
+        verified_scopes = {str(scope) for scope in verified.get("scopes", [])}
+        if verified_scopes != set(requested_scopes):
+            raise CalendarSafeError(
+                "installed alias scope verification differs from the approved plan"
+            )
+        _require_write_scopes(account)
+    except BaseException as original_error:
+        if replaced and backup_path.is_file():
+            try:
+                _atomic_restore_credential(
+                    backup_path, credentials_path, staging_dir
+                )
+            except (OSError, shutil.Error) as restore_error:
+                raise CalendarSafeError(
+                    "authorization failed after alias replacement and automatic "
+                    "restore also failed; manual restore is required from "
+                    f"{backup_path}: {restore_error}"
+                ) from original_error
+        raise
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+    return {
+        "kind": "gws-calendar-safe-authorization",
+        "status": "authorized",
+        "account": account,
+        "accountEmail": ACCOUNT_ADDRESSES[account],
+        "scopes": requested_scopes,
+        "calendarScopes": [CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE],
+        "backupPath": str(backup_path),
+        "credentialPath": str(credentials_path),
+        "tokensRemainMachineLocal": True,
+        "verifiedAt": _rfc3339(_now()),
+    }
+
+
+def _google_error_detail(exc: HTTPError) -> str:
+    try:
+        payload = json.loads(exc.read())
+        message = payload.get("error", {}).get("message")
+        if message:
+            return str(message)[:500]
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return "Google Calendar rejected the request"
+
+
+def _api_request(
+    access_token: str,
+    method: str,
+    path: str,
+    *,
+    query: dict[str, Any] | None = None,
+    body: Any | None = None,
+    if_match: str | None = None,
+    opener: Callable[..., Any] = urlopen,
+) -> dict[str, Any]:
+    url = f"{CALENDAR_API_ROOT}{path}"
+    if query:
+        normalized = {
+            key: str(value).lower() if isinstance(value, bool) else value
+            for key, value in query.items()
+            if value is not None
+        }
+        url = f"{url}?{urlencode(normalized)}"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "User-Agent": "gws-calendar-safe/1",
+    }
+    encoded_body = None
+    if body is not None:
+        encoded_body = _canonical_json(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    if if_match:
+        headers["If-Match"] = if_match
+    request = Request(url, data=encoded_body, headers=headers, method=method)
+    try:
+        with opener(request, timeout=60) as response:
+            raw = response.read()
+    except HTTPError as exc:
+        if exc.code == 412:
+            raise CalendarDriftError(
+                "Calendar resource changed after preview (HTTP 412); preview again"
+            ) from exc
+        raise CalendarSafeError(
+            f"Calendar API {method} failed (HTTP {exc.code}): "
+            f"{_google_error_detail(exc)}"
+        ) from exc
+    except (URLError, TimeoutError) as exc:
+        raise CalendarSafeError(f"Calendar API {method} failed") from exc
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise CalendarSafeError("Calendar API returned invalid JSON") from exc
+
+
+def _calendar_path(calendar_id: str, suffix: str = "") -> str:
+    return f"/calendars/{quote(calendar_id, safe='')}{suffix}"
+
+
+def _event_path(calendar_id: str, event_id: str) -> str:
+    return _calendar_path(calendar_id, f"/events/{quote(event_id, safe='')}")
+
+
+def _list_calendars(access_token: str) -> list[dict[str, Any]]:
+    calendars: list[dict[str, Any]] = []
+    page_token: str | None = None
+    while True:
+        payload = _api_request(
+            access_token,
+            "GET",
+            "/users/me/calendarList",
+            query={"maxResults": 250, "pageToken": page_token},
+        )
+        calendars.extend(
+            entry for entry in payload.get("items", []) if isinstance(entry, dict)
+        )
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            return calendars
+
+
+def _calendar_summary(entry: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": entry.get("id"),
+        "summary": entry.get("summary"),
+        "primary": bool(entry.get("primary")),
+        "accessRole": entry.get("accessRole"),
+        "timeZone": entry.get("timeZone"),
+        "defaultReminders": copy.deepcopy(entry.get("defaultReminders", [])),
+        "etag": entry.get("etag"),
+        "writable": entry.get("accessRole") in WRITE_ACCESS_ROLES,
+    }
+
+
+def _assert_calendar_identity(
+    entries: list[dict[str, Any]], account: str
+) -> None:
+    primary = [entry for entry in entries if entry.get("primary")]
+    expected = ACCOUNT_ADDRESSES[account]
+    if len(primary) != 1 or str(primary[0].get("id", "")).lower() != expected.lower():
+        observed = [str(entry.get("id")) for entry in primary]
+        raise CalendarSafeError(
+            f"alias {account} primary calendar identity mismatch: "
+            f"expected {expected}, observed {observed or ['none']}"
+        )
+
+
+def _select_calendar(
+    access_token: str,
+    calendar_id: str,
+    *,
+    require_write: bool,
+    account: str | None = None,
+) -> dict[str, Any]:
+    entries = _list_calendars(access_token)
+    if account is not None:
+        _assert_calendar_identity(entries, account)
+    selected = next(
+        (
+            entry
+            for entry in entries
+            if entry.get("id") == calendar_id
+            or (calendar_id == "primary" and entry.get("primary"))
+        ),
+        None,
+    )
+    if not selected:
+        raise CalendarSafeError(f"calendar is not in the selected account list: {calendar_id}")
+    if require_write and selected.get("accessRole") not in WRITE_ACCESS_ROLES:
+        raise CalendarSafeError(
+            f"calendar is not writable (accessRole={selected.get('accessRole')})"
+        )
+    return selected
+
+
+def _get_event(access_token: str, calendar_id: str, event_id: str) -> dict[str, Any]:
+    return _api_request(
+        access_token,
+        "GET",
+        _event_path(calendar_id, event_id),
+        query={"maxAttendees": 250},
+    )
+
+
+def _get_event_optional(
+    access_token: str,
+    calendar_id: str,
+    event_id: str,
+) -> dict[str, Any] | None:
+    try:
+        return _get_event(access_token, calendar_id, event_id)
+    except CalendarSafeError as exc:
+        if "HTTP 404" in str(exc):
+            return None
+        raise
+
+
+def _validate_timezone(name: str) -> None:
+    try:
+        ZoneInfo(name)
+    except ZoneInfoNotFoundError as exc:
+        raise CalendarSafeError(f"unknown IANA timezone: {name}") from exc
+
+
+def _validate_event_times(start: Any, end: Any) -> None:
+    if not isinstance(start, dict) or not isinstance(end, dict):
+        raise CalendarSafeError("start and end must be objects")
+    start_has_date = "date" in start
+    end_has_date = "date" in end
+    start_has_time = "dateTime" in start
+    end_has_time = "dateTime" in end
+    if start_has_date != end_has_date or start_has_time != end_has_time:
+        raise CalendarSafeError("start and end must use the same date or dateTime form")
+    if start_has_date and start_has_time:
+        raise CalendarSafeError("start cannot contain both date and dateTime")
+    if not start_has_date and not start_has_time:
+        raise CalendarSafeError("start and end require date or dateTime")
+    if start_has_date:
+        try:
+            start_date = date.fromisoformat(str(start["date"]))
+            end_date = date.fromisoformat(str(end["date"]))
+        except ValueError as exc:
+            raise CalendarSafeError("all-day dates must use YYYY-MM-DD") from exc
+        if end_date <= start_date:
+            raise CalendarSafeError("all-day end date is exclusive and must follow start")
+        return
+    start_zone = str(start.get("timeZone", ""))
+    end_zone = str(end.get("timeZone", ""))
+    if not start_zone or not end_zone or start_zone != end_zone:
+        raise CalendarSafeError(
+            "timed start and end require the same explicit IANA timezone"
+        )
+    _validate_timezone(start_zone)
+    start_time = _parse_rfc3339(str(start["dateTime"]))
+    end_time = _parse_rfc3339(str(end["dateTime"]))
+    if end_time <= start_time:
+        raise CalendarSafeError("event end must follow event start")
+
+
+def _validate_reminders(value: Any) -> dict[str, Any]:
+    if value is None or value == "calendarDefault":
+        return {"useDefault": True}
+    if value == "none":
+        return {"useDefault": False, "overrides": []}
+    if not isinstance(value, dict):
+        raise CalendarSafeError(
+            "reminders must be calendarDefault, none, or an override object"
+        )
+    if value.get("useDefault") is True:
+        if value.get("overrides"):
+            raise CalendarSafeError("default reminders cannot include overrides")
+        return {"useDefault": True}
+    overrides = value.get("overrides", [])
+    if not isinstance(overrides, list) or len(overrides) > 5:
+        raise CalendarSafeError("reminder overrides must be a list of at most five")
+    normalized: list[dict[str, Any]] = []
+    for override in overrides:
+        if not isinstance(override, dict):
+            raise CalendarSafeError("each reminder override must be an object")
+        method = override.get("method")
+        minutes = override.get("minutes")
+        if method not in {"email", "popup"}:
+            raise CalendarSafeError("reminder method must be email or popup")
+        if not isinstance(minutes, int) or minutes < 0 or minutes > 40320:
+            raise CalendarSafeError("reminder minutes must be an integer from 0 to 40320")
+        normalized.append({"method": method, "minutes": minutes})
+    return {"useDefault": False, "overrides": normalized}
+
+
+def _validate_recurrence(value: Any) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise CalendarSafeError("recurrence must be a non-empty list")
+    lines = [str(line).strip() for line in value]
+    if any(not line for line in lines):
+        raise CalendarSafeError("recurrence lines cannot be empty")
+    if any(line.upper().startswith(("DTSTART", "DTEND")) for line in lines):
+        raise CalendarSafeError("recurrence cannot contain DTSTART or DTEND")
+    return lines
+
+
+def _validate_common_event_fields(body: dict[str, Any], *, require_times: bool) -> None:
+    if "summary" in body and not str(body["summary"]).strip():
+        raise CalendarSafeError("event title cannot be empty")
+    if require_times or "start" in body or "end" in body:
+        if "start" not in body or "end" not in body:
+            raise CalendarSafeError("start and end must be changed together")
+        _validate_event_times(body["start"], body["end"])
+    if "visibility" in body and body["visibility"] not in {
+        "default",
+        "private",
+        "public",
+    }:
+        raise CalendarSafeError("visibility must be default, private, or public")
+    if "transparency" in body and body["transparency"] not in {
+        "opaque",
+        "transparent",
+    }:
+        raise CalendarSafeError("transparency must be opaque or transparent")
+    if "recurrence" in body:
+        body["recurrence"] = _validate_recurrence(body["recurrence"])
+    if "reminders" in body:
+        body["reminders"] = _validate_reminders(body["reminders"])
+
+
+def _conference_payload(value: Any, request_id: str) -> tuple[Any | None, int | None]:
+    if value in (None, "none", "preserve"):
+        return None, None
+    if value == "remove":
+        return None, 1
+    if value != "googleMeet":
+        raise CalendarSafeError(
+            "conference must be none, preserve, remove, or googleMeet"
+        )
+    return (
+        {
+            "createRequest": {
+                "requestId": request_id,
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
+        1,
+    )
+
+
+def _deterministic_id(prefix: str, value: Any, length: int = 40) -> str:
+    digest = hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+    return f"{prefix}{digest}"[:length]
+
+
+def _self_attendees(account: str) -> list[dict[str, str]]:
+    return [{"email": ACCOUNT_ADDRESSES[account]}]
+
+
+def _attendee_emails(event: dict[str, Any]) -> list[str]:
+    return [
+        str(attendee.get("email"))
+        for attendee in event.get("attendees", [])
+        if isinstance(attendee, dict) and attendee.get("email")
+    ]
+
+
+def _external_attendees(event: dict[str, Any], account: str) -> list[str]:
+    own = ACCOUNT_ADDRESSES[account].lower()
+    return [email for email in _attendee_emails(event) if email.lower() != own]
+
+
+def _ensure_complete_attendees(event: dict[str, Any]) -> None:
+    if event.get("attendeesOmitted"):
+        raise CalendarSafeError(
+            "Calendar omitted part of the attendee list; no write can preserve it safely"
+        )
+
+
+def _is_organizer(event: dict[str, Any], account: str, calendar_id: str) -> bool:
+    del calendar_id
+    organizer = event.get("organizer") or {}
+    email = str(organizer.get("email", "")).lower()
+    return bool(organizer.get("self")) or email == ACCOUNT_ADDRESSES[account].lower()
+
+
+def _conference_summary(event: dict[str, Any]) -> dict[str, Any]:
+    data = event.get("conferenceData")
+    if not isinstance(data, dict) or not data:
+        return {"state": "none", "hangoutLink": event.get("hangoutLink")}
+    solution = data.get("conferenceSolution") or {}
+    return {
+        "state": "present",
+        "type": (solution.get("key") or {}).get("type"),
+        "name": solution.get("name"),
+        "conferenceId": data.get("conferenceId"),
+        "hangoutLink": event.get("hangoutLink"),
+    }
+
+
+def _event_summary(
+    event: dict[str, Any],
+    account: str,
+    calendar_id: str,
+) -> dict[str, Any]:
+    organizer = event.get("organizer") or {}
+    creator = event.get("creator") or {}
+    attendee_emails = _attendee_emails(event)
+    selected_email = ACCOUNT_ADDRESSES[account].lower()
+    return {
+        "eventId": event.get("id"),
+        "eventLink": event.get("htmlLink"),
+        "title": event.get("summary"),
+        "description": event.get("description"),
+        "start": copy.deepcopy(event.get("start")),
+        "end": copy.deepcopy(event.get("end")),
+        "timezone": (event.get("start") or {}).get("timeZone"),
+        "location": event.get("location"),
+        "visibility": event.get("visibility", "default"),
+        "transparency": event.get("transparency", "opaque"),
+        "reminders": copy.deepcopy(event.get("reminders")),
+        "conference": _conference_summary(event),
+        "attendees": attendee_emails,
+        "attendeeCount": len(attendee_emails),
+        "selectedAccountIsAttendee": any(
+            email.lower() == selected_email for email in attendee_emails
+        ),
+        "externalAttendees": _external_attendees(event, account),
+        "attendeeState": (
+            "self-only" if not _external_attendees(event, account) else "has-guests"
+        ),
+        "organizer": {
+            "email": organizer.get("email"),
+            "self": bool(organizer.get("self")),
+            "selectedAccountIsOrganizer": _is_organizer(event, account, calendar_id),
+        },
+        "creator": {
+            "email": creator.get("email"),
+            "self": bool(creator.get("self")),
+        },
+        "guestsCanInviteOthers": event.get("guestsCanInviteOthers"),
+        "guestsCanModify": event.get("guestsCanModify"),
+        "guestsCanSeeOtherGuests": event.get("guestsCanSeeOtherGuests"),
+        "extendedProperties": copy.deepcopy(event.get("extendedProperties")),
+        "attachments": copy.deepcopy(event.get("attachments")),
+        "source": copy.deepcopy(event.get("source")),
+        "recurringEventId": event.get("recurringEventId"),
+        "originalStartTime": copy.deepcopy(event.get("originalStartTime")),
+        "recurrence": copy.deepcopy(event.get("recurrence")),
+        "status": event.get("status"),
+        "etag": event.get("etag"),
+        "updated": event.get("updated"),
+    }
+
+
+def _diff(before: Any, after: Any, prefix: str = "") -> list[dict[str, Any]]:
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: list[dict[str, Any]] = []
+        for key in sorted(set(before) | set(after)):
+            path = f"{prefix}.{key}" if prefix else key
+            if key not in before:
+                changes.append({"field": path, "before": None, "after": after[key]})
+            elif key not in after:
+                changes.append({"field": path, "before": before[key], "after": None})
+            else:
+                changes.extend(_diff(before[key], after[key], path))
+        return changes
+    if before != after:
+        return [{"field": prefix or "value", "before": before, "after": after}]
+    return []
+
+
+def _finalize_preview(preview: dict[str, Any]) -> dict[str, Any]:
+    finalized = copy.deepcopy(preview)
+    finalized["approvalHash"] = _sha256(finalized)
+    return finalized
+
+
+def _validate_preview(
+    preview: dict[str, Any],
+    approval_hash: str,
+    destructive_confirmation: str | None = None,
+) -> None:
+    if preview.get("kind") != PREVIEW_KIND:
+        raise CalendarSafeError("unrecognized preview file")
+    if preview.get("schemaVersion") != PREVIEW_SCHEMA_VERSION:
+        raise CalendarSafeError("unsupported preview schema version")
+    stored_hash = preview.get("approvalHash")
+    unsigned = copy.deepcopy(preview)
+    unsigned.pop("approvalHash", None)
+    expected_hash = _sha256(unsigned)
+    if stored_hash != expected_hash or approval_hash != expected_hash:
+        raise CalendarSafeError("approval hash does not match the exact preview")
+    expires_at = _parse_rfc3339(str(preview.get("expiresAt")))
+    if _now() > expires_at:
+        raise CalendarSafeError("preview approval expired; preview again")
+    if not preview.get("applyAllowed", False):
+        raise CalendarSafeError("this preview is read-only and cannot be applied")
+    if preview.get("destructive") and (
+        destructive_confirmation != preview.get("destructiveConfirmation")
+    ):
+        raise CalendarSafeError(
+            "destructive confirmation does not match the exact event and scope"
+        )
+
+
+def _parse_request_path(path: Any) -> tuple[str, str | None]:
+    from urllib.parse import unquote
+
+    if not isinstance(path, str) or "?" in path or "#" in path:
+        raise CalendarSafeError("preview contains an invalid Calendar API path")
+    parts = path.split("/")
+    if len(parts) not in {4, 5} or parts[:2] != ["", "calendars"]:
+        raise CalendarSafeError("preview path is outside Calendar event endpoints")
+    if parts[3] != "events" or not parts[2]:
+        raise CalendarSafeError("preview path is outside Calendar event endpoints")
+    calendar_id = unquote(parts[2])
+    if len(parts) == 4:
+        return calendar_id, None
+    if not parts[4]:
+        raise CalendarSafeError("preview contains an invalid exact event path")
+    return calendar_id, unquote(parts[4])
+
+
+def _validate_query(query: Any, *, allow_attachments: bool = False) -> None:
+    if not isinstance(query, dict):
+        raise CalendarSafeError("preview query must be an object")
+    allowed = {"sendUpdates", "conferenceDataVersion"}
+    if allow_attachments:
+        allowed.add("supportsAttachments")
+    unknown = set(query) - allowed
+    if unknown:
+        raise CalendarSafeError(
+            f"preview contains unsupported query parameters: {', '.join(sorted(unknown))}"
+        )
+    if query.get("sendUpdates") not in NOTIFICATION_MODES:
+        raise CalendarSafeError("preview notification mode must be none or all")
+    if query.get("conferenceDataVersion") not in {None, 1}:
+        raise CalendarSafeError("conferenceDataVersion must be omitted or 1")
+    if "supportsAttachments" in query and query["supportsAttachments"] is not True:
+        raise CalendarSafeError("supportsAttachments may only be explicitly true")
+
+
+def _validate_conference_write(value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict) or set(value) != {"createRequest"}:
+        raise CalendarSafeError(
+            "conference changes may only remove conferencing or request a new Meet"
+        )
+    create_request = value.get("createRequest")
+    if not isinstance(create_request, dict):
+        raise CalendarSafeError("conference createRequest must be an object")
+    solution = create_request.get("conferenceSolutionKey")
+    if solution != {"type": "hangoutsMeet"} or not create_request.get("requestId"):
+        raise CalendarSafeError("conference createRequest must request one unique Google Meet")
+
+
+def _validate_event_write_body(
+    body: Any,
+    *,
+    allowed_fields: set[str],
+    require_times: bool,
+) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise CalendarSafeError("preview event body must be an object")
+    unknown = set(body) - allowed_fields
+    if unknown:
+        raise CalendarSafeError(
+            f"preview contains unsupported event fields: {', '.join(sorted(unknown))}"
+        )
+    normalized = copy.deepcopy(body)
+    _validate_common_event_fields(normalized, require_times=require_times)
+    if "conferenceData" in normalized:
+        _validate_conference_write(normalized["conferenceData"])
+    return normalized
+
+
+def _validate_preview_request_policy(preview: dict[str, Any]) -> None:
+    operation = preview.get("operation")
+    if operation not in {"create", "update", "update-following", "delete", "delete-following"}:
+        raise CalendarSafeError("preview operation is not supported")
+    account = preview.get("account")
+    if account not in ACCOUNT_ADDRESSES:
+        raise CalendarSafeError("preview account is not approved")
+    if preview.get("accountEmail") != ACCOUNT_ADDRESSES[str(account)]:
+        raise CalendarSafeError("preview account email does not match the alias")
+    calendar = preview.get("calendar")
+    if not isinstance(calendar, dict) or not calendar.get("id"):
+        raise CalendarSafeError("preview has no exact calendar")
+    expected_calendar_id = str(calendar["id"])
+    notification_mode = preview.get("notificationBehavior")
+    if notification_mode not in NOTIFICATION_MODES:
+        raise CalendarSafeError("preview has no exact notification behavior")
+    recurrence_scope = preview.get("recurrenceScope")
+    allowed_scopes = {
+        "create": {"new"},
+        "update": {"occurrence", "series"},
+        "update-following": {"following"},
+        "delete": {"occurrence", "series"},
+        "delete-following": {"following"},
+    }
+    if recurrence_scope not in allowed_scopes[str(operation)]:
+        raise CalendarSafeError("preview recurrence scope does not match the operation")
+    request = preview.get("request")
+    if not isinstance(request, dict):
+        raise CalendarSafeError("preview request must be an object")
+
+    def expect_equal(actual: Any, expected: Any, label: str) -> None:
+        if _canonical_json(actual) != _canonical_json(expected):
+            raise CalendarSafeError(f"preview {label} does not match its request")
+
+    def validate_notification(query: dict[str, Any]) -> None:
+        if query.get("sendUpdates") != notification_mode:
+            raise CalendarSafeError(
+                "preview request notification mode does not match the shown behavior"
+            )
+
+    def validate_path(value: dict[str, Any], *, collection: bool) -> str | None:
+        request_calendar_id, event_id = _parse_request_path(value.get("path"))
+        if request_calendar_id != expected_calendar_id:
+            raise CalendarSafeError("preview request calendar does not match preview")
+        if collection != (event_id is None):
+            raise CalendarSafeError("preview request does not target the expected event shape")
+        return event_id
+
+    if operation == "create":
+        if set(request) != {"method", "path", "query", "body", "ifMatch"}:
+            raise CalendarSafeError("create preview has an unexpected request shape")
+        validate_path(request, collection=True)
+        if request.get("method") != "POST" or request.get("ifMatch") is not None:
+            raise CalendarSafeError("create preview must contain one insert request")
+        _validate_query(request.get("query", {}))
+        validate_notification(request["query"])
+        if notification_mode != "none":
+            raise CalendarSafeError("new self-only events must show sendUpdates=none")
+        body = _validate_event_write_body(
+            request.get("body"), allowed_fields=CREATE_API_FIELDS, require_times=True
+        )
+        if body.get("attendees") != _self_attendees(str(account)):
+            raise CalendarSafeError("create preview violates the self-only attendee policy")
+        if request.get("query", {}).get("sendUpdates") != "none":
+            raise CalendarSafeError("new self-only events must use sendUpdates=none")
+        event_id = str(body.get("id", ""))
+        if not re.fullmatch(r"[0-9a-v]{5,1024}", event_id):
+            raise CalendarSafeError("create preview contains an invalid Google event ID")
+        if preview.get("before") is not None:
+            raise CalendarSafeError("create preview before-state must be empty")
+        expected_after = _event_summary(body, str(account), expected_calendar_id)
+        expect_equal(preview.get("after"), expected_after, "after-state")
+        expect_equal(preview.get("diff"), _diff({}, expected_after), "diff")
+        if body.get("reminders", {}).get("useDefault"):
+            expect_equal(
+                preview.get("resolvedDefaultReminders"),
+                calendar.get("defaultReminders", []),
+                "resolved default reminders",
+            )
+        return
+
+    if operation == "update-following":
+        if set(request) != {"steps", "rollback"}:
+            raise CalendarSafeError("series split preview has an unexpected request shape")
+        steps = request.get("steps")
+        if not isinstance(steps, list) or len(steps) != 2:
+            raise CalendarSafeError("this-and-following requires exactly two requests")
+        first, second = steps
+        if not isinstance(first, dict) or not isinstance(second, dict):
+            raise CalendarSafeError("series split requests must be objects")
+        expected_step_fields = {"method", "path", "query", "body", "ifMatch"}
+        if set(first) != expected_step_fields or set(second) != expected_step_fields:
+            raise CalendarSafeError("series split step has an unexpected request shape")
+        parent_event_id = validate_path(first, collection=False)
+        validate_path(second, collection=True)
+        if first.get("method") != "PATCH" or not first.get("ifMatch"):
+            raise CalendarSafeError("series split must ETag-patch the original series")
+        if set(first.get("body", {})) != {"recurrence"}:
+            raise CalendarSafeError("series split may only shorten the original recurrence")
+        _validate_recurrence(first["body"]["recurrence"])
+        _validate_query(first.get("query", {}))
+        validate_notification(first["query"])
+        if second.get("method") != "POST" or second.get("ifMatch") is not None:
+            raise CalendarSafeError("series split must insert one new series")
+        _validate_query(second.get("query", {}), allow_attachments=True)
+        validate_notification(second["query"])
+        new_body = _validate_event_write_body(
+            second.get("body"),
+            allowed_fields=SPLIT_CREATE_API_FIELDS,
+            require_times=True,
+        )
+        if not isinstance(new_body.get("attendees"), list):
+            raise CalendarSafeError("new split series must preserve the attendee list")
+        new_event_id = str(new_body.get("id", ""))
+        if not re.fullmatch(r"[0-9a-v]{5,1024}", new_event_id):
+            raise CalendarSafeError("series split contains an invalid Google event ID")
+        if bool(new_body.get("attachments")) != (
+            second.get("query", {}).get("supportsAttachments") is True
+        ):
+            raise CalendarSafeError(
+                "series split attachment support does not match the copied event"
+            )
+        before = preview.get("before")
+        after = preview.get("after")
+        if not isinstance(before, dict) or not isinstance(before.get("parent"), dict):
+            raise CalendarSafeError("series split preview has no exact parent state")
+        if not isinstance(before.get("splitInstance"), dict):
+            raise CalendarSafeError("series split preview has no exact instance state")
+        if not isinstance(after, dict) or not isinstance(after.get("newSeries"), dict):
+            raise CalendarSafeError("series split preview has no exact new-series state")
+        if parent_event_id != str(before["parent"].get("eventId")):
+            raise CalendarSafeError("series split request targets a different parent")
+        if new_event_id != after["newSeries"].get("eventId"):
+            raise CalendarSafeError("series split request creates a different event")
+        expect_equal(
+            after["newSeries"],
+            _event_summary(new_body, str(account), expected_calendar_id),
+            "new-series state",
+        )
+        for field in sorted(IMMUTABLE_SPLIT_COPY_FIELDS):
+            expect_equal(
+                new_body.get(field),
+                before["parent"].get(field),
+                f"copied {field}",
+            )
+        rollback = request.get("rollback")
+        if (
+            not isinstance(rollback, dict)
+            or set(rollback) != {"body"}
+            or set(rollback.get("body", {})) != {"recurrence"}
+        ):
+            raise CalendarSafeError("series split requires an exact recurrence rollback")
+        _validate_recurrence(rollback["body"]["recurrence"])
+        expect_equal(
+            rollback["body"]["recurrence"],
+            before["parent"].get("recurrence"),
+            "series rollback",
+        )
+        return
+
+    if set(request) != {"method", "path", "query", "body", "ifMatch"}:
+        raise CalendarSafeError("event preview has an unexpected request shape")
+    event_id = validate_path(request, collection=False)
+    if not request.get("ifMatch"):
+        raise CalendarSafeError("existing-event writes require an ETag")
+    _validate_query(request.get("query", {}))
+    validate_notification(request["query"])
+    before = preview.get("before")
+    if not isinstance(before, dict) or event_id != str(before.get("eventId")):
+        raise CalendarSafeError("event request target does not match the before-state")
+    if operation == "update":
+        if request.get("method") != "PATCH":
+            raise CalendarSafeError("update preview must contain one patch request")
+        body = _validate_event_write_body(
+            request.get("body"), allowed_fields=PATCH_API_FIELDS, require_times=False
+        )
+        if "attendees" in body:
+            raise CalendarSafeError("existing attendee lists are immutable")
+        return
+    if not preview.get("destructive"):
+        raise CalendarSafeError("delete preview is missing its destructive gate")
+    if operation == "delete":
+        if request.get("method") != "DELETE" or request.get("body") is not None:
+            raise CalendarSafeError("delete preview must contain one exact DELETE request")
+        expect_equal(
+            preview.get("after"),
+            {"status": "cancelled-or-deleted"},
+            "delete consequence",
+        )
+        if preview.get("destructiveConfirmation") != (
+            f"DELETE:{event_id}:{recurrence_scope}"
+        ):
+            raise CalendarSafeError("delete confirmation does not match the exact target")
+        return
+    if request.get("method") != "PATCH" or set(request.get("body", {})) != {"recurrence"}:
+        raise CalendarSafeError(
+            "this-and-following deletion may only shorten the original recurrence"
+        )
+    _validate_recurrence(request["body"]["recurrence"])
+    if preview.get("destructiveConfirmation") != f"DELETE:{event_id}:following":
+        raise CalendarSafeError("delete confirmation does not match the exact target")
+
+
+def _finalize_validated_preview(preview: dict[str, Any]) -> dict[str, Any]:
+    _validate_preview_request_policy(preview)
+    return _finalize_preview(preview)
+
+
+def _base_preview(
+    operation: str,
+    account: str,
+    calendar: dict[str, Any],
+) -> dict[str, Any]:
+    generated = _now()
+    return {
+        "kind": PREVIEW_KIND,
+        "schemaVersion": PREVIEW_SCHEMA_VERSION,
+        "operation": operation,
+        "generatedAt": _rfc3339(generated),
+        "expiresAt": _rfc3339(generated + timedelta(minutes=PREVIEW_TTL_MINUTES)),
+        "account": account,
+        "accountEmail": ACCOUNT_ADDRESSES[account],
+        "calendar": _calendar_summary(calendar),
+        "calendarVisibilityWarning": (
+            "detailed sharing visibility is intentionally unavailable because "
+            "Calendar ACL scope is not granted"
+        ),
+    }
+
+
+def _build_create_event(
+    account: str,
+    calendar: dict[str, Any],
+    request: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    unknown = set(request) - CREATE_FIELDS
+    if unknown:
+        raise CalendarSafeError(f"unsupported create fields: {', '.join(sorted(unknown))}")
+    if "attendees" in request:
+        raise CalendarSafeError(
+            "attendees are policy-owned; new events contain only the selected account"
+        )
+    summary = str(request.get("summary", "")).strip()
+    if not summary:
+        raise CalendarSafeError("event title is required")
+    if "start" not in request or "end" not in request:
+        raise CalendarSafeError("event start and end are required")
+
+    idempotency_key = str(request.get("idempotencyKey") or _sha256(request))
+    event_id = _deterministic_id(
+        "e325",
+        {
+            "account": account,
+            "calendar": calendar.get("id"),
+            "idempotencyKey": idempotency_key,
+        },
+    )
+    event: dict[str, Any] = {
+        "id": event_id,
+        "summary": summary,
+        "start": copy.deepcopy(request["start"]),
+        "end": copy.deepcopy(request["end"]),
+        "attendees": _self_attendees(account),
+        "reminders": _validate_reminders(request.get("reminders")),
+        "visibility": request.get(
+            "visibility", "default" if calendar.get("primary") else "private"
+        ),
+    }
+    for field in (
+        "description",
+        "location",
+        "recurrence",
+        "transparency",
+        "colorId",
+    ):
+        if field in request:
+            event[field] = copy.deepcopy(request[field])
+    _validate_common_event_fields(event, require_times=True)
+
+    conference_request_id = _deterministic_id(
+        "meet", {"eventId": event_id, "idempotencyKey": idempotency_key}, 32
+    )
+    conference, conference_version = _conference_payload(
+        request.get("conference", "none"), conference_request_id
+    )
+    if conference is not None:
+        event["conferenceData"] = conference
+    query = {
+        "sendUpdates": "none",
+        "conferenceDataVersion": conference_version,
+    }
+    return event, query
+
+
+def create_preview(
+    account: str,
+    calendar_id: str,
+    request: dict[str, Any],
+    *,
+    access_token: str,
+) -> dict[str, Any]:
+    calendar = _select_calendar(
+        access_token, calendar_id, require_write=True, account=account
+    )
+    event, query = _build_create_event(account, calendar, request)
+    exact_calendar_id = str(calendar["id"])
+    after = _event_summary(event, account, exact_calendar_id)
+    preview = {
+        **_base_preview("create", account, calendar),
+        "applyAllowed": True,
+        "recurrenceScope": "new",
+        "notificationBehavior": "none",
+        "guestNotificationRisk": "none; only the selected account is an attendee",
+        "attendeeMutation": "self-only creation",
+        "before": None,
+        "after": after,
+        "diff": _diff({}, after),
+        "request": {
+            "method": "POST",
+            "path": _calendar_path(exact_calendar_id, "/events"),
+            "query": query,
+            "body": event,
+            "ifMatch": None,
+        },
+    }
+    if event.get("reminders", {}).get("useDefault"):
+        preview["resolvedDefaultReminders"] = copy.deepcopy(
+            calendar.get("defaultReminders", [])
+        )
+    return _finalize_validated_preview(preview)
+
+
+def _normalize_patch(patch: dict[str, Any], request_id: str) -> tuple[dict[str, Any], int | None]:
+    unknown = set(patch) - PATCH_FIELDS
+    if unknown:
+        raise CalendarSafeError(f"unsupported update fields: {', '.join(sorted(unknown))}")
+    if "attendees" in patch:
+        raise CalendarSafeError("attendee lists are immutable in gws-calendar-safe")
+    body = copy.deepcopy(patch)
+    conference_mode = body.pop("conference", "preserve")
+    conference_version: int | None = None
+    if conference_mode != "preserve":
+        conference, conference_version = _conference_payload(conference_mode, request_id)
+        body["conferenceData"] = conference
+    _validate_common_event_fields(body, require_times=False)
+    if not body:
+        raise CalendarSafeError("update patch is empty")
+    return body, conference_version
+
+
+def _merge_event(event: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    merged = copy.deepcopy(event)
+    for key, value in patch.items():
+        if value is None:
+            merged.pop(key, None)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _notification_mode(
+    event: dict[str, Any],
+    account: str,
+    requested: str | None,
+) -> tuple[str, str]:
+    external = _external_attendees(event, account)
+    if requested is not None and requested not in NOTIFICATION_MODES:
+        raise CalendarSafeError("notification mode must be none or all")
+    if external and requested is None:
+        raise CalendarSafeError(
+            "attendee-bearing events require an explicit notification choice: none or all"
+        )
+    mode = requested or "none"
+    if external and mode == "none":
+        risk = (
+            "Google warns that sendUpdates=none can cause synchronization problems "
+            "for some users; no guest email is requested"
+        )
+    elif external:
+        risk = f"all {len(external)} external attendees may be notified"
+    else:
+        risk = "none; the event has no external attendees"
+    return mode, risk
+
+
+def _resolve_update_target(
+    access_token: str,
+    calendar_id: str,
+    source: dict[str, Any],
+    scope: str,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    if scope == "occurrence":
+        return source, None
+    parent_id = source.get("recurringEventId") or (
+        source.get("id") if source.get("recurrence") else None
+    )
+    if not parent_id:
+        raise CalendarSafeError(f"{scope} scope requires a recurring event")
+    parent = (
+        source if source.get("id") == parent_id else _get_event(access_token, calendar_id, parent_id)
+    )
+    if scope == "series":
+        return parent, None
+    if scope != "following":
+        raise CalendarSafeError("recurrence scope must be occurrence, series, or following")
+    if not source.get("recurringEventId") or not source.get("originalStartTime"):
+        raise CalendarSafeError(
+            "this-and-following requires an exact recurring instance event ID"
+        )
+    return parent, source
+
+
+def _split_recurrence(
+    recurrence: Any,
+    split_start: dict[str, Any],
+) -> tuple[list[str], list[str]]:
+    lines = _validate_recurrence(recurrence)
+    rrules = [line for line in lines if line.upper().startswith("RRULE:")]
+    if len(lines) != 1 or len(rrules) != 1:
+        raise CalendarSafeError(
+            "safe this-and-following currently requires exactly one RRULE and no RDATE, EXDATE, or EXRULE lines"
+        )
+    rule = rrules[0]
+    prefix, value = rule.split(":", 1)
+    parts = [part for part in value.split(";") if part]
+    if any(part.upper().startswith("COUNT=") for part in parts):
+        raise CalendarSafeError(
+            "safe this-and-following does not support COUNT-based RRULEs; use an UNTIL-based or unbounded series"
+        )
+    existing_until = next(
+        (part.split("=", 1)[1] for part in parts if part.upper().startswith("UNTIL=")),
+        None,
+    )
+    if "dateTime" in split_start:
+        split = _parse_rfc3339(str(split_start["dateTime"]))
+        until = (split.astimezone(timezone.utc) - timedelta(seconds=1)).strftime(
+            "%Y%m%dT%H%M%SZ"
+        )
+        if existing_until and existing_until < until:
+            raise CalendarSafeError("split instance falls after the series UNTIL boundary")
+    elif "date" in split_start:
+        try:
+            split_date = date.fromisoformat(str(split_start["date"]))
+        except ValueError as exc:
+            raise CalendarSafeError("invalid all-day split date") from exc
+        until = (split_date - timedelta(days=1)).strftime("%Y%m%d")
+        if existing_until and existing_until[:8] < until:
+            raise CalendarSafeError("split instance falls after the series UNTIL boundary")
+    else:
+        raise CalendarSafeError("split instance has no original start time")
+    old_parts = [part for part in parts if not part.upper().startswith("UNTIL=")]
+    old_parts.append(f"UNTIL={until}")
+    return [f"{prefix}:{';'.join(old_parts)}"], [rule]
+
+
+def _series_copy(parent: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: copy.deepcopy(value)
+        for key, value in parent.items()
+        if key in COPIED_SERIES_FIELDS
+    }
+
+
+def _following_update_preview(
+    account: str,
+    calendar: dict[str, Any],
+    parent: dict[str, Any],
+    instance: dict[str, Any],
+    patch: dict[str, Any],
+    notification_mode: str,
+    notification_risk: str,
+) -> dict[str, Any]:
+    split_start = instance.get("originalStartTime") or instance.get("start")
+    old_recurrence, new_recurrence = _split_recurrence(
+        parent.get("recurrence"), split_start
+    )
+    request_id = _deterministic_id(
+        "split",
+        {"parent": parent.get("id"), "split": split_start, "patch": patch},
+        32,
+    )
+    if parent.get("conferenceData") and patch.get("conference", "preserve") == "preserve":
+        raise CalendarSafeError(
+            "this-and-following cannot safely reuse existing conference data; "
+            "choose conference=googleMeet for a new unique Meet or conference=remove"
+        )
+    patch_body, conference_version = _normalize_patch(patch, request_id)
+    old_patch = {"recurrence": old_recurrence}
+    new_event = _series_copy(parent)
+    new_event["id"] = _deterministic_id(
+        "e325s",
+        {"parent": parent.get("id"), "split": split_start, "patch": patch},
+    )
+    new_event["start"] = copy.deepcopy(instance.get("start"))
+    new_event["end"] = copy.deepcopy(instance.get("end"))
+    new_event["recurrence"] = new_recurrence
+    new_event.pop("conferenceData", None)
+    new_event = _merge_event(new_event, patch_body)
+    new_event["attendees"] = copy.deepcopy(parent.get("attendees", []))
+    _validate_common_event_fields(new_event, require_times=True)
+    exact_calendar_id = str(calendar["id"])
+    parent_after = _merge_event(parent, old_patch)
+    new_after = _event_summary(new_event, account, exact_calendar_id)
+    insert_query: dict[str, Any] = {
+        "sendUpdates": notification_mode,
+        "conferenceDataVersion": conference_version,
+    }
+    if new_event.get("attachments"):
+        insert_query["supportsAttachments"] = True
+    return {
+        **_base_preview("update-following", account, calendar),
+        "applyAllowed": _is_organizer(parent, account, exact_calendar_id),
+        "recurrenceScope": "following",
+        "notificationBehavior": notification_mode,
+        "guestNotificationRisk": notification_risk,
+        "attendeeMutation": "none; the new series copies the exact attendee list",
+        "before": {
+            "parent": _event_summary(parent, account, exact_calendar_id),
+            "splitInstance": _event_summary(instance, account, exact_calendar_id),
+        },
+        "after": {
+            "parent": _event_summary(parent_after, account, exact_calendar_id),
+            "newSeries": new_after,
+        },
+        "diff": (
+            _diff(parent.get("recurrence"), old_recurrence, "parent.recurrence")
+            + _diff({}, new_after, "newSeries")
+        ),
+        "request": {
+            "steps": [
+                {
+                    "method": "PATCH",
+                    "path": _event_path(exact_calendar_id, str(parent["id"])),
+                    "query": {
+                        "sendUpdates": notification_mode,
+                        "conferenceDataVersion": 1,
+                    },
+                    "body": old_patch,
+                    "ifMatch": parent.get("etag"),
+                },
+                {
+                    "method": "POST",
+                    "path": _calendar_path(exact_calendar_id, "/events"),
+                    "query": insert_query,
+                    "body": new_event,
+                    "ifMatch": None,
+                },
+            ],
+            "rollback": {
+                "body": {"recurrence": copy.deepcopy(parent.get("recurrence"))}
+            },
+        },
+    }
+
+
+def update_preview(
+    account: str,
+    calendar_id: str,
+    event_id: str,
+    patch: dict[str, Any],
+    *,
+    scope: str,
+    send_updates: str | None,
+    access_token: str,
+) -> dict[str, Any]:
+    calendar = _select_calendar(
+        access_token, calendar_id, require_write=False, account=account
+    )
+    exact_calendar_id = str(calendar["id"])
+    source = _get_event(access_token, exact_calendar_id, event_id)
+    target, instance = _resolve_update_target(
+        access_token, exact_calendar_id, source, scope
+    )
+    _ensure_complete_attendees(target)
+    mode, risk = _notification_mode(target, account, send_updates)
+    if scope == "following":
+        assert instance is not None
+        return _finalize_validated_preview(
+            _following_update_preview(
+                account, calendar, target, instance, patch, mode, risk
+            )
+        )
+
+    request_id = _deterministic_id(
+        "meet",
+        {"event": target.get("id"), "etag": target.get("etag"), "patch": patch},
+        32,
+    )
+    body, conference_version = _normalize_patch(patch, request_id)
+    after_event = _merge_event(target, body)
+    if _attendee_emails(after_event) != _attendee_emails(target):
+        raise CalendarSafeError("attendee list changed unexpectedly")
+    preview = {
+        **_base_preview("update", account, calendar),
+        "applyAllowed": (
+            calendar.get("accessRole") in WRITE_ACCESS_ROLES
+            and _is_organizer(target, account, exact_calendar_id)
+        ),
+        "recurrenceScope": scope,
+        "notificationBehavior": mode,
+        "guestNotificationRisk": risk,
+        "attendeeMutation": "none",
+        "before": _event_summary(target, account, exact_calendar_id),
+        "after": _event_summary(after_event, account, exact_calendar_id),
+        "diff": _diff(
+            _event_summary(target, account, exact_calendar_id),
+            _event_summary(after_event, account, exact_calendar_id),
+        ),
+        "request": {
+            "method": "PATCH",
+            "path": _event_path(exact_calendar_id, str(target["id"])),
+            "query": {
+                "sendUpdates": mode,
+                "conferenceDataVersion": conference_version,
+            },
+            "body": body,
+            "ifMatch": target.get("etag"),
+        },
+    }
+    return _finalize_validated_preview(preview)
+
+
+def delete_preview(
+    account: str,
+    calendar_id: str,
+    event_id: str,
+    *,
+    scope: str,
+    send_updates: str | None,
+    access_token: str,
+) -> dict[str, Any]:
+    calendar = _select_calendar(
+        access_token, calendar_id, require_write=False, account=account
+    )
+    exact_calendar_id = str(calendar["id"])
+    source = _get_event(access_token, exact_calendar_id, event_id)
+    target, instance = _resolve_update_target(
+        access_token, exact_calendar_id, source, scope
+    )
+    _ensure_complete_attendees(target)
+    mode, risk = _notification_mode(target, account, send_updates)
+    organizer = _is_organizer(target, account, exact_calendar_id)
+    if scope == "following":
+        assert instance is not None
+        old_recurrence, _ = _split_recurrence(
+            target.get("recurrence"),
+            instance.get("originalStartTime") or instance.get("start"),
+        )
+        body = {"recurrence": old_recurrence}
+        request: dict[str, Any] = {
+            "method": "PATCH",
+            "path": _event_path(exact_calendar_id, str(target["id"])),
+            "query": {"sendUpdates": mode},
+            "body": body,
+            "ifMatch": target.get("etag"),
+        }
+        after = _event_summary(
+            _merge_event(target, body), account, exact_calendar_id
+        )
+        operation = "delete-following"
+        diff = _diff(
+            target.get("recurrence"), old_recurrence, "parent.recurrence"
+        )
+    else:
+        request = {
+            "method": "DELETE",
+            "path": _event_path(exact_calendar_id, str(target["id"])),
+            "query": {"sendUpdates": mode},
+            "body": None,
+            "ifMatch": target.get("etag"),
+        }
+        after = {"status": "cancelled-or-deleted"}
+        operation = "delete"
+        diff = [{"field": "status", "before": target.get("status"), "after": "cancelled"}]
+    preview = {
+        **_base_preview(operation, account, calendar),
+        "applyAllowed": (
+            organizer and calendar.get("accessRole") in WRITE_ACCESS_ROLES
+        ),
+        "recurrenceScope": scope,
+        "notificationBehavior": mode,
+        "guestNotificationRisk": risk,
+        "attendeeMutation": "none",
+        "destructive": True,
+        "destructiveConfirmation": (
+            f"DELETE:{target.get('id')}:{scope}"
+        ),
+        "before": _event_summary(target, account, exact_calendar_id),
+        "after": after,
+        "diff": diff,
+        "request": request,
+    }
+    return _finalize_validated_preview(preview)
+
+
+def _assert_calendar_unchanged(current: dict[str, Any], preview: dict[str, Any]) -> None:
+    expected = preview["calendar"]
+    current_summary = _calendar_summary(current)
+    for field in (
+        "id",
+        "primary",
+        "accessRole",
+        "timeZone",
+        "defaultReminders",
+        "etag",
+    ):
+        if current_summary.get(field) != expected.get(field):
+            raise CalendarDriftError(
+                f"calendar {field} changed after preview; preview again"
+            )
+    if current_summary.get("accessRole") not in WRITE_ACCESS_ROLES:
+        raise CalendarDriftError("calendar is no longer writable")
+
+
+def _assert_event_matches_preview(
+    current: dict[str, Any],
+    expected: Any,
+    account: str,
+    calendar_id: str,
+) -> None:
+    if not isinstance(expected, dict):
+        raise CalendarSafeError("preview has no exact before-state")
+    current_summary = _event_summary(current, account, calendar_id)
+    if _canonical_json(current_summary) != _canonical_json(expected):
+        raise CalendarDriftError("event state changed or preview before-state is invalid")
+
+
+def _assert_preview_value(actual: Any, expected: Any, label: str) -> None:
+    if _canonical_json(actual) != _canonical_json(expected):
+        raise CalendarSafeError(f"preview {label} is inconsistent with its write request")
+
+
+def _assert_simple_preview_intent(
+    current: dict[str, Any],
+    preview: dict[str, Any],
+    account: str,
+    calendar_id: str,
+) -> None:
+    operation = str(preview["operation"])
+    request = preview["request"]
+    before = preview["before"]
+    if operation == "update":
+        expected_after = _event_summary(
+            _merge_event(current, request["body"]), account, calendar_id
+        )
+        expected_diff = _diff(before, expected_after)
+        _assert_preview_value(preview.get("after"), expected_after, "after-state")
+        _assert_preview_value(preview.get("diff"), expected_diff, "diff")
+        return
+    if operation == "delete-following":
+        expected_after = _event_summary(
+            _merge_event(current, request["body"]), account, calendar_id
+        )
+        expected_diff = _diff(
+            current.get("recurrence"),
+            request["body"]["recurrence"],
+            "parent.recurrence",
+        )
+        _assert_preview_value(preview.get("after"), expected_after, "after-state")
+        _assert_preview_value(preview.get("diff"), expected_diff, "diff")
+        return
+    expected_after = {"status": "cancelled-or-deleted"}
+    expected_diff = [
+        {
+            "field": "status",
+            "before": current.get("status"),
+            "after": "cancelled",
+        }
+    ]
+    _assert_preview_value(preview.get("after"), expected_after, "delete consequence")
+    _assert_preview_value(preview.get("diff"), expected_diff, "diff")
+
+
+def _assert_following_preview_intent(
+    parent: dict[str, Any],
+    instance: dict[str, Any],
+    preview: dict[str, Any],
+    account: str,
+    calendar_id: str,
+) -> None:
+    first, second = preview["request"]["steps"]
+    expected_old, expected_new = _split_recurrence(
+        parent.get("recurrence"),
+        instance.get("originalStartTime") or instance.get("start"),
+    )
+    _assert_preview_value(
+        first["body"]["recurrence"], expected_old, "shortened recurrence"
+    )
+    _assert_preview_value(
+        second["body"]["recurrence"], expected_new, "new-series recurrence"
+    )
+    parent_after = _event_summary(
+        _merge_event(parent, first["body"]), account, calendar_id
+    )
+    new_after = _event_summary(second["body"], account, calendar_id)
+    _assert_preview_value(
+        preview.get("after", {}).get("parent"), parent_after, "parent after-state"
+    )
+    _assert_preview_value(
+        preview.get("after", {}).get("newSeries"), new_after, "new-series state"
+    )
+    expected_diff = (
+        _diff(parent.get("recurrence"), expected_old, "parent.recurrence")
+        + _diff({}, new_after, "newSeries")
+    )
+    _assert_preview_value(preview.get("diff"), expected_diff, "diff")
+
+
+def _request_calendar_id(request: dict[str, Any]) -> str:
+    from urllib.parse import unquote
+
+    return unquote(str(request["path"]).split("/calendars/", 1)[1].split("/", 1)[0])
+
+
+def _request_event_id(request: dict[str, Any]) -> str:
+    from urllib.parse import unquote
+
+    return unquote(str(request["path"]).rsplit("/", 1)[-1])
+
+
+def _execute_request(access_token: str, request: dict[str, Any]) -> dict[str, Any]:
+    return _api_request(
+        access_token,
+        str(request["method"]),
+        str(request["path"]),
+        query=copy.deepcopy(request.get("query")),
+        body=copy.deepcopy(request.get("body")),
+        if_match=request.get("ifMatch"),
+    )
+
+
+def _audit_event_context(state: Any) -> Any:
+    if not isinstance(state, dict):
+        return None
+    if "eventId" in state or "attendeeState" in state or "organizer" in state:
+        return {
+            "eventId": state.get("eventId"),
+            "organizer": copy.deepcopy(state.get("organizer")),
+            "attendeeState": state.get("attendeeState"),
+            "attendeeCount": state.get("attendeeCount"),
+            "selectedAccountIsAttendee": state.get("selectedAccountIsAttendee"),
+            "conference": copy.deepcopy(state.get("conference")),
+        }
+    nested = {
+        key: context
+        for key, value in state.items()
+        if (context := _audit_event_context(value)) is not None
+    }
+    return nested or None
+
+
+def _redacted_audit_record(record: dict[str, Any]) -> dict[str, Any]:
+    changed_fields = sorted(
+        {
+            str(change.get("field"))
+            for change in record.get("requestedDiff", [])
+            if isinstance(change, dict) and change.get("field")
+        }
+    )
+    return {
+        "kind": "gws-calendar-safe-audit-redacted",
+        "status": record.get("status"),
+        "operation": record.get("operation"),
+        "account": record.get("account"),
+        "calendar": record.get("calendar"),
+        "eventId": record.get("eventId"),
+        "priorEtag": record.get("priorEtag"),
+        "resultingEtag": record.get("resultingEtag"),
+        "changedFields": changed_fields,
+        "recurrenceScope": record.get("recurrenceScope"),
+        "attendeeMutation": record.get("attendeeMutation"),
+        "notificationBehavior": record.get("notificationBehavior"),
+        "rollback": copy.deepcopy(record.get("rollback")),
+        "verifiedAt": record.get("verifiedAt"),
+    }
+
+
+def apply_preview(
+    preview: dict[str, Any],
+    approval_hash: str,
+    destructive_confirmation: str | None = None,
+) -> dict[str, Any]:
+    _validate_preview(preview, approval_hash, destructive_confirmation)
+    _validate_preview_request_policy(preview)
+    account = str(preview["account"])
+    _require_write_scopes(account)
+    token = _access_token(account)
+    request = preview["request"]
+    first_request = request.get("steps", [request])[0]
+    calendar_id = _request_calendar_id(first_request)
+    calendar = _select_calendar(
+        token, calendar_id, require_write=True, account=account
+    )
+    _assert_calendar_unchanged(calendar, preview)
+
+    operation = str(preview["operation"])
+    responses: list[dict[str, Any]] = []
+    rollback: dict[str, Any] | None = None
+    if operation == "create":
+        body = request["body"]
+        attendees = body.get("attendees", [])
+        if attendees != _self_attendees(account):
+            raise CalendarSafeError("create attendee policy changed after preview")
+        if request.get("query", {}).get("sendUpdates") != "none":
+            raise CalendarSafeError("new self-only events must use sendUpdates=none")
+        existing = _get_event_optional(token, calendar_id, str(body["id"]))
+        if existing:
+            comparable = copy.deepcopy(body)
+            comparable.pop("conferenceData", None)
+            matches = all(existing.get(key) == value for key, value in comparable.items())
+            if not matches:
+                raise CalendarDriftError(
+                    "deterministic event ID already exists with different content"
+                )
+            responses.append(existing)
+            result_status = "already_applied"
+        else:
+            responses.append(_execute_request(token, request))
+            result_status = "applied"
+    elif "steps" in request:
+        first, second = request["steps"]
+        current = _get_event(token, calendar_id, _request_event_id(first))
+        _ensure_complete_attendees(current)
+        if not _is_organizer(current, account, calendar_id):
+            raise CalendarSafeError("selected account is not the event organizer")
+        _assert_event_matches_preview(
+            current,
+            preview.get("before", {}).get("parent"),
+            account,
+            calendar_id,
+        )
+        if current.get("etag") != first.get("ifMatch"):
+            raise CalendarDriftError("series ETag changed after preview; preview again")
+        split_before = preview.get("before", {}).get("splitInstance")
+        split_event_id = split_before.get("eventId") if isinstance(split_before, dict) else None
+        if not split_event_id:
+            raise CalendarSafeError("series split preview has no exact split instance")
+        current_instance = _get_event(token, calendar_id, str(split_event_id))
+        _ensure_complete_attendees(current_instance)
+        _assert_event_matches_preview(
+            current_instance, split_before, account, calendar_id
+        )
+        if second.get("body", {}).get("attendees") != current.get("attendees", []):
+            raise CalendarDriftError("series split attendee list is not an exact copy")
+        for field in sorted(IMMUTABLE_SPLIT_COPY_FIELDS):
+            if second.get("body", {}).get(field) != current.get(field):
+                raise CalendarDriftError(
+                    f"series split {field} is not an exact copy of the parent"
+                )
+        _assert_following_preview_intent(
+            current, current_instance, preview, account, calendar_id
+        )
+        duplicate = _get_event_optional(
+            token, calendar_id, str(second.get("body", {}).get("id"))
+        )
+        if duplicate is not None:
+            raise CalendarDriftError(
+                "series split target event ID already exists; no write was attempted"
+            )
+        first_response = _execute_request(token, first)
+        responses.append(first_response)
+        try:
+            responses.append(_execute_request(token, second))
+        except CalendarSafeError as exc:
+            rollback_request = {
+                "method": "PATCH",
+                "path": first["path"],
+                "query": {
+                    "sendUpdates": first.get("query", {}).get("sendUpdates", "none")
+                },
+                "body": request["rollback"]["body"],
+                "ifMatch": first_response.get("etag"),
+            }
+            try:
+                rollback_response = _execute_request(token, rollback_request)
+                rollback = {
+                    "status": "restored-original-series",
+                    "etag": rollback_response.get("etag"),
+                }
+            except CalendarSafeError as rollback_exc:
+                raise CalendarSafeError(
+                    "series split failed after shortening the original series, and "
+                    f"automatic rollback also failed: {rollback_exc}"
+                ) from exc
+            raise CalendarSafeError(
+                "series split insertion failed; the original series was restored"
+            ) from exc
+        result_status = "applied"
+    else:
+        if request.get("ifMatch"):
+            current = _get_event(
+                token, calendar_id, _request_event_id(request)
+            )
+            _ensure_complete_attendees(current)
+            if not _is_organizer(current, account, calendar_id):
+                raise CalendarSafeError("selected account is not the event organizer")
+            _assert_event_matches_preview(
+                current, preview.get("before"), account, calendar_id
+            )
+            if current.get("etag") != request.get("ifMatch"):
+                raise CalendarDriftError("event ETag changed after preview; preview again")
+            if _attendee_emails(current) != preview["before"].get("attendees", []):
+                raise CalendarDriftError("attendee list changed after preview; preview again")
+            _assert_simple_preview_intent(current, preview, account, calendar_id)
+        responses.append(_execute_request(token, request))
+        result_status = "applied"
+
+    last = responses[-1] if responses else {}
+    before = preview.get("before", {})
+    if isinstance(before, dict) and "parent" in before:
+        receipt_before = before.get("parent", {})
+    else:
+        receipt_before = before if isinstance(before, dict) else {}
+    requested_after = preview.get("after", {})
+    actual_after: Any = requested_after
+    response_state_parsed = False
+    if operation == "update-following" and len(responses) == 2:
+        if responses[0].get("id") and responses[1].get("id"):
+            actual_after = {
+                "parent": _event_summary(responses[0], account, calendar_id),
+                "newSeries": _event_summary(responses[1], account, calendar_id),
+            }
+            response_state_parsed = True
+    elif last.get("id"):
+        actual_after = _event_summary(last, account, calendar_id)
+        response_state_parsed = True
+    receipt_after = actual_after if isinstance(actual_after, dict) else {}
+    applied_diff = _diff(receipt_before, receipt_after)
+    record = {
+        "kind": "gws-calendar-safe-audit",
+        "status": result_status,
+        "operation": operation,
+        "account": account,
+        "calendar": calendar_id,
+        "eventId": (
+            last.get("id")
+            or receipt_after.get("eventId")
+            or receipt_before.get("eventId")
+        ),
+        "eventLink": (
+            last.get("htmlLink")
+            or receipt_after.get("eventLink")
+            or receipt_before.get("eventLink")
+        ),
+        "priorEtag": receipt_before.get("etag"),
+        "resultingEtag": last.get("etag"),
+        "requestedDiff": copy.deepcopy(preview.get("diff", [])),
+        "appliedDiff": applied_diff,
+        "appliedState": copy.deepcopy(receipt_after),
+        "eventContext": {
+            "before": _audit_event_context(before),
+            "after": _audit_event_context(actual_after),
+        },
+        "recurrenceScope": preview.get("recurrenceScope"),
+        "attendeeMutation": preview.get("attendeeMutation"),
+        "notificationBehavior": preview.get("notificationBehavior"),
+        "guestNotificationRisk": preview.get("guestNotificationRisk"),
+        "rollback": rollback,
+        "verification": {
+            "calendarRereadBeforeWrite": True,
+            "eventIdentityCheckedBeforeWrite": True,
+            "ifMatchUsed": operation != "create",
+            "writeResponseReceived": bool(responses),
+            "writeResponseStateParsed": response_state_parsed,
+        },
+        "verifiedAt": _rfc3339(_now()),
+    }
+    record["redacted"] = _redacted_audit_record(record)
+    return record
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CalendarSafeError(f"could not read JSON file: {path}") from exc
+    if not isinstance(payload, dict):
+        raise CalendarSafeError(f"JSON file must contain an object: {path}")
+    return payload
+
+
+def _write_output(payload: Any) -> None:
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Preview and apply guarded Google Calendar changes."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("accounts", help="Show the fixed account policy and local state")
+
+    auth_plan = subparsers.add_parser(
+        "auth-plan", help="Show the exact scope-preserving reauthorization plan"
+    )
+    auth_plan.add_argument(
+        "--account", required=True, choices=sorted(ACCOUNT_ADDRESSES)
+    )
+
+    authorize = subparsers.add_parser(
+        "authorize", help="Run one exact approved Calendar reauthorization"
+    )
+    authorize.add_argument(
+        "--account", required=True, choices=sorted(ACCOUNT_ADDRESSES)
+    )
+    authorize.add_argument("--approval-hash", required=True)
+
+    calendars = subparsers.add_parser("calendars", help="List calendars and write roles")
+    calendars.add_argument("--account", required=True, choices=sorted(ACCOUNT_ADDRESSES))
+
+    read = subparsers.add_parser("event-read", help="Read one exact event")
+    read.add_argument("--account", required=True, choices=sorted(ACCOUNT_ADDRESSES))
+    read.add_argument("--calendar-id", required=True)
+    read.add_argument("--event-id", required=True)
+
+    create = subparsers.add_parser("create-preview", help="Preview one self-only event")
+    create.add_argument("--account", required=True, choices=sorted(ACCOUNT_ADDRESSES))
+    create.add_argument("--calendar-id", required=True)
+    create.add_argument("--input", type=Path, required=True)
+
+    update = subparsers.add_parser("update-preview", help="Preview one exact event edit")
+    update.add_argument("--account", required=True, choices=sorted(ACCOUNT_ADDRESSES))
+    update.add_argument("--calendar-id", required=True)
+    update.add_argument("--event-id", required=True)
+    update.add_argument("--patch", type=Path, required=True)
+    update.add_argument(
+        "--scope", choices=("occurrence", "series", "following"), required=True
+    )
+    update.add_argument("--send-updates", choices=("none", "all"))
+
+    delete = subparsers.add_parser("delete-preview", help="Preview cancellation or deletion")
+    delete.add_argument("--account", required=True, choices=sorted(ACCOUNT_ADDRESSES))
+    delete.add_argument("--calendar-id", required=True)
+    delete.add_argument("--event-id", required=True)
+    delete.add_argument(
+        "--scope", choices=("occurrence", "series", "following"), required=True
+    )
+    delete.add_argument("--send-updates", choices=("none", "all"))
+
+    apply = subparsers.add_parser("apply", help="Apply one unexpired exact preview")
+    apply.add_argument("--preview", type=Path, required=True)
+    apply.add_argument("--approval-hash", required=True)
+    apply.add_argument(
+        "--confirm-destructive",
+        help="Required exact DELETE:<event-id>:<scope> token for destructive previews",
+    )
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        if args.command == "accounts":
+            _write_output(
+                {
+                    "accounts": [
+                        {
+                            "alias": alias,
+                            "email": email,
+                            "credentialPresent": _credential_path(alias).is_file(),
+                        }
+                        for alias, email in ACCOUNT_ADDRESSES.items()
+                    ],
+                    "excludedAliases": ["jiffy"],
+                    "requiredWriteScopes": [CALENDAR_EVENTS_SCOPE, CALENDAR_LIST_SCOPE],
+                }
+            )
+            return 0
+
+        if args.command == "apply":
+            _write_output(
+                apply_preview(
+                    _load_json(args.preview),
+                    args.approval_hash,
+                    args.confirm_destructive,
+                )
+            )
+            return 0
+
+        if args.command == "auth-plan":
+            _write_output(_auth_plan(args.account))
+            return 0
+        if args.command == "authorize":
+            _write_output(authorize_account(args.account, args.approval_hash))
+            return 0
+
+        account = args.account
+        token = _access_token(account)
+        if args.command == "calendars":
+            entries = _list_calendars(token)
+            _assert_calendar_identity(entries, account)
+            _write_output(
+                {
+                    "account": account,
+                    "calendars": [
+                        _calendar_summary(entry) for entry in entries
+                    ],
+                }
+            )
+            return 0
+        if args.command == "event-read":
+            calendar = _select_calendar(
+                token,
+                args.calendar_id,
+                require_write=False,
+                account=account,
+            )
+            event = _get_event(token, str(calendar["id"]), args.event_id)
+            _write_output(
+                {
+                    "account": account,
+                    "calendar": _calendar_summary(calendar),
+                    "event": _event_summary(event, account, str(calendar["id"])),
+                }
+            )
+            return 0
+        if args.command == "create-preview":
+            _write_output(
+                create_preview(
+                    account,
+                    args.calendar_id,
+                    _load_json(args.input),
+                    access_token=token,
+                )
+            )
+            return 0
+        if args.command == "update-preview":
+            _write_output(
+                update_preview(
+                    account,
+                    args.calendar_id,
+                    args.event_id,
+                    _load_json(args.patch),
+                    scope=args.scope,
+                    send_updates=args.send_updates,
+                    access_token=token,
+                )
+            )
+            return 0
+        if args.command == "delete-preview":
+            _write_output(
+                delete_preview(
+                    account,
+                    args.calendar_id,
+                    args.event_id,
+                    scope=args.scope,
+                    send_updates=args.send_updates,
+                    access_token=token,
+                )
+            )
+            return 0
+        raise CalendarSafeError(f"unsupported command: {args.command}")
+    except CalendarSafeError as exc:
+        print(f"gws-calendar-safe: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -29,7 +29,6 @@ ACCOUNT_ADDRESSES = {
 
 GMAIL_COMPOSE_SCOPE = "https://www.googleapis.com/auth/gmail.compose"
 AUTH_SCOPES = (
-    "https://www.googleapis.com/auth/calendar.readonly,"
     "https://www.googleapis.com/auth/drive.readonly,"
     "https://www.googleapis.com/auth/gmail.readonly,"
     f"{GMAIL_COMPOSE_SCOPE}"
@@ -148,6 +147,7 @@ def _load_credentials(account: str) -> dict[str, str]:
     except (OSError, json.JSONDecodeError) as exc:
         raise DraftCreationError(f"could not read credential file: {path}") from exc
 
+    payload.setdefault("token_uri", "https://oauth2.googleapis.com/token")
     required = ("client_id", "client_secret", "refresh_token", "token_uri")
     missing = [field for field in required if not payload.get(field)]
     if missing:

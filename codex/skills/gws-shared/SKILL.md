@@ -21,13 +21,18 @@ The `gws` binary must be on `$PATH`. On this machine, `~/pro/botfiles/bin/gws` i
 # Browser-based OAuth (interactive) for the current session
 gws auth login --readonly --services drive,gmail
 
-# Exact scopes for existing read access plus Gmail draft creation.
+# Exact scopes for Gmail/Drive read access plus Gmail draft creation.
 # gmail.compose also technically permits sending.
-gws auth login --scopes https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose
+gws auth login --scopes https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose
 
 # Save the refreshed login into a named account alias
 gws-save-account work
 ```
+
+For Calendar access or any Calendar write, use `gws-calendar-safe`. Before a
+human reauthorization, run `gws-calendar-safe auth-plan --account <alias>` so
+the exact existing non-Calendar scopes are preserved and the Calendar portion
+is replaced with only `calendar.events` plus `calendar.calendarlist.readonly`.
 
 ## Multi-Account Pattern (This Machine)
 
@@ -77,6 +82,8 @@ gws <service> <resource> [sub-resource] <method> [flags]
 - Explicit “save/create in Gmail drafts” intent is sufficient confirmation for draft creation. A vague “draft an email” request is not.
 - Gmail sending is separate from draft creation and always requires explicit confirmation immediately before sending.
 - Google offers no general draft-only OAuth scope; `gmail.compose` also grants send capability.
+- Calendar writes must use `gws-calendar-safe`; do not use raw Calendar mutation commands.
+- Never start Calendar OAuth silently. Show the exact `auth-plan` output first.
 - Prefer `--dry-run` for destructive operations
 - Use `--sanitize` for PII/content safety screening
 

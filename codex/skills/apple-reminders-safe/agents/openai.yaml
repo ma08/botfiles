@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Apple Reminders"
+  short_description: "Preview and apply guarded Reminders changes"
+  default_prompt: "Use $apple-reminders-safe to preview a bounded Apple Reminders change."

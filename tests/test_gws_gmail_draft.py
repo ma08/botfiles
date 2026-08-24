@@ -15,6 +15,7 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HELPER = REPO_ROOT / "bin" / "gws-gmail-draft"
+ACCOUNT_HELPER = REPO_ROOT / "bin" / "gws-account"
 LOADER = importlib.machinery.SourceFileLoader("gws_gmail_draft", str(HELPER))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 assert SPEC
@@ -188,6 +189,12 @@ class GmailDraftHelperTests(unittest.TestCase):
         self.assertNotIn("/drafts/send", source)
         self.assertNotIn("/messages/send", source)
 
+    def test_gmail_bootstrap_does_not_grant_calendar_write_scope(self) -> None:
+        self.assertNotIn("calendar", MODULE.AUTH_SCOPES)
+        for path in (REPO_ROOT / "bin" / "gws-account", REPO_ROOT / "bin" / "gws-save-account"):
+            source = path.read_text(encoding="utf-8")
+            self.assertNotIn("calendar.events", source)
+
     def test_large_message_payload_is_sent_in_https_body(self) -> None:
         raw = base64.urlsafe_b64encode(b"x" * 238_296).decode("ascii")
         captured: dict[str, object] = {}
@@ -287,6 +294,116 @@ class GmailDraftHelperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 77)
         self.assertIn("missing the required gmail.compose scope", result.stderr)
         self.assertIn("gws-account columbia auth login --scopes", result.stderr)
+
+
+class GwsAccountWrapperTests(unittest.TestCase):
+    def test_derived_auth_cache_tracks_canonical_credential_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            accounts_dir = root / "accounts"
+            state_root = root / "account-state"
+            fake_bin = root / "bin"
+            accounts_dir.mkdir()
+            fake_bin.mkdir()
+
+            credentials = accounts_dir / "personal.json"
+            original = '{"refresh_token":"original","client_id":"id"}'
+            replacement = '{"refresh_token":"replacement","client_id":"id"}'
+            credentials.write_text(original, encoding="utf-8")
+            credentials.chmod(0o600)
+
+            state_dir = state_root / "personal"
+            state_dir.mkdir(parents=True)
+            encrypted_cache = state_dir / "credentials.enc"
+            token_cache = state_dir / "token_cache.json"
+            encrypted_cache.write_text("stale", encoding="utf-8")
+            token_cache.write_text("stale", encoding="utf-8")
+
+            fake_gws = fake_bin / "gws"
+            fake_gws.write_text(
+                "#!/bin/sh\n"
+                'encrypted="$GOOGLE_WORKSPACE_CLI_CONFIG_DIR/credentials.enc"\n'
+                'token="$GOOGLE_WORKSPACE_CLI_CONFIG_DIR/token_cache.json"\n'
+                'if [ "$EXPECT_ENCRYPTED_CACHE" = absent ] && [ -e "$encrypted" ]; then exit 91; fi\n'
+                'if [ "$EXPECT_ENCRYPTED_CACHE" = present ] && [ ! -e "$encrypted" ]; then exit 92; fi\n'
+                'if [ "$EXPECT_TOKEN_CACHE" = absent ] && [ -e "$token" ]; then exit 93; fi\n'
+                'if [ "$(umask)" != "$EXPECT_UMASK" ]; then exit 94; fi\n'
+                'printf "%s\\n" refreshed > "$encrypted"\n'
+                "printf '%s\\n' '{\"status\":\"ok\"}'\n",
+                encoding="utf-8",
+            )
+            fake_gws.chmod(0o700)
+
+            base_env = os.environ.copy()
+            base_env.update(
+                {
+                    "HOME": str(root),
+                    "GWS_ACCOUNTS_DIR": str(accounts_dir),
+                    "GWS_ACCOUNT_STATE_DIR": str(state_root),
+                    "GWS_REAL_BIN": str(fake_gws),
+                    "PATH": f"{fake_bin}:{base_env['PATH']}",
+                    "EXPECT_TOKEN_CACHE": "absent",
+                    "EXPECT_UMASK": "0027",
+                }
+            )
+            command = [
+                "bash",
+                "-c",
+                'umask 0027; exec "$@"',
+                "bash",
+                str(ACCOUNT_HELPER),
+                "personal",
+                "auth",
+                "status",
+            ]
+
+            first = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**base_env, "EXPECT_ENCRYPTED_CACHE": "absent"},
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            marker = state_dir / "credentials.sha256"
+            original_fingerprint = marker.read_text(encoding="utf-8")
+            self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+
+            second = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**base_env, "EXPECT_ENCRYPTED_CACHE": "present"},
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+
+            credentials.write_text(replacement, encoding="utf-8")
+            credentials.chmod(0o600)
+            third = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**base_env, "EXPECT_ENCRYPTED_CACHE": "absent"},
+            )
+            self.assertEqual(third.returncode, 0, third.stderr)
+            self.assertNotEqual(
+                marker.read_text(encoding="utf-8"), original_fingerprint
+            )
+
+            credentials.write_text(original, encoding="utf-8")
+            credentials.chmod(0o600)
+            os.utime(credentials, (1, 1))
+            rollback = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**base_env, "EXPECT_ENCRYPTED_CACHE": "absent"},
+            )
+            self.assertEqual(rollback.returncode, 0, rollback.stderr)
+            self.assertEqual(marker.read_text(encoding="utf-8"), original_fingerprint)
 
 
 if __name__ == "__main__":

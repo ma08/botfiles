@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Build and install the fixed-path EventKit helper used by apple-reminders-safe.
+
+set -euo pipefail
+
+BUNDLE_ID="com.trymyzone.personal-os.apple-reminders-native"
+BOTFILES_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+SOURCE_DIR="${APPLE_REMINDERS_NATIVE_SOURCE_DIR:-$BOTFILES_ROOT/macos/apple-reminders-native}"
+INSTALL_DIR="${APPLE_REMINDERS_NATIVE_INSTALL_DIR:-$HOME/.local/libexec/personal-os}"
+BINARY_PATH="$INSTALL_DIR/apple-reminders-native"
+MANIFEST_PATH="$INSTALL_DIR/apple-reminders-native.manifest.json"
+BUILD_DIR="${APPLE_REMINDERS_NATIVE_BUILD_DIR:-$HOME/pro/lab/apple-reminders-native-build}"
+REPLACE=false
+
+usage() {
+    cat <<'EOF'
+Usage: install-apple-reminders-native [--replace]
+
+Build and install the narrow Apple Reminders EventKit helper at its fixed path.
+The first install is allowed without a flag. Replacing an existing binary requires
+--replace because changing its code identity may require a new macOS TCC grant.
+EOF
+}
+
+fail() {
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+source_hash() {
+    {
+        printf '%s\n' "$SOURCE_DIR/Package.swift"
+        /usr/bin/find -s "$SOURCE_DIR/Sources" "$SOURCE_DIR/Tests" -type f \
+            \( -name '*.swift' -o -name '*.plist' \)
+    } | while IFS= read -r source_file; do
+        relative_path="${source_file#"$SOURCE_DIR"/}"
+        printf '%s  %s\n' "$(/usr/bin/shasum -a 256 "$source_file" | /usr/bin/awk '{print $1}')" \
+            "$relative_path"
+    done | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+}
+
+for argument in "$@"; do
+    case "$argument" in
+        --replace) REPLACE=true ;;
+        -h|--help) usage; exit 0 ;;
+        *) fail "unsupported argument: $argument" ;;
+    esac
+done
+
+[ "$(/usr/bin/uname -s)" = "Darwin" ] || fail "this installer must run on macOS"
+[ -f "$SOURCE_DIR/Package.swift" ] || fail "Swift package not found: $SOURCE_DIR"
+command -v xcrun >/dev/null 2>&1 || fail "xcrun is required"
+command -v codesign >/dev/null 2>&1 || fail "codesign is required"
+
+CURRENT_SOURCE_HASH="$(source_hash)"
+
+if [ -e "$BINARY_PATH" ] || [ -e "$MANIFEST_PATH" ]; then
+    if [ -e "$BINARY_PATH" ]; then
+        [ -f "$BINARY_PATH" ] && [ ! -L "$BINARY_PATH" ] || \
+            fail "existing native helper is not a regular file: $BINARY_PATH"
+    fi
+    if [ -e "$MANIFEST_PATH" ]; then
+        [ -f "$MANIFEST_PATH" ] && [ ! -L "$MANIFEST_PATH" ] || \
+            fail "existing native manifest is not a regular file: $MANIFEST_PATH"
+    fi
+
+    if [ -f "$BINARY_PATH" ] && [ -f "$MANIFEST_PATH" ]; then
+        INSTALLED_SOURCE_HASH="$(/usr/bin/plutil -extract sourceHash raw -o - "$MANIFEST_PATH" 2>/dev/null || true)"
+        EXPECTED_BINARY_HASH="$(/usr/bin/plutil -extract binarySha256 raw -o - "$MANIFEST_PATH" 2>/dev/null || true)"
+        MANIFEST_BUNDLE_ID="$(/usr/bin/plutil -extract bundleIdentifier raw -o - "$MANIFEST_PATH" 2>/dev/null || true)"
+        ACTUAL_BINARY_HASH="$(/usr/bin/shasum -a 256 "$BINARY_PATH" | /usr/bin/awk '{print $1}')"
+        BINARY_MODE="$(/usr/bin/stat -f '%Lp' "$BINARY_PATH")"
+        MANIFEST_MODE="$(/usr/bin/stat -f '%Lp' "$MANIFEST_PATH")"
+        INSTALLED_IDENTIFIER="$(/usr/bin/codesign -dv --verbose=4 "$BINARY_PATH" 2>&1 \
+            | /usr/bin/sed -n 's/^Identifier=//p')"
+        BINARY_MODE_SAFE=true
+        case "$BINARY_MODE" in
+            *[2367][0-9]|*[0-9][2367]) BINARY_MODE_SAFE=false ;;
+        esac
+        if [ "$INSTALLED_SOURCE_HASH" = "$CURRENT_SOURCE_HASH" ] \
+            && [ -n "$EXPECTED_BINARY_HASH" ] \
+            && [ "$EXPECTED_BINARY_HASH" = "$ACTUAL_BINARY_HASH" ] \
+            && [ "$MANIFEST_BUNDLE_ID" = "$BUNDLE_ID" ] \
+            && [ "$INSTALLED_IDENTIFIER" = "$BUNDLE_ID" ] \
+            && [ "$MANIFEST_MODE" = "600" ] \
+            && [ "$BINARY_MODE_SAFE" = true ] \
+            && [ -x "$BINARY_PATH" ] \
+            && /usr/bin/codesign --verify --strict "$BINARY_PATH" 2>/dev/null; then
+            echo "Apple Reminders native helper is already installed and verified."
+            exit 0
+        fi
+    fi
+
+    if [ "$REPLACE" != true ]; then
+        fail "an installed helper differs from this source; review it, then rerun with --replace"
+    fi
+    echo "WARNING: replacing the helper may require granting Apple Reminders access again." >&2
+fi
+
+/bin/mkdir -p "$BUILD_DIR" "$INSTALL_DIR"
+/usr/bin/xcrun swift build \
+    --package-path "$SOURCE_DIR" \
+    --configuration release \
+    --scratch-path "$BUILD_DIR"
+BIN_DIR="$(/usr/bin/xcrun swift build \
+    --package-path "$SOURCE_DIR" \
+    --configuration release \
+    --scratch-path "$BUILD_DIR" \
+    --show-bin-path)"
+BUILT_BINARY="$BIN_DIR/apple-reminders-native"
+[ -x "$BUILT_BINARY" ] || fail "Swift build did not produce the expected executable"
+
+umask 077
+TEMP_BINARY="$INSTALL_DIR/.apple-reminders-native.$$"
+TEMP_MANIFEST="$INSTALL_DIR/.apple-reminders-native.manifest.$$"
+cleanup() {
+    /bin/rm -f "$TEMP_BINARY" "$TEMP_MANIFEST"
+}
+trap cleanup EXIT
+
+/usr/bin/install -m 0755 "$BUILT_BINARY" "$TEMP_BINARY"
+/usr/bin/codesign --force --sign - --identifier "$BUNDLE_ID" "$TEMP_BINARY"
+/usr/bin/codesign --verify --strict "$TEMP_BINARY"
+IDENTIFIER="$(/usr/bin/codesign -dv --verbose=4 "$TEMP_BINARY" 2>&1 \
+    | /usr/bin/sed -n 's/^Identifier=//p')"
+[ "$IDENTIFIER" = "$BUNDLE_ID" ] || fail "installed helper has an unexpected bundle identifier"
+BINARY_HASH="$(/usr/bin/shasum -a 256 "$TEMP_BINARY" | /usr/bin/awk '{print $1}')"
+INSTALLED_AT="$(TZ=UTC /bin/date '+%Y-%m-%dT%H:%M:%SZ')"
+
+/usr/bin/printf '{\n  "schemaVersion": 1,\n  "bundleIdentifier": "%s",\n  "protocolVersion": 1,\n  "sourceHash": "%s",\n  "binarySha256": "%s",\n  "installedAt": "%s"\n}\n' \
+    "$BUNDLE_ID" "$CURRENT_SOURCE_HASH" "$BINARY_HASH" "$INSTALLED_AT" \
+    > "$TEMP_MANIFEST"
+/bin/chmod 0600 "$TEMP_MANIFEST"
+
+/bin/mv -f "$TEMP_BINARY" "$BINARY_PATH"
+/bin/mv -f "$TEMP_MANIFEST" "$MANIFEST_PATH"
+trap - EXIT
+
+echo "Installed Apple Reminders native helper: $BINARY_PATH"
+echo "Manifest: $MANIFEST_PATH"
+echo "No Reminders permission prompt was requested."

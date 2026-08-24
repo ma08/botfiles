@@ -1,0 +1,1714 @@
+#!/usr/bin/env python3
+"""Guarded Apple Reminders access through a fixed-identity Mac EventKit helper."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import fcntl
+import hashlib
+import json
+import os
+import platform
+import shlex
+import stat
+import subprocess
+import sys
+import tempfile
+from contextlib import contextmanager
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+PREVIEW_KIND = "apple-reminders-safe-preview"
+AUTH_PREVIEW_KIND = "apple-reminders-safe-authorization-preview"
+PREVIEW_SCHEMA_VERSION = 1
+PREVIEW_TTL_MINUTES = 20
+PROTOCOL_VERSION = 1
+HARD_LIMIT = 500
+DEFAULT_REMOTE_HOST = "sourya-mac"
+MAX_REQUEST_BYTES = 1_048_576
+SENSITIVE_FIELDS = {"title", "notes", "url"}
+
+CREATE_FIELDS = {
+    "listId",
+    "title",
+    "notes",
+    "url",
+    "due",
+    "priority",
+    "recurrence",
+    "alarms",
+}
+UPDATE_FIELDS = {"set", "clear", "moveToListId"}
+UPDATE_SET_FIELDS = {"title", "notes", "url", "due", "priority", "recurrence", "alarms"}
+CLEARABLE_FIELDS = {"notes", "url", "due", "recurrence", "alarms"}
+
+
+class RemindersSafeError(RuntimeError):
+    """A safe-to-report transport, policy, validation, or state failure."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "REMINDERS_SAFE_ERROR",
+        tcc_status: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.tcc_status = tcc_status
+
+
+class NativeCallError(RemindersSafeError):
+    """A structured failure returned by the native EventKit boundary."""
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _sha256(value: Any) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _text_digest(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {"present": False, "length": 0, "sha256": None}
+    text = str(value)
+    return {
+        "present": True,
+        "length": len(text),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _rfc3339(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_rfc3339(value: str, *, code: str = "INVALID_PREVIEW") -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RemindersSafeError(
+            f"invalid RFC3339 timestamp: {value}", code=code
+        ) from exc
+    if parsed.tzinfo is None:
+        raise RemindersSafeError(
+            "preview timestamp has no timezone", code="INVALID_PREVIEW"
+        )
+    return parsed
+
+
+def _state_root() -> Path:
+    root = Path(
+        os.environ.get(
+            "APPLE_REMINDERS_SAFE_STATE_DIR",
+            Path.home() / ".local" / "state" / "apple-reminders-safe",
+        )
+    )
+    _assert_private_non_git_path(root, must_exist=root.exists())
+    return root
+
+
+def _atomic_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        path.parent.chmod(0o700)
+    except OSError:
+        pass
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=False, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    except Exception:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary_name)
+        except OSError:
+            pass
+        raise
+
+
+def _assert_private_non_git_path(path: Path, *, must_exist: bool) -> None:
+    if path.is_symlink():
+        raise RemindersSafeError(
+            f"private Apple Reminders files cannot be symlinks: {path}",
+            code="UNSAFE_PRIVATE_PATH",
+        )
+    resolved = path.resolve(strict=must_exist)
+    directory = resolved if resolved.is_dir() else resolved.parent
+    for parent in (directory, *directory.parents):
+        if (parent / ".git").exists():
+            raise RemindersSafeError(
+                f"private Apple Reminders files cannot be stored in a Git worktree: {path}",
+                code="UNSAFE_PRIVATE_PATH",
+            )
+    if must_exist:
+        mode = stat.S_IMODE(resolved.stat().st_mode)
+        if mode & 0o077:
+            raise RemindersSafeError(
+                f"private Apple Reminders file permissions are too broad ({mode:04o}); use chmod 600: {path}",
+                code="UNSAFE_PRIVATE_PATH",
+            )
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    try:
+        _assert_private_non_git_path(path, must_exist=True)
+        if path.stat().st_size > MAX_REQUEST_BYTES:
+            raise RemindersSafeError(
+                f"JSON file exceeds 1 MiB: {path}", code="INVALID_REQUEST"
+            )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RemindersSafeError(
+            f"JSON file not found: {path}", code="INVALID_REQUEST"
+        ) from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RemindersSafeError(
+            f"could not read JSON file: {path}", code="INVALID_REQUEST"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise RemindersSafeError(
+            f"JSON file must contain one object: {path}", code="INVALID_REQUEST"
+        )
+    return payload
+
+
+def _write_output(payload: Any, output: Path | None = None) -> None:
+    if output is not None:
+        _assert_private_non_git_path(output, must_exist=False)
+        _atomic_json(output, payload)
+    print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+def _preview_for_display(preview: dict[str, Any], output: Path) -> dict[str, Any]:
+    display = copy.deepcopy(preview)
+    request = display.get("request")
+    if isinstance(request, dict):
+        if "notes" in request:
+            request["notesState"] = _text_digest(request.pop("notes"))
+        set_fields = request.get("set")
+        if isinstance(set_fields, dict) and "notes" in set_fields:
+            set_fields["notesState"] = _text_digest(set_fields.pop("notes"))
+    display["previewPath"] = str(output)
+    return display
+
+
+def _write_private_preview(preview: dict[str, Any], output: Path) -> None:
+    _assert_private_non_git_path(output, must_exist=False)
+    _atomic_json(output, preview)
+    print(
+        json.dumps(
+            _preview_for_display(preview, output),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+def _timeout_seconds(write: bool = False) -> float:
+    default = "30" if write else "20"
+    raw = os.environ.get("APPLE_REMINDERS_TIMEOUT_SECONDS", default)
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RemindersSafeError(
+            "APPLE_REMINDERS_TIMEOUT_SECONDS must be numeric",
+            code="INVALID_CONFIGURATION",
+        ) from exc
+    if not 1 <= value <= 60:
+        raise RemindersSafeError(
+            "Apple Reminders timeout must be between 1 and 60 seconds",
+            code="INVALID_CONFIGURATION",
+        )
+    return value
+
+
+def _transport_command(arguments: list[str]) -> tuple[list[str], str]:
+    force_remote = os.environ.get("APPLE_REMINDERS_FORCE_REMOTE") == "1"
+    if platform.system() == "Darwin" and not force_remote:
+        runner = Path.home() / ".local" / "bin" / "apple-reminders-native-run"
+        return [str(runner), *arguments], "local-mac"
+
+    remote_command = 'exec "$HOME/.local/bin/apple-reminders-native-run"'
+    if arguments:
+        remote_command = f"{remote_command} {shlex.join(arguments)}"
+    return (
+        [
+            "/usr/bin/ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=5",
+            "-o",
+            "ConnectionAttempts=1",
+            "-o",
+            "ServerAliveInterval=5",
+            "-o",
+            "ServerAliveCountMax=1",
+            DEFAULT_REMOTE_HOST,
+            remote_command,
+        ],
+        f"ssh:{DEFAULT_REMOTE_HOST}",
+    )
+
+
+def _parse_native_error(stderr: str) -> tuple[str, str, str | None] | None:
+    try:
+        payload = json.loads(stderr)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict) or payload.get("status") != "error":
+        return None
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return None
+    return (
+        str(error.get("code") or "NATIVE_FAILURE"),
+        str(error.get("message") or "the native helper failed"),
+        str(error["tccStatus"]) if error.get("tccStatus") is not None else None,
+    )
+
+
+def _ssh_failure(stderr: str) -> tuple[str, str]:
+    lowered = stderr.lower()
+    offline_markers = (
+        "could not resolve hostname",
+        "no route to host",
+        "connection timed out",
+        "operation timed out",
+        "connection refused",
+        "network is unreachable",
+    )
+    if any(marker in lowered for marker in offline_markers):
+        return "MAC_OFFLINE", "sourya-mac is offline or unreachable"
+    return "SSH_FAILURE", "SSH to sourya-mac failed"
+
+
+def native_call(
+    arguments: list[str],
+    *,
+    request: dict[str, Any] | None = None,
+    write: bool = False,
+) -> dict[str, Any]:
+    command, transport = _transport_command(arguments)
+    input_text = None if request is None else f"{_canonical_json(request)}\n"
+    try:
+        result = subprocess.run(
+            command,
+            input=input_text,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_timeout_seconds(write),
+        )
+    except FileNotFoundError as exc:
+        code = (
+            "SSH_CLIENT_MISSING"
+            if transport.startswith("ssh:")
+            else "NATIVE_NOT_INSTALLED"
+        )
+        raise RemindersSafeError(
+            f"required command is not installed: {command[0]}", code=code
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RemindersSafeError(
+            "Apple Reminders fetch timed out"
+            if not write
+            else "Apple Reminders write timed out with an unknown outcome",
+            code="FETCH_TIMEOUT" if not write else "WRITE_OUTCOME_UNKNOWN",
+        ) from exc
+
+    if result.returncode != 0:
+        parsed = _parse_native_error(result.stderr.strip())
+        if parsed is not None:
+            code, message, tcc_status = parsed
+            raise NativeCallError(message, code=code, tcc_status=tcc_status)
+        if transport.startswith("ssh:") and result.returncode == 255:
+            code, message = _ssh_failure(result.stderr)
+            raise RemindersSafeError(message, code=code)
+        raise RemindersSafeError(
+            "the Apple Reminders native boundary failed without a structured response",
+            code="NATIVE_PROTOCOL_FAILURE",
+        )
+
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RemindersSafeError(
+            "the Apple Reminders native boundary returned invalid JSON",
+            code="NATIVE_PROTOCOL_FAILURE",
+        ) from exc
+    if not isinstance(payload, dict):
+        raise RemindersSafeError(
+            "the Apple Reminders native response is not an object",
+            code="NATIVE_PROTOCOL_FAILURE",
+        )
+    if payload.get("protocolVersion") != PROTOCOL_VERSION:
+        raise RemindersSafeError(
+            "the Apple Reminders native protocol version does not match",
+            code="NATIVE_PROTOCOL_MISMATCH",
+        )
+    if payload.get("status") != "ok":
+        raise RemindersSafeError(
+            "the Apple Reminders native boundary returned an unexpected status",
+            code="NATIVE_PROTOCOL_FAILURE",
+        )
+    health = payload.get("health")
+    if not isinstance(health, dict):
+        raise RemindersSafeError(
+            "the Apple Reminders native response omitted source health",
+            code="NATIVE_PROTOCOL_FAILURE",
+        )
+    health["transport"] = transport
+    return payload
+
+
+def _validate_limit(value: int) -> int:
+    if not 1 <= value <= HARD_LIMIT:
+        raise RemindersSafeError(
+            f"limit must be between 1 and {HARD_LIMIT}", code="INVALID_REQUEST"
+        )
+    return value
+
+
+def _validate_due(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RemindersSafeError("due must be an object", code="INVALID_REQUEST")
+    unknown = set(value).difference({"kind", "value", "timeZone"})
+    if unknown:
+        raise RemindersSafeError(
+            f"unsupported due fields: {', '.join(sorted(unknown))}",
+            code="INVALID_REQUEST",
+        )
+    kind = value.get("kind")
+    local_value = value.get("value")
+    time_zone = value.get("timeZone")
+    if kind not in {"all-day", "timed", "floating"} or not isinstance(local_value, str):
+        raise RemindersSafeError(
+            "due requires kind all-day, timed, or floating plus a value",
+            code="INVALID_REQUEST",
+        )
+    try:
+        if kind == "all-day":
+            parsed_date = date.fromisoformat(local_value)
+            if parsed_date.isoformat() != local_value:
+                raise ValueError
+        else:
+            parsed_time = datetime.fromisoformat(local_value).replace(
+                tzinfo=timezone.utc
+            )
+            if parsed_time.strftime("%Y-%m-%dT%H:%M:%S") != local_value:
+                raise ValueError
+    except ValueError as exc:
+        raise RemindersSafeError(
+            "due value must be a real YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS date",
+            code="INVALID_REQUEST",
+        ) from exc
+    if kind == "timed":
+        if not isinstance(time_zone, str):
+            raise RemindersSafeError(
+                "timed due values require an explicit IANA timeZone",
+                code="INVALID_REQUEST",
+            )
+        try:
+            ZoneInfo(time_zone)
+        except ZoneInfoNotFoundError as exc:
+            raise RemindersSafeError(
+                f"unknown IANA timezone: {time_zone}", code="INVALID_REQUEST"
+            ) from exc
+    elif time_zone is not None:
+        raise RemindersSafeError(
+            "only timed due values may include timeZone", code="INVALID_REQUEST"
+        )
+    return copy.deepcopy(value)
+
+
+def _validate_recurrence(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RemindersSafeError("recurrence must be an object", code="INVALID_REQUEST")
+    unknown = set(value).difference({"frequency", "interval"})
+    if unknown:
+        raise RemindersSafeError(
+            f"unsupported recurrence fields: {', '.join(sorted(unknown))}",
+            code="INVALID_REQUEST",
+        )
+    frequency = value.get("frequency")
+    interval = value.get("interval", 1)
+    if frequency not in {"daily", "weekly", "monthly", "yearly"}:
+        raise RemindersSafeError(
+            "recurrence frequency must be daily, weekly, monthly, or yearly",
+            code="INVALID_REQUEST",
+        )
+    if (
+        isinstance(interval, bool)
+        or not isinstance(interval, int)
+        or not 1 <= interval <= 999
+    ):
+        raise RemindersSafeError(
+            "recurrence interval must be an integer from 1 to 999",
+            code="INVALID_REQUEST",
+        )
+    return {"frequency": frequency, "interval": interval}
+
+
+def _validate_alarms(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or len(value) > 20:
+        raise RemindersSafeError(
+            "alarms must be a list of at most 20 items", code="INVALID_REQUEST"
+        )
+    result: list[dict[str, Any]] = []
+    for alarm in value:
+        if not isinstance(alarm, dict):
+            raise RemindersSafeError(
+                "each alarm must be an object", code="INVALID_REQUEST"
+            )
+        unknown = set(alarm).difference({"absoluteDate", "relativeOffsetSeconds"})
+        if unknown:
+            raise RemindersSafeError(
+                f"unsupported alarm fields: {', '.join(sorted(unknown))}",
+                code="INVALID_REQUEST",
+            )
+        present = [
+            key for key in ("absoluteDate", "relativeOffsetSeconds") if key in alarm
+        ]
+        if len(present) != 1:
+            raise RemindersSafeError(
+                "each alarm requires exactly one absoluteDate or relativeOffsetSeconds",
+                code="INVALID_REQUEST",
+            )
+        if present[0] == "absoluteDate":
+            absolute = alarm["absoluteDate"]
+            if not isinstance(absolute, str):
+                raise RemindersSafeError(
+                    "alarm absoluteDate must be RFC3339 text", code="INVALID_REQUEST"
+                )
+            _parse_rfc3339(absolute, code="INVALID_REQUEST")
+        else:
+            relative = alarm["relativeOffsetSeconds"]
+            if isinstance(relative, bool) or not isinstance(relative, (int, float)):
+                raise RemindersSafeError(
+                    "alarm relativeOffsetSeconds must be numeric",
+                    code="INVALID_REQUEST",
+                )
+        result.append(copy.deepcopy(alarm))
+    return result
+
+
+def _validate_common_field(name: str, value: Any) -> Any:
+    if name == "title":
+        if not isinstance(value, str) or not value.strip() or len(value) > 1024:
+            raise RemindersSafeError(
+                "title must contain 1 to 1024 characters", code="INVALID_REQUEST"
+            )
+        return value
+    if name == "notes":
+        if not isinstance(value, str) or len(value.encode("utf-8")) > MAX_REQUEST_BYTES:
+            raise RemindersSafeError(
+                "notes must be text that fits within the 1 MiB request bound",
+                code="INVALID_REQUEST",
+            )
+        return value
+    if name == "url":
+        if not isinstance(value, str) or len(value) > 4096:
+            raise RemindersSafeError(
+                "url must be HTTP or HTTPS text", code="INVALID_REQUEST"
+            )
+        parsed = urlparse(value)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise RemindersSafeError(
+                "url must be an HTTP or HTTPS URL", code="INVALID_REQUEST"
+            )
+        return value
+    if name == "due":
+        return _validate_due(value)
+    if name == "priority":
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 9:
+            raise RemindersSafeError(
+                "priority must be an integer from 0 to 9", code="INVALID_REQUEST"
+            )
+        return value
+    if name == "recurrence":
+        return _validate_recurrence(value)
+    if name == "alarms":
+        return _validate_alarms(value)
+    raise RemindersSafeError(
+        f"unsupported reminder field: {name}", code="INVALID_REQUEST"
+    )
+
+
+def validate_create(request: dict[str, Any]) -> dict[str, Any]:
+    unknown = set(request).difference(CREATE_FIELDS)
+    if unknown:
+        raise RemindersSafeError(
+            f"unsupported create fields: {', '.join(sorted(unknown))}",
+            code="INVALID_REQUEST",
+        )
+    list_id = request.get("listId")
+    if not isinstance(list_id, str) or not list_id.strip():
+        raise RemindersSafeError(
+            "create requires one explicit listId", code="INVALID_REQUEST"
+        )
+    if "title" not in request:
+        raise RemindersSafeError("create requires title", code="INVALID_REQUEST")
+    normalized: dict[str, Any] = {"listId": list_id}
+    for name, value in request.items():
+        if name == "listId":
+            continue
+        if value is None:
+            raise RemindersSafeError(
+                f"omit {name} instead of setting it to null", code="INVALID_REQUEST"
+            )
+        normalized[name] = _validate_common_field(name, value)
+    return normalized
+
+
+def validate_update(request: dict[str, Any]) -> dict[str, Any]:
+    unknown = set(request).difference(UPDATE_FIELDS)
+    if unknown:
+        raise RemindersSafeError(
+            f"unsupported update fields: {', '.join(sorted(unknown))}",
+            code="INVALID_REQUEST",
+        )
+    set_fields = request.get("set", {})
+    clear_fields = request.get("clear", [])
+    move_to = request.get("moveToListId")
+    if not isinstance(set_fields, dict):
+        raise RemindersSafeError("update set must be an object", code="INVALID_REQUEST")
+    unknown_set = set(set_fields).difference(UPDATE_SET_FIELDS)
+    if unknown_set:
+        raise RemindersSafeError(
+            f"unsupported set fields: {', '.join(sorted(unknown_set))}",
+            code="INVALID_REQUEST",
+        )
+    normalized_set: dict[str, Any] = {}
+    for name, value in set_fields.items():
+        if value is None:
+            raise RemindersSafeError(
+                f"use clear for {name} instead of setting it to null",
+                code="INVALID_REQUEST",
+            )
+        normalized_set[name] = _validate_common_field(name, value)
+    if not isinstance(clear_fields, list) or not all(
+        isinstance(item, str) for item in clear_fields
+    ):
+        raise RemindersSafeError(
+            "update clear must be a list of field names", code="INVALID_REQUEST"
+        )
+    if len(clear_fields) != len(set(clear_fields)):
+        raise RemindersSafeError(
+            "update clear fields must be unique", code="INVALID_REQUEST"
+        )
+    unknown_clear = set(clear_fields).difference(CLEARABLE_FIELDS)
+    if unknown_clear:
+        raise RemindersSafeError(
+            f"unsupported clear fields: {', '.join(sorted(unknown_clear))}",
+            code="INVALID_REQUEST",
+        )
+    overlap = set(normalized_set).intersection(clear_fields)
+    if overlap:
+        raise RemindersSafeError(
+            f"fields cannot be set and cleared together: {', '.join(sorted(overlap))}",
+            code="INVALID_REQUEST",
+        )
+    if move_to is not None and (not isinstance(move_to, str) or not move_to.strip()):
+        raise RemindersSafeError(
+            "moveToListId must be one explicit list ID", code="INVALID_REQUEST"
+        )
+    if not normalized_set and not clear_fields and move_to is None:
+        raise RemindersSafeError("update contains no changes", code="INVALID_REQUEST")
+    return {
+        "set": normalized_set,
+        "clear": list(clear_fields),
+        **({"moveToListId": move_to} if move_to is not None else {}),
+    }
+
+
+def _native_lists(limit: int = HARD_LIMIT) -> dict[str, Any]:
+    response = native_call(["lists", "--limit", str(_validate_limit(limit))])
+    if response.get("health", {}).get("truncated"):
+        raise RemindersSafeError(
+            "Reminder list inventory hit the hard cap and is incomplete",
+            code="HARD_CAP_TRUNCATED",
+        )
+    return response
+
+
+def _exact_list(list_id: str, *, writable: bool) -> dict[str, Any]:
+    response = _native_lists()
+    lists = response.get("data", {}).get("lists", [])
+    matches = [
+        item for item in lists if isinstance(item, dict) and item.get("id") == list_id
+    ]
+    if len(matches) != 1:
+        raise RemindersSafeError(
+            "no exact Apple Reminders list matches listId", code="LIST_NOT_FOUND"
+        )
+    selected = matches[0]
+    if writable and selected.get("allowsContentModifications") is not True:
+        raise RemindersSafeError(
+            "the selected Apple Reminders list is read-only", code="LIST_READ_ONLY"
+        )
+    return selected
+
+
+def _extract_snapshot(response: dict[str, Any]) -> dict[str, Any]:
+    reminder = response.get("data", {}).get("reminder")
+    if not isinstance(reminder, dict) or not isinstance(reminder.get("state"), dict):
+        raise RemindersSafeError(
+            "native response omitted the exact reminder state",
+            code="NATIVE_PROTOCOL_FAILURE",
+        )
+    _record_identity(reminder)
+    return reminder
+
+
+def _get_snapshot(
+    *,
+    local_id: str | None = None,
+    external_id: str | None = None,
+    list_id: str | None = None,
+) -> dict[str, Any]:
+    if local_id:
+        return _extract_snapshot(native_call(["get", "--local-id", local_id]))
+    if not external_id or not list_id:
+        raise RemindersSafeError(
+            "use localId alone or externalId with listId", code="INVALID_REQUEST"
+        )
+    return _extract_snapshot(
+        native_call(["get", "--external-id", external_id, "--list-id", list_id])
+    )
+
+
+def _record_identity(snapshot: dict[str, Any]) -> None:
+    state = snapshot.get("state")
+    if not isinstance(state, dict):
+        return
+    reminder_list = state.get("list")
+    if not isinstance(reminder_list, dict) or not isinstance(
+        reminder_list.get("source"), dict
+    ):
+        return
+    source_id = str(reminder_list["source"].get("id") or "")
+    list_id = str(reminder_list.get("id") or "")
+    local_id = str(state.get("localId") or "")
+    external_id = state.get("externalId")
+    if not source_id or not list_id or not local_id:
+        return
+    identity_key = "\x1f".join(
+        [source_id, list_id, str(external_id) if external_id else f"local:{local_id}"]
+    )
+    path = _state_root() / "identity-map.json"
+    payload: dict[str, Any] = {"schemaVersion": 1, "identities": {}}
+    try:
+        if path.exists():
+            mode = stat.S_IMODE(path.stat().st_mode)
+            if mode & 0o077:
+                return
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and isinstance(loaded.get("identities"), dict):
+                payload = loaded
+    except (OSError, json.JSONDecodeError):
+        return
+    identities = payload["identities"]
+    previous = identities.get(identity_key, {})
+    prior_ids = (
+        list(previous.get("previousLocalIds", [])) if isinstance(previous, dict) else []
+    )
+    prior_local = previous.get("localId") if isinstance(previous, dict) else None
+    if prior_local and prior_local != local_id and prior_local not in prior_ids:
+        prior_ids.append(prior_local)
+    identities[identity_key] = {
+        "sourceId": source_id,
+        "listId": list_id,
+        "externalId": external_id,
+        "localId": local_id,
+        "previousLocalIds": prior_ids[-5:],
+        "lastSeenAt": _rfc3339(_now()),
+    }
+    try:
+        _atomic_json(path, payload)
+    except OSError:
+        return
+
+
+def _notes_state(value: Any) -> dict[str, Any]:
+    return _text_digest(value)
+
+
+def _priority_label(priority: int) -> str:
+    if 1 <= priority <= 4:
+        return "high"
+    if priority == 5:
+        return "medium"
+    if 6 <= priority <= 9:
+        return "low"
+    return "none"
+
+
+def _due_preview(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    local_value = str(value["value"])
+    date_part, _, time_part = local_value.partition("T")
+    year, month, day = [int(part) for part in date_part.split("-")]
+    components = {"year": year, "month": month, "day": day}
+    if time_part:
+        hour, minute, second = [int(part) for part in time_part.split(":")]
+        components.update({"hour": hour, "minute": minute, "second": second})
+    return {
+        "kind": value["kind"],
+        "localValue": local_value,
+        "timeZone": value.get("timeZone"),
+        "floating": value["kind"] == "floating",
+        "components": components,
+    }
+
+
+def _recurrence_preview(value: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    return [
+        {
+            "frequency": value["frequency"],
+            "interval": value.get("interval", 1),
+            "daysOfTheWeek": [],
+            "daysOfTheMonth": [],
+            "monthsOfTheYear": [],
+            "weeksOfTheYear": [],
+            "daysOfTheYear": [],
+            "setPositions": [],
+            "end": None,
+        }
+    ]
+
+
+def _alarms_preview(values: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if values is None:
+        return []
+    return [
+        {
+            "absoluteDate": item.get("absoluteDate"),
+            "relativeOffsetSeconds": item.get("relativeOffsetSeconds"),
+            "location": None,
+        }
+        for item in values
+    ]
+
+
+def _normalized_due_state(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "kind": value.get("kind"),
+        "localValue": value.get("localValue"),
+        "timeZone": value.get("timeZone"),
+        "floating": value.get("floating"),
+        "components": copy.deepcopy(value.get("components", {})),
+    }
+
+
+def _normalized_recurrence_state(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        result.append(
+            {
+                "frequency": item.get("frequency"),
+                "interval": item.get("interval"),
+                "daysOfTheWeek": copy.deepcopy(item.get("daysOfTheWeek", [])),
+                "daysOfTheMonth": copy.deepcopy(item.get("daysOfTheMonth", [])),
+                "monthsOfTheYear": copy.deepcopy(item.get("monthsOfTheYear", [])),
+                "weeksOfTheYear": copy.deepcopy(item.get("weeksOfTheYear", [])),
+                "daysOfTheYear": copy.deepcopy(item.get("daysOfTheYear", [])),
+                "setPositions": copy.deepcopy(item.get("setPositions", [])),
+                "end": copy.deepcopy(item.get("end")),
+            }
+        )
+    return result
+
+
+def _normalized_alarm_state(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        result.append(
+            {
+                "absoluteDate": item.get("absoluteDate"),
+                "relativeOffsetSeconds": item.get("relativeOffsetSeconds"),
+                "location": copy.deepcopy(item.get("location")),
+            }
+        )
+    return result
+
+
+def _state_view(state: dict[str, Any]) -> dict[str, Any]:
+    reminder_list = state.get("list") if isinstance(state.get("list"), dict) else {}
+    source = (
+        reminder_list.get("source")
+        if isinstance(reminder_list.get("source"), dict)
+        else {}
+    )
+    return {
+        "identity": {
+            "localId": state.get("localId"),
+            "externalId": state.get("externalId"),
+            "sourceId": source.get("id"),
+        },
+        "list": {
+            "id": reminder_list.get("id"),
+            "title": reminder_list.get("title"),
+            "allowsContentModifications": reminder_list.get(
+                "allowsContentModifications"
+            ),
+            "source": copy.deepcopy(source),
+        },
+        "title": state.get("title"),
+        "notesState": _notes_state(state.get("notes")),
+        "due": _normalized_due_state(state.get("due")),
+        "priority": state.get("priority"),
+        "priorityLabel": state.get("priorityLabel"),
+        "completed": state.get("completed"),
+        "completionDate": state.get("completionDate"),
+        "recurrence": _normalized_recurrence_state(state.get("recurrence", [])),
+        "alarms": _normalized_alarm_state(state.get("alarms", [])),
+        "url": state.get("url"),
+        "creationDate": state.get("creationDate"),
+        "lastModifiedDate": state.get("lastModifiedDate"),
+    }
+
+
+def _create_after_view(
+    request: dict[str, Any], reminder_list: dict[str, Any]
+) -> dict[str, Any]:
+    priority = int(request.get("priority", 0))
+    return {
+        "identity": {
+            "localId": None,
+            "externalId": None,
+            "sourceId": reminder_list["source"]["id"],
+        },
+        "list": copy.deepcopy(reminder_list),
+        "title": request["title"],
+        "notesState": _notes_state(request.get("notes")),
+        "due": _due_preview(request.get("due")),
+        "priority": priority,
+        "priorityLabel": _priority_label(priority),
+        "completed": False,
+        "completionDate": None,
+        "recurrence": _recurrence_preview(request.get("recurrence")),
+        "alarms": _alarms_preview(request.get("alarms")),
+        "url": request.get("url"),
+        "creationDate": "set by EventKit on apply",
+        "lastModifiedDate": "set by EventKit on apply",
+    }
+
+
+def _update_after_view(
+    before: dict[str, Any], request: dict[str, Any], move_list: dict[str, Any] | None
+) -> dict[str, Any]:
+    after = copy.deepcopy(before)
+    set_fields = request["set"]
+    clear_fields = set(request["clear"])
+    if "title" in set_fields:
+        after["title"] = set_fields["title"]
+    if "notes" in set_fields:
+        after["notesState"] = _notes_state(set_fields["notes"])
+    if "url" in set_fields:
+        after["url"] = set_fields["url"]
+    if "due" in set_fields:
+        after["due"] = _due_preview(set_fields["due"])
+    if "priority" in set_fields:
+        after["priority"] = set_fields["priority"]
+        after["priorityLabel"] = _priority_label(set_fields["priority"])
+    if "recurrence" in set_fields:
+        after["recurrence"] = _recurrence_preview(set_fields["recurrence"])
+    if "alarms" in set_fields:
+        after["alarms"] = _alarms_preview(set_fields["alarms"])
+    if "notes" in clear_fields:
+        after["notesState"] = _notes_state(None)
+    for field in ("url", "due"):
+        if field in clear_fields:
+            after[field] = None
+    for field in ("recurrence", "alarms"):
+        if field in clear_fields:
+            after[field] = []
+    if move_list is not None:
+        after["list"] = copy.deepcopy(move_list)
+        after["identity"]["sourceId"] = move_list["source"]["id"]
+    after["lastModifiedDate"] = "updated by EventKit on apply"
+    return after
+
+
+def _diff(
+    before: dict[str, Any] | None, after: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    fields = sorted(set(before or {}).union(after or {}))
+    result = []
+    for field in fields:
+        old = None if before is None else before.get(field)
+        new = None if after is None else after.get(field)
+        if old != new:
+            result.append({"field": field, "before": old, "after": new})
+    return result
+
+
+def _base_preview(operation: str) -> dict[str, Any]:
+    created = _now()
+    _, execution_boundary = _transport_command([])
+    return {
+        "kind": PREVIEW_KIND,
+        "schemaVersion": PREVIEW_SCHEMA_VERSION,
+        "operation": operation,
+        "createdAt": _rfc3339(created),
+        "expiresAt": _rfc3339(created + timedelta(minutes=PREVIEW_TTL_MINUTES)),
+        "executionBoundary": execution_boundary,
+        "policy": {
+            "explicitListRequired": True,
+            "unspecifiedFieldsPreserved": True,
+            "singleReminderOnly": True,
+            "deletionSeparatelyGated": operation == "delete",
+            "cloudFreshness": "unverified",
+        },
+    }
+
+
+def _seal_preview(preview: dict[str, Any]) -> dict[str, Any]:
+    sealed = copy.deepcopy(preview)
+    sealed["approvalHash"] = _sha256(preview)
+    return sealed
+
+
+def create_preview(request: dict[str, Any]) -> dict[str, Any]:
+    normalized = validate_create(request)
+    reminder_list = _exact_list(normalized["listId"], writable=True)
+    preview = _base_preview("create")
+    preview.update(
+        {
+            "request": normalized,
+            "before": None,
+            "after": _create_after_view(normalized, reminder_list),
+        }
+    )
+    preview["diff"] = _diff(preview["before"], preview["after"])
+    return _seal_preview(preview)
+
+
+def _target_identity(snapshot: dict[str, Any]) -> dict[str, Any]:
+    state = snapshot["state"]
+    reminder_list = state["list"]
+    return {
+        "localId": state["localId"],
+        "externalId": state.get("externalId"),
+        "listId": reminder_list["id"],
+        "sourceId": reminder_list["source"]["id"],
+    }
+
+
+def _state_digest_without_local_id(snapshot: dict[str, Any]) -> str:
+    state = copy.deepcopy(snapshot["state"])
+    state.pop("localId", None)
+    return _sha256(state)
+
+
+def change_preview(
+    operation: str,
+    snapshot: dict[str, Any],
+    request: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if operation not in {"update", "complete", "reopen", "delete"}:
+        raise RemindersSafeError(
+            "unsupported preview operation", code="INVALID_REQUEST"
+        )
+    before_view = _state_view(snapshot["state"])
+    move_list = None
+    normalized: dict[str, Any]
+    if operation == "update":
+        normalized = validate_update(request or {})
+        if "moveToListId" in normalized:
+            move_list = _exact_list(normalized["moveToListId"], writable=True)
+        after_view: dict[str, Any] | None = _update_after_view(
+            before_view, normalized, move_list
+        )
+    elif operation in {"complete", "reopen"}:
+        normalized = {"completed": operation == "complete"}
+        after_view = copy.deepcopy(before_view)
+        after_view["completed"] = operation == "complete"
+        after_view["completionDate"] = (
+            "set by EventKit on apply" if operation == "complete" else None
+        )
+        after_view["lastModifiedDate"] = "updated by EventKit on apply"
+    else:
+        normalized = {}
+        after_view = None
+    preview = _base_preview(operation)
+    preview.update(
+        {
+            "target": _target_identity(snapshot),
+            "beforeRevision": snapshot["revision"],
+            "beforeStateDigestWithoutLocalId": _state_digest_without_local_id(snapshot),
+            "request": normalized,
+            "before": before_view,
+            "after": after_view,
+            "diff": _diff(before_view, after_view),
+        }
+    )
+    if operation == "delete":
+        preview["destructiveConfirmation"] = f"DELETE:{snapshot['state']['localId']}"
+    return _seal_preview(preview)
+
+
+def _validate_preview(preview: dict[str, Any], approval_hash: str) -> str:
+    if (
+        preview.get("kind") != PREVIEW_KIND
+        or preview.get("schemaVersion") != PREVIEW_SCHEMA_VERSION
+    ):
+        raise RemindersSafeError("unrecognized preview file", code="INVALID_PREVIEW")
+    stored_hash = preview.get("approvalHash")
+    if not isinstance(stored_hash, str) or stored_hash != approval_hash:
+        raise RemindersSafeError(
+            "approval hash does not match the exact preview", code="APPROVAL_MISMATCH"
+        )
+    unsigned = copy.deepcopy(preview)
+    unsigned.pop("approvalHash", None)
+    if _sha256(unsigned) != stored_hash:
+        raise RemindersSafeError(
+            "preview contents changed after sealing", code="INVALID_PREVIEW"
+        )
+    expires = preview.get("expiresAt")
+    if not isinstance(expires, str) or _parse_rfc3339(expires) <= _now():
+        raise RemindersSafeError(
+            "preview approval expired; preview again", code="PREVIEW_EXPIRED"
+        )
+    operation = preview.get("operation")
+    if operation not in {"create", "update", "complete", "reopen", "delete"}:
+        raise RemindersSafeError(
+            "preview operation is unsupported", code="INVALID_PREVIEW"
+        )
+    _, current_boundary = _transport_command([])
+    if preview.get("executionBoundary") != current_boundary:
+        raise RemindersSafeError(
+            "preview was created for a different execution boundary",
+            code="EXECUTION_BOUNDARY_MISMATCH",
+        )
+    return str(operation)
+
+
+def _reread_target(preview: dict[str, Any]) -> dict[str, Any]:
+    target = preview.get("target")
+    if not isinstance(target, dict):
+        raise RemindersSafeError("preview has no exact target", code="INVALID_PREVIEW")
+    local_id = target.get("localId")
+    try:
+        current = _get_snapshot(local_id=str(local_id))
+    except NativeCallError as exc:
+        if exc.code != "NOT_FOUND" or not target.get("externalId"):
+            raise
+        current = _get_snapshot(
+            external_id=str(target["externalId"]), list_id=str(target["listId"])
+        )
+    if current.get("revision") == preview.get("beforeRevision"):
+        return current
+    current_target = _target_identity(current)
+    same_external_identity = (
+        bool(target.get("externalId"))
+        and current_target.get("externalId") == target.get("externalId")
+        and current_target.get("listId") == target.get("listId")
+        and current_target.get("sourceId") == target.get("sourceId")
+    )
+    if same_external_identity and _state_digest_without_local_id(
+        current
+    ) == preview.get("beforeStateDigestWithoutLocalId"):
+        return current
+    raise RemindersSafeError(
+        "the reminder changed after preview; generate a new preview",
+        code="DRIFT",
+    )
+
+
+def _verification_fields(operation: str, preview: dict[str, Any]) -> set[str]:
+    if operation == "create":
+        return {
+            "list",
+            "title",
+            "notesState",
+            "due",
+            "priority",
+            "priorityLabel",
+            "completed",
+            "recurrence",
+            "alarms",
+            "url",
+        }
+    if operation == "update":
+        request = preview["request"]
+        fields = set(request["set"]).union(request["clear"])
+        if request.get("moveToListId") is not None:
+            fields.add("list")
+        if "priority" in fields:
+            fields.add("priorityLabel")
+        if "notes" in fields:
+            fields.remove("notes")
+            fields.add("notesState")
+        return fields
+    if operation in {"complete", "reopen"}:
+        return {"completed"}
+    return set()
+
+
+def _verify_after(
+    operation: str, preview: dict[str, Any], actual: dict[str, Any]
+) -> None:
+    expected = preview.get("after")
+    if not isinstance(expected, dict):
+        raise RemindersSafeError(
+            "preview has no expected after-state", code="INVALID_PREVIEW"
+        )
+    actual_view = _state_view(actual["state"])
+    for field in _verification_fields(operation, preview):
+        if actual_view.get(field) != expected.get(field):
+            raise RemindersSafeError(
+                f"post-write verification failed for {field}",
+                code="WRITE_VERIFICATION_FAILED",
+            )
+
+
+def _redacted_diff(diff: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for change in diff:
+        field = str(change.get("field"))
+        if field in SENSITIVE_FIELDS:
+            result.append(
+                {
+                    "field": field,
+                    "before": _text_digest(change.get("before")),
+                    "after": _text_digest(change.get("after")),
+                }
+            )
+        elif field == "notesState":
+            result.append(copy.deepcopy(change))
+        elif field == "identity":
+            continue
+        else:
+            result.append(copy.deepcopy(change))
+    return result
+
+
+def _audit_record(
+    operation: str,
+    preview: dict[str, Any],
+    result: dict[str, Any] | None,
+    approval_hash: str,
+) -> dict[str, Any]:
+    state = result.get("state", {}) if isinstance(result, dict) else {}
+    reminder_list = state.get("list", {}) if isinstance(state, dict) else {}
+    target = preview.get("target", {})
+    return {
+        "kind": "apple-reminders-safe-audit",
+        "schemaVersion": 1,
+        "operation": operation,
+        "approvalHash": approval_hash,
+        "appliedAt": _rfc3339(_now()),
+        "identity": {
+            "localId": state.get("localId") or target.get("localId"),
+            "externalId": state.get("externalId") or target.get("externalId"),
+        },
+        "list": {
+            "id": reminder_list.get("id") or target.get("listId"),
+            "sourceId": (
+                reminder_list.get("source", {}).get("id")
+                if isinstance(reminder_list.get("source"), dict)
+                else target.get("sourceId")
+            ),
+        },
+        "timestamps": {
+            "creationDate": state.get("creationDate"),
+            "lastModifiedDate": state.get("lastModifiedDate"),
+            "completionDate": state.get("completionDate"),
+        },
+        "appliedDiff": _redacted_diff(preview.get("diff", [])),
+        "verification": {
+            "exactRereadBeforeWrite": operation != "create",
+            "revisionChecked": operation != "create",
+            "exactRereadAfterWrite": operation != "delete",
+            "deleteAbsenceVerified": operation == "delete",
+            "nativeWriteResponseParsed": True,
+        },
+        "contentStored": False,
+        "cloudFreshness": "unverified",
+    }
+
+
+def _write_audit(record: dict[str, Any]) -> Path:
+    day = _now().date().isoformat()
+    path = _state_root() / "audit" / day / f"{record['approvalHash']}.json"
+    _atomic_json(path, record)
+    return path
+
+
+def _verified_reread(written: dict[str, Any]) -> dict[str, Any]:
+    reread = _get_snapshot(local_id=written["state"]["localId"])
+    if reread["revision"] != written["revision"]:
+        raise RemindersSafeError(
+            "the reminder changed before post-write verification completed",
+            code="WRITE_VERIFICATION_FAILED",
+        )
+    return reread
+
+
+@contextmanager
+def _apply_ledger_lock() -> Any:
+    root = _state_root()
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    root.chmod(0o700)
+    lock_path = root / "apply-ledger.lock"
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "r+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
+def _apply_ledger_path() -> Path:
+    return _state_root() / "apply-ledger.json"
+
+
+def _read_apply_ledger() -> dict[str, Any]:
+    path = _apply_ledger_path()
+    if not path.exists():
+        return {"schemaVersion": 1, "entries": {}}
+    _assert_private_non_git_path(path, must_exist=True)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RemindersSafeError(
+            "the local create-apply ledger is unreadable",
+            code="STATE_INVALID",
+        ) from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schemaVersion") != 1
+        or not isinstance(payload.get("entries"), dict)
+    ):
+        raise RemindersSafeError(
+            "the local create-apply ledger is invalid",
+            code="STATE_INVALID",
+        )
+    return payload
+
+
+def _apply_create_with_ledger(
+    preview: dict[str, Any], approval_hash: str
+) -> dict[str, Any]:
+    request = validate_create(preview.get("request", {}))
+    with _apply_ledger_lock():
+        ledger = _read_apply_ledger()
+        existing = ledger["entries"].get(approval_hash)
+        if isinstance(existing, dict):
+            if existing.get("status") == "applied" and isinstance(
+                existing.get("result"), dict
+            ):
+                result = copy.deepcopy(existing["result"])
+                result["status"] = "already_applied"
+                return result
+            raise RemindersSafeError(
+                "a prior create apply has an unknown outcome; inspect the exact list before previewing again",
+                code="WRITE_OUTCOME_UNKNOWN",
+            )
+
+        _exact_list(request["listId"], writable=True)
+        ledger["entries"][approval_hash] = {
+            "status": "in_progress",
+            "operation": "create",
+            "startedAt": _rfc3339(_now()),
+        }
+        _atomic_json(_apply_ledger_path(), ledger)
+
+        response = native_call(["create"], request=request, write=True)
+        written = _extract_snapshot(response)
+        reread = _verified_reread(written)
+        _verify_after("create", preview, reread)
+        record = _audit_record("create", preview, reread, approval_hash)
+        audit_path = _write_audit(record)
+        result = {
+            "status": "applied",
+            "audit": record,
+            "auditPath": str(audit_path),
+        }
+        ledger["entries"][approval_hash] = {
+            "status": "applied",
+            "operation": "create",
+            "finishedAt": _rfc3339(_now()),
+            "result": result,
+        }
+        _atomic_json(_apply_ledger_path(), ledger)
+        return result
+
+
+def apply_preview(
+    preview: dict[str, Any],
+    approval_hash: str,
+    destructive_confirmation: str | None,
+) -> dict[str, Any]:
+    operation = _validate_preview(preview, approval_hash)
+    if operation == "delete":
+        expected_confirmation = preview.get("destructiveConfirmation")
+        if (
+            not isinstance(expected_confirmation, str)
+            or destructive_confirmation != expected_confirmation
+        ):
+            raise RemindersSafeError(
+                "delete requires the exact fresh destructive confirmation from the preview",
+                code="DESTRUCTIVE_CONFIRMATION_REQUIRED",
+            )
+    elif destructive_confirmation is not None:
+        raise RemindersSafeError(
+            "destructive confirmation is valid only for delete", code="INVALID_REQUEST"
+        )
+
+    if operation == "create":
+        return _apply_create_with_ledger(preview, approval_hash)
+
+    current = _reread_target(preview)
+    local_id = current["state"]["localId"]
+    revision = current["revision"]
+    if operation == "update":
+        request = validate_update(preview.get("request", {}))
+        if request.get("moveToListId") is not None:
+            _exact_list(request["moveToListId"], writable=True)
+        native_request = {
+            "localId": local_id,
+            "expectedRevision": revision,
+            "set": request["set"],
+            "clear": request["clear"],
+            **(
+                {"moveToListId": request["moveToListId"]}
+                if request.get("moveToListId") is not None
+                else {}
+            ),
+        }
+        response = native_call(["update"], request=native_request, write=True)
+        written = _extract_snapshot(response)
+        final_state = _verified_reread(written)
+        _verify_after(operation, preview, final_state)
+    elif operation in {"complete", "reopen"}:
+        completed = operation == "complete"
+        response = native_call(
+            ["set-completed"],
+            request={
+                "localId": local_id,
+                "expectedRevision": revision,
+                "completed": completed,
+            },
+            write=True,
+        )
+        written = _extract_snapshot(response)
+        final_state = _verified_reread(written)
+        _verify_after(operation, preview, final_state)
+    else:
+        native_call(
+            ["delete"],
+            request={"localId": local_id, "expectedRevision": revision},
+            write=True,
+        )
+        try:
+            _get_snapshot(local_id=local_id)
+        except NativeCallError as exc:
+            if exc.code != "NOT_FOUND":
+                raise
+        else:
+            raise RemindersSafeError(
+                "the reminder still exists after delete",
+                code="WRITE_VERIFICATION_FAILED",
+            )
+        final_state = None
+
+    record = _audit_record(operation, preview, final_state, approval_hash)
+    audit_path = _write_audit(record)
+    return {"status": "applied", "audit": record, "auditPath": str(audit_path)}
+
+
+def authorization_preview() -> dict[str, Any]:
+    response = native_call(["status"])
+    tcc_status = response["health"].get("tccStatus")
+    created = _now()
+    _, execution_boundary = _transport_command([])
+    preview: dict[str, Any] = {
+        "kind": AUTH_PREVIEW_KIND,
+        "schemaVersion": 1,
+        "operation": "request-full-reminders-access",
+        "createdAt": _rfc3339(created),
+        "expiresAt": _rfc3339(created + timedelta(minutes=PREVIEW_TTL_MINUTES)),
+        "currentTccStatus": tcc_status,
+        "willPrompt": tcc_status == "not-determined",
+        "requestedAccess": "full Apple Reminders access through EventKit",
+        "bundleIdentifier": "com.trymyzone.personal-os.apple-reminders-native",
+        "executionBoundary": execution_boundary,
+        "remoteHost": DEFAULT_REMOTE_HOST,
+    }
+    preview["approvalHash"] = _sha256(preview)
+    return preview
+
+
+def authorize(preview: dict[str, Any], approval_hash: str) -> dict[str, Any]:
+    if preview.get("kind") != AUTH_PREVIEW_KIND or preview.get("schemaVersion") != 1:
+        raise RemindersSafeError(
+            "unrecognized authorization preview", code="INVALID_PREVIEW"
+        )
+    stored = preview.get("approvalHash")
+    unsigned = copy.deepcopy(preview)
+    unsigned.pop("approvalHash", None)
+    if stored != approval_hash or _sha256(unsigned) != approval_hash:
+        raise RemindersSafeError(
+            "approval hash does not match the authorization preview",
+            code="APPROVAL_MISMATCH",
+        )
+    if _parse_rfc3339(str(preview.get("expiresAt"))) <= _now():
+        raise RemindersSafeError(
+            "authorization preview expired; preview again", code="PREVIEW_EXPIRED"
+        )
+    _, current_boundary = _transport_command([])
+    if preview.get("executionBoundary") != current_boundary:
+        raise RemindersSafeError(
+            "authorization preview was created for a different execution boundary",
+            code="EXECUTION_BOUNDARY_MISMATCH",
+        )
+    current = native_call(["status"])
+    status = current["health"].get("tccStatus")
+    if status != preview.get("currentTccStatus"):
+        raise RemindersSafeError(
+            "macOS Reminders permission state changed after preview", code="DRIFT"
+        )
+    if status in {"denied", "restricted", "write-only"}:
+        raise RemindersSafeError(
+            "macOS cannot show the requested full-access prompt from this state; review Privacy & Security > Reminders",
+            code=f"TCC_{str(status).upper().replace('-', '_')}",
+            tcc_status=str(status),
+        )
+    return native_call(["authorize"], write=True)
+
+
+def _redact_search_notes(response: dict[str, Any]) -> dict[str, Any]:
+    redacted = copy.deepcopy(response)
+    reminders = redacted.get("data", {}).get("reminders", [])
+    for snapshot in reminders:
+        state = snapshot.get("state") if isinstance(snapshot, dict) else None
+        if isinstance(state, dict):
+            if "notes" in state:
+                state["notesState"] = _notes_state(state.pop("notes"))
+            elif not isinstance(state.get("notesState"), dict):
+                raise RemindersSafeError(
+                    "native search response omitted redacted note state",
+                    code="NATIVE_PROTOCOL_FAILURE",
+                )
+            _record_identity(snapshot)
+    return redacted
+
+
+def _target_arguments(parser: argparse.ArgumentParser) -> None:
+    identity = parser.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--local-id")
+    identity.add_argument("--external-id")
+    parser.add_argument("--list-id")
+
+
+def _snapshot_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    if args.local_id:
+        if args.list_id:
+            raise RemindersSafeError(
+                "list-id cannot accompany local-id", code="INVALID_REQUEST"
+            )
+        return _get_snapshot(local_id=args.local_id)
+    if not args.list_id:
+        raise RemindersSafeError("external-id requires list-id", code="INVALID_REQUEST")
+    return _get_snapshot(external_id=args.external_id, list_id=args.list_id)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Safely read, preview, and apply bounded Apple Reminders operations."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("version", help="Show native protocol and helper versions")
+    subparsers.add_parser("status", help="Show Mac, TCC, fetch, and freshness state")
+
+    auth_preview = subparsers.add_parser(
+        "authorize-preview", help="Preview the exact macOS Reminders access request"
+    )
+    auth_preview.add_argument("--output", type=Path, required=True)
+    auth = subparsers.add_parser(
+        "authorize", help="Run one explicitly approved macOS Reminders access request"
+    )
+    auth.add_argument("--preview", type=Path, required=True)
+    auth.add_argument("--approval-hash", required=True)
+
+    lists = subparsers.add_parser("lists", help="List bounded Apple Reminders lists")
+    lists.add_argument("--limit", type=int, default=100)
+
+    search = subparsers.add_parser(
+        "search", help="Search bounded reminders with notes redacted"
+    )
+    search.add_argument("--query", required=True)
+    search.add_argument("--list-id")
+    search.add_argument("--include-completed", action="store_true")
+    search.add_argument("--limit", type=int, default=50)
+
+    get = subparsers.add_parser(
+        "get", help="Read one exact reminder, including its note"
+    )
+    _target_arguments(get)
+
+    collect = subparsers.add_parser(
+        "collect-page", help="Return one bounded owner-only Deep Feed collection page"
+    )
+    collect.add_argument("--list-id")
+    collect.add_argument("--include-completed", action="store_true")
+    collect.add_argument("--after")
+    collect.add_argument("--limit", type=int, default=100)
+    collect.add_argument("--owner-only-deep-feed", action="store_true", required=True)
+
+    create = subparsers.add_parser("create-preview", help="Preview one reminder create")
+    create.add_argument("--input", type=Path, required=True)
+    create.add_argument("--output", type=Path, required=True)
+
+    update = subparsers.add_parser(
+        "update-preview", help="Preview one exact reminder update"
+    )
+    _target_arguments(update)
+    update.add_argument("--patch", type=Path, required=True)
+    update.add_argument("--output", type=Path, required=True)
+
+    for name in ("complete", "reopen", "delete"):
+        change = subparsers.add_parser(
+            f"{name}-preview", help=f"Preview one exact reminder {name}"
+        )
+        _target_arguments(change)
+        change.add_argument("--output", type=Path, required=True)
+
+    apply = subparsers.add_parser("apply", help="Apply one exact unexpired preview")
+    apply.add_argument("--preview", type=Path, required=True)
+    apply.add_argument("--approval-hash", required=True)
+    apply.add_argument("--confirm-destructive")
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        if args.command in {"version", "status"}:
+            _write_output(native_call([args.command]))
+            return 0
+        if args.command == "authorize-preview":
+            _write_private_preview(authorization_preview(), args.output)
+            return 0
+        if args.command == "authorize":
+            _write_output(authorize(_load_json(args.preview), args.approval_hash))
+            return 0
+        if args.command == "lists":
+            _write_output(_native_lists(_validate_limit(args.limit)))
+            return 0
+        if args.command == "search":
+            arguments = [
+                "search",
+                "--query",
+                args.query,
+                "--limit",
+                str(_validate_limit(args.limit)),
+            ]
+            if args.list_id:
+                arguments.extend(["--list-id", args.list_id])
+            if args.include_completed:
+                arguments.append("--include-completed")
+            _write_output(_redact_search_notes(native_call(arguments)))
+            return 0
+        if args.command == "get":
+            _write_output({"status": "ok", "reminder": _snapshot_from_args(args)})
+            return 0
+        if args.command == "collect-page":
+            arguments = ["scan", "--limit", str(_validate_limit(args.limit))]
+            if args.list_id:
+                arguments.extend(["--list-id", args.list_id])
+            if args.after:
+                arguments.extend(["--after", args.after])
+            if args.include_completed:
+                arguments.append("--include-completed")
+            response = native_call(arguments)
+            for snapshot in response.get("data", {}).get("reminders", []):
+                if isinstance(snapshot, dict):
+                    _record_identity(snapshot)
+            _write_output(response)
+            return 0
+        if args.command == "create-preview":
+            _write_private_preview(create_preview(_load_json(args.input)), args.output)
+            return 0
+        if args.command == "update-preview":
+            preview = change_preview(
+                "update", _snapshot_from_args(args), _load_json(args.patch)
+            )
+            _write_private_preview(preview, args.output)
+            return 0
+        if args.command in {"complete-preview", "reopen-preview", "delete-preview"}:
+            operation = args.command.removesuffix("-preview")
+            _write_private_preview(
+                change_preview(operation, _snapshot_from_args(args)), args.output
+            )
+            return 0
+        if args.command == "apply":
+            _write_output(
+                apply_preview(
+                    _load_json(args.preview),
+                    args.approval_hash,
+                    args.confirm_destructive,
+                )
+            )
+            return 0
+        raise RemindersSafeError("unsupported command", code="INVALID_REQUEST")
+    except RemindersSafeError as exc:
+        payload = {
+            "status": "error",
+            "error": {
+                "code": exc.code,
+                "message": str(exc),
+                **({"tccStatus": exc.tcc_status} if exc.tcc_status else {}),
+            },
+        }
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
