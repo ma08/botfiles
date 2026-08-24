@@ -1,0 +1,4 @@
+interface:
+  display_name: "Personal OS Repo Cleanup"
+  short_description: "Clean and synchronize personal_os across machines"
+  default_prompt: "Use $personal-os-repo-cleanup to commit, reconcile, push, and synchronize personal_os across the GCP and Mac checkouts."
