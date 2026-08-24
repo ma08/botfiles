@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare Production Release"
+  short_description: "Assess releases with evidence and dual review"
+  default_prompt: "Use $prepare-production-release to assess this exact candidate with risk-scaled evidence, complementary external review, and any authorized read-only production-state survey, then propose a bounded plan."
