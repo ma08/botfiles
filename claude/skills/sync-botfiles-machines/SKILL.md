@@ -5,10 +5,11 @@ description: Safely inventory, reconcile, clean, and synchronize divergent botfi
 
 # Sync Botfiles Machines
 
-Reconcile authored changes without committing machine state, secrets, or
-generated/vendor material. Treat `research-cpu-01` as the canonical integration
-host and `sourya-mac` as a synchronized client unless current instructions say
-otherwise.
+Reconcile authored changes without committing machine state, secrets, private
+information, or generated/vendor material. The botfiles GitHub repository is
+public, so treat every pushed byte and commit as immediately internet-visible.
+Treat `research-cpu-01` as the canonical integration host and `sourya-mac` as a
+synchronized client unless current instructions say otherwise.
 
 ## Safety Contract
 
@@ -22,6 +23,12 @@ otherwise.
 - Never copy `secrets/local/`, raw user configs, credentials, auth state,
   plugin caches, marketplace materializations, or generated vendor trees
   between machines or into Git-backed task artifacts.
+- Never commit private messages, Calendar or Reminder contents, raw logs or
+  transcripts, non-public personal identifiers, customer information, private
+  infrastructure details, or machine-local values merely because no secret
+  scanner recognizes them.
+- Keep scanner output redacted to finding class, path, and line number. Never
+  print a suspected value while deciding whether it is safe.
 - Do not delete an untracked path until it is positively classified. Preserve
   unknown or authored material for review.
 - Keep original dirty checkouts untouched while integrating. Use an isolated
@@ -101,7 +108,8 @@ Before every commit:
 
 - inspect staged filenames and the full staged diff;
 - run `git diff --cached --check`;
-- scan staged content for private keys and common token shapes;
+- scan staged content for private keys, common token shapes, and private
+  information inappropriate for a public repository;
 - validate affected shell, Python, JSON, TOML, YAML, and skill files.
 
 Restore ambiguous deletions unless evidence proves they were intentional.
@@ -198,6 +206,29 @@ landing for a material architecture/scope change, weakened security or
 rollback, destructive ambiguity, or unresolved required capability.
 
 Present compact redacted evidence and obtain explicit landing approval.
+
+### Public-repository disclosure gate
+
+Immediately before requesting approval, and again immediately before pushing:
+
+1. Resolve the exact live push range as `<live-remote-main>..HEAD`. Scan the
+   complete range, including intermediate commits, not only the staged diff or
+   final tree.
+2. Use an available secret scanner plus manual review. Check for credentials,
+   tokens, private keys, authorization material, copied config values, private
+   URLs or infrastructure, personal contact details, customer/company data,
+   message/Calendar/Reminder content, screenshots, logs, transcripts, and
+   machine-specific paths that disclose more than documented public
+   conventions.
+3. Treat placeholder fixtures and already-public identifiers as intentional
+   only after inspecting their context. Existing presence elsewhere in the
+   repository is evidence, not an automatic allowlist.
+4. Record only redacted finding classes and paths. Remove or replace unsafe
+   content and rerun the complete-range scan. If a finding is uncertain, stop
+   and ask rather than push it.
+5. Confirm no `secrets/local/`, local user config, credential store, private
+   task artifact, cache, or generated runtime path occurs anywhere in the push
+   range.
 
 ## 10. Land, Synchronize, And Handoff
 
