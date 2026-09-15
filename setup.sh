@@ -59,12 +59,12 @@ check_ssh_workflow_tools() {
         echo "    You can still run with explicit session names, e.g. work-ml my-session"
     fi
 
-    if command -v zellij &> /dev/null; then
-        echo "  [OK] zellij (required for work-here and remote attach targets)"
+    if "$SCRIPT_DIR/bin/install-zellij" --check; then
+        echo "  [OK] zellij (pane-aware task orchestration ready)"
     else
-        echo "  [MISSING] zellij (required for work-here on this machine)"
-        echo "    Install with: brew install zellij"
-        echo "    or install via your Linux package manager or cargo."
+        echo "  [MISSING/OLD] zellij requires the 0.44+ pane APIs for task messaging"
+        echo "    Run: $SCRIPT_DIR/bin/install-zellij --apply --artifact-dir <task-scratchpad>"
+        echo "    Existing pre-0.44 sessions keep their original client until migrated."
     fi
 
     if command -v mosh &> /dev/null; then

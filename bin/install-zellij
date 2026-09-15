@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Install a verified Zellij CLI for pane-aware orchestration without stopping sessions."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import platform
+import shutil
+import shlex
+import subprocess
+import sys
+import tarfile
+import urllib.request
+
+VERSION = '0.44.1'
+ASSETS = {
+    ('Darwin', 'arm64'): ('aarch64-apple-darwin', '544c19a9353f0ecc52877ef1e80b1c1dcbf8f258b4817077f9520099c12cc30c'),
+    ('Darwin', 'x86_64'): ('x86_64-apple-darwin', '590071e02f7733d25201ec9a97c5bd661ac7da3cbdf2ae52a11685b36654b7dc'),
+    ('Linux', 'aarch64'): ('aarch64-unknown-linux-musl', '6f028bb569d29be968c961249c5f80d5336ad4ad4b3cd79af8e32afab57b0948'),
+    ('Linux', 'x86_64'): ('x86_64-unknown-linux-musl', '669825021d529fca5d939888263c9d2a90762145191fa07581a15250e8af2b49'),
+}
+
+def compatible(binary: str) -> bool:
+    for action, required in [('list-panes', '--json'), ('dump-screen', '--pane-id')]:
+        result = subprocess.run([binary, 'action', action, '--help'], capture_output=True,
+                                text=True, timeout=10)
+        if result.returncode or required not in result.stdout:
+            return False
+    return True
+
+def extract_binary(archive: bytes, checksum: str) -> bytes:
+    if hashlib.sha256(archive).hexdigest() != checksum:
+        raise ValueError('Release archive checksum mismatch; installation refused')
+    with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as tar:
+        matches = [m for m in tar.getmembers() if m.name in ('zellij', './zellij')]
+        if len(matches) != 1 or not matches[0].isfile():
+            raise ValueError('Expected one regular zellij binary in release archive')
+        member = tar.extractfile(matches[0])
+        if member is None:
+            raise ValueError('Unable to read release binary')
+        return member.read()
+
+def activate(binary: Path, link: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if link.exists() or link.is_symlink():
+        if link.resolve() == binary.resolve():
+            return
+        backup = link.with_name('zellij.before-' + VERSION)
+        if backup.exists() or backup.is_symlink():
+            raise ValueError('Previous executable backup already exists; inspect it before retrying')
+        if link.is_symlink():
+            backup.symlink_to(os.readlink(link))
+        elif link.is_file():
+            shutil.copy2(link, backup)
+        else:
+            raise ValueError('Refusing to replace a non-file zellij entry')
+    temporary = link.with_name('.zellij-link-' + str(os.getpid()))
+    try:
+        temporary.symlink_to(binary)
+        os.replace(temporary, link)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+def write_launcher(binary: Path, legacy: Path | None = None) -> Path:
+    launcher = binary.with_name('launcher')
+    configuration = binary.with_name('routing.json')
+    old = json.loads(configuration.read_text()) if configuration.exists() else {}
+    configuration.write_text(json.dumps({
+        'current': str(binary),
+        'legacy': str(legacy.resolve()) if legacy else old.get('legacy'),
+        'socket_directory': ('/tmp/zellij-' + str(os.getuid())
+                             if platform.system() == 'Darwin' else None),
+    }, indent=2) + '\n')
+    router = binary.with_name('router.py')
+    shutil.copy2(Path(__file__).resolve().with_name('zellij-compat'), router)
+    launcher.write_text(
+        '#!/bin/sh\n'
+        '# Keep existing sessions on their original protocol client.\n'
+        'exec ' + shlex.quote(sys.executable) + ' ' + shlex.quote(str(router)) +
+        ' ' + shlex.quote(str(configuration)) + ' "$@"\n'
+    )
+    launcher.chmod(0o755)
+    return launcher
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--apply', action='store_true', help='Install only if current CLI lacks required pane APIs')
+    parser.add_argument('--check', action='store_true', help='Check only (the default)')
+    parser.add_argument('--artifact-dir', type=Path, help='Required for apply; stores downloaded release and receipt')
+    parser.add_argument('--legacy-binary', type=Path, help='Original pre-0.44 client for existing sessions')
+    args = parser.parse_args()
+    if args.apply and args.check:
+        parser.error('Choose --check or --apply')
+    previous = shutil.which('zellij')
+    destination = Path.home() / '.local/share/botfiles/zellij' / VERSION / 'zellij'
+    repair_launcher = (args.apply and previous and
+                       (Path(previous).resolve().parent == destination.parent or args.legacy_binary))
+    if previous and compatible(previous) and not repair_launcher:
+        print('Zellij pane APIs ready: ' + previous)
+        return 0
+    if not args.apply:
+        print('Zellij needs list-panes --json and dump-screen --pane-id (0.44 or newer).')
+        print('Run bin/install-zellij --apply --artifact-dir <task scratchpad directory>.')
+        return 1
+    if args.artifact_dir is None:
+        parser.error('--apply requires --artifact-dir')
+    target, checksum = ASSETS.get((platform.system(), platform.machine()), (None, None))
+    if target is None:
+        parser.error('Unsupported OS/architecture for the verified release assets')
+    artifact_dir = args.artifact_dir.expanduser().resolve()
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    name = 'zellij-' + target + '.tar.gz'
+    url = 'https://github.com/zellij-org/zellij/releases/download/v' + VERSION + '/' + name
+    archive_path = artifact_dir / name
+    if archive_path.exists():
+        archive = archive_path.read_bytes()
+    else:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            archive = response.read()
+    binary_bytes = extract_binary(archive, checksum)
+    (artifact_dir / name).write_bytes(archive)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists() and destination.read_bytes() != binary_bytes:
+        raise ValueError('Versioned destination has different contents; refusing to replace it')
+    if not destination.exists():
+        destination.write_bytes(binary_bytes)
+    destination.chmod(0o755)
+    if not compatible(str(destination)):
+        raise ValueError('Downloaded CLI lacks required pane APIs; default executable unchanged')
+    link = Path.home() / '.local/bin/zellij'
+    legacy = args.legacy_binary
+    if legacy is not None:
+        legacy = legacy.expanduser().resolve(strict=True)
+        if legacy == destination or compatible(str(legacy)):
+            raise ValueError('--legacy-binary must be an original pre-0.44 client')
+    elif previous and Path(previous).resolve().parent != destination.parent:
+        legacy = Path(previous).resolve()
+    activate(write_launcher(destination, legacy), link)
+    receipt = ('version=' + VERSION + '\nsha256=' + checksum + '\nprevious=' + str(previous) +
+               '\ninstalled=' + str(destination) + '\nlink=' + str(link) + '\n')
+    (artifact_dir / 'installation-receipt.txt').write_text(receipt)
+    print(receipt.rstrip())
+    print('Existing sessions were not stopped. Exact named sessions retain their original client.')
+    return 0
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        raise SystemExit(str(error))

@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Route exact existing sessions to their original Zellij protocol client."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+def session_names(binary, environment):
+    result = subprocess.run(
+        [binary, 'list-sessions', '--short', '--no-formatting'],
+        env=environment, capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode:
+        return set()
+    return set(result.stdout.splitlines())
+
+
+def target_session(arguments, environment):
+    for index, argument in enumerate(arguments):
+        if argument in ('action', 'attach', 'a', 'kill-session', 'delete-session'):
+            break
+        if argument in ('-s', '--session') and index + 1 < len(arguments):
+            return arguments[index + 1]
+        if argument.startswith('--session='):
+            return argument.partition('=')[2]
+    if arguments and arguments[0] in ('attach', 'a', 'kill-session', 'delete-session'):
+        for argument in arguments[1:]:
+            if argument in ('--create', '-c', '--create-background', '--force', '-f'):
+                continue
+            if argument.startswith('-'):
+                return None
+            return argument
+    if arguments and arguments[0] == 'action':
+        return environment.get('ZELLIJ_SESSION_NAME')
+    return None
+
+
+def run(config, arguments):
+    original_environment = dict(os.environ)
+    current_environment = dict(original_environment)
+    if config.get('socket_directory'):
+        current_environment.setdefault('ZELLIJ_SOCKET_DIR', config['socket_directory'])
+    current = config['current']
+    legacy = config.get('legacy')
+    if legacy and Path(legacy).is_file():
+        if arguments and arguments[0] in ('list-sessions', 'ls') and '--help' not in arguments:
+            results = [subprocess.run([binary, *arguments], env=environment,
+                       capture_output=True, text=True, timeout=10)
+                       for binary, environment in [(current, current_environment),
+                                                   (legacy, original_environment)]]
+            for result in results:
+                if result.returncode == 0:
+                    sys.stdout.write(result.stdout)
+            if any(result.returncode == 0 for result in results):
+                return 0
+            sys.stderr.write(results[0].stderr)
+            return results[0].returncode
+        target = target_session(arguments, original_environment)
+        if target and target in session_names(legacy, original_environment):
+            if target in session_names(current, current_environment):
+                raise ValueError('Session exists in both protocol namespaces; use its exact versioned binary.')
+            os.execve(legacy, [legacy, *arguments], original_environment)
+    os.execve(current, [current, *arguments], current_environment)
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(run(json.loads(Path(sys.argv[1]).read_text()), sys.argv[2:]))
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        raise SystemExit(str(error))
