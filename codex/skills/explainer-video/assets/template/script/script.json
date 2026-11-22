@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "title": "Primes never run out",
+    "subtitle": "Euclid's proof in under a minute",
+    "kicker": "Example · explainer-video template",
+    "attribution": "Proof: Euclid, Elements, Book IX, Proposition 20"
+  },
+  "voice": {
+    "provider": "elevenlabs",
+    "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+    "voice_name": "George (ElevenLabs premade)",
+    "model": "eleven_multilingual_v2",
+    "seed": 4242,
+    "tempo": 1.0,
+    "stability": 0.5,
+    "similarity_boost": 0.75
+  },
+  "timing": {"lead_in": 0.5, "tail": 0.7, "last_tail": 3.0, "draft_wpm": 150},
+  "music": null,
+  "pronunciations": {
+    "Euclid": "Yoo-klid"
+  },
+  "scenes": [
+    {
+      "id": "s01_hook",
+      "title": "Primes never run out",
+      "lines": [
+        {"caption": "Two, three, five, seven, eleven."},
+        {"caption": "Primes are the whole numbers you can't split into smaller factors."},
+        {"caption": "Do they ever run out? About 2,300 years ago, Euclid showed they don't."}
+      ]
+    },
+    {
+      "id": "s02_proof",
+      "title": "Euclid's argument",
+      "lines": [
+        {"caption": "Suppose you had a complete list of primes, say two, three and five."},
+        {"caption": "Multiply them together and add one. You get thirty-one."},
+        {"caption": "Dividing it by any prime on the list leaves a remainder of one, so its prime factors are all new."},
+        {"caption": "Any finite list is missing a prime. So the list never ends."}
+      ]
+    }
+  ]
+}

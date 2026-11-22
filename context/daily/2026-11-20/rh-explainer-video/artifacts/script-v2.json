@@ -1,0 +1,235 @@
+{
+  "version": "v2.1",
+  "written": "2026-11-20 ~1:35pm PST",
+  "voice": {
+    "provider": "elevenlabs",
+    "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+    "name": "George",
+    "model": "eleven_v3"
+  },
+  "notes": "caption = on-screen/caption text. tts = text sent to TTS (respellings for names; filled from pronunciations map at voicing time). Lines with status:true come from status.json and must be re-checked before final render.",
+  "pronunciations": {
+    "Alpöge": "Alpurgay",
+    "Weil's": "Vay's",
+    "Weil": "Vay",
+    "Deligne": "Duh-leen",
+    "Stepanov": "Steh-pah-noff",
+    "Landau's": "Lahn-dow's",
+    "Levent": "Leh-vent"
+  },
+  "scenes": [
+    {
+      "id": "s01_claim",
+      "title": "The claim",
+      "lines": [
+        {
+          "caption": "On November 20th, 2026, the number theorist Levent Alpöge, who works at Anthropic, posted a short note."
+        },
+        {
+          "caption": "He says that he and Claude have found a proof of the Riemann Hypothesis, and of a broader version, written entirely in Lean, a language computers can check."
+        },
+        {
+          "caption": "Here's what that means, and what's been checked."
+        }
+      ]
+    },
+    {
+      "id": "s02_primes",
+      "title": "The prime staircase",
+      "lines": [
+        {
+          "caption": "Start with the primes. Two, three, five, seven, eleven."
+        },
+        {
+          "caption": "Count them up to any number x, and you get a staircase. A smooth curve tracks it closely."
+        },
+        {
+          "caption": "Up to a trillion there are about 37.6 billion primes, and the curve misses by only about thirty-eight thousand."
+        },
+        {
+          "caption": "Does the fit stay that tight forever?"
+        }
+      ]
+    },
+    {
+      "id": "s03_zeros",
+      "title": "Zeta and its zeros",
+      "lines": [
+        {
+          "caption": "In 1859, Bernhard Riemann tied that question to one function, called zeta."
+        },
+        {
+          "caption": "It's built from the whole numbers, and it encodes the primes exactly."
+        },
+        {
+          "caption": "It has infinitely many zeros in a narrow strip of the complex plane. Riemann guessed they all sit on the strip's center line."
+        },
+        {
+          "caption": "Computers have checked trillions. All on the line. But nobody could prove it for every one."
+        }
+      ]
+    },
+    {
+      "id": "s04_music",
+      "title": "Music of the primes",
+      "lines": [
+        {
+          "caption": "Here's why that matters. Each zero adds a wave, and the waves together rebuild the prime staircase."
+        },
+        {
+          "caption": "A zero's distance from the line sets how loud its wave can get."
+        },
+        {
+          "caption": "All on the line means no wave drowns out the rest, and the error stays near the square root of x."
+        },
+        {
+          "caption": "The generalized version says the same for primes in patterns, like primes ending in 7."
+        }
+      ]
+    },
+    {
+      "id": "s05_parallel",
+      "title": "A parallel world",
+      "lines": [
+        {
+          "caption": "There's a parallel world where this is already a theorem: polynomials over finite fields, where the question becomes counting points on curves."
+        },
+        {
+          "caption": "André Weil proved it there in the 1940s. Pierre Deligne went much further in 1974."
+        },
+        {
+          "caption": "And in 1969, Sergei Stepanov found an unusually elementary proof."
+        }
+      ]
+    },
+    {
+      "id": "s06_stepanov",
+      "title": "Stepanov's trick",
+      "lines": [
+        {
+          "caption": "Stepanov's trick: build a helper polynomial that's zero at every point you want to count."
+        },
+        {
+          "caption": "Not just zero, but zero many times over."
+        },
+        {
+          "caption": "A polynomial of limited degree can only have so many roots, counted with multiplicity. So more multiplicity means a tighter count."
+        },
+        {
+          "caption": "And multiplicity comes from derivatives."
+        }
+      ]
+    },
+    {
+      "id": "s07_wall",
+      "title": "The wall",
+      "lines": [
+        {
+          "caption": "That's where the integers push back."
+        },
+        {
+          "caption": "You can differentiate a polynomial. You can't differentiate the number seven."
+        },
+        {
+          "caption": "Alpöge names exactly this gap."
+        }
+      ]
+    },
+    {
+      "id": "s08_ladder",
+      "title": "The ladder",
+      "lines": [
+        {
+          "caption": "His note describes a way around it."
+        },
+        {
+          "caption": "A theta lift carries a highly symmetric object from one group of symmetries to another."
+        },
+        {
+          "caption": "According to the note, each lift mimics one more order of multiplicity. Chain them into a ladder, and every rung buys one more."
+        },
+        {
+          "caption": "For primes up to X, Claude suggested about the square root of X rungs."
+        },
+        {
+          "caption": "Alpöge says that line alone should make mathematicians fall out of their chairs."
+        }
+      ]
+    },
+    {
+      "id": "s09_toy_and_end",
+      "title": "Where it starts and ends",
+      "lines": [
+        {
+          "caption": "The ladder grew out of a toy he worked out first: a new proof of Weil's theorem using only signs, where two quantities with opposite signs can't cancel."
+        },
+        {
+          "caption": "As far as anyone has found, that toy isn't in the formal proof."
+        },
+        {
+          "caption": "What is: at the very end, a classical argument of Landau's turns a one-sided bound on a smoothed prime count into this: no zero lies right of the line."
+        }
+      ]
+    },
+    {
+      "id": "s10_box",
+      "title": "What's in the box",
+      "lines": [
+        {
+          "caption": "So what did he post? Seventeen million lines of Lean, in 175,000 files, without a single comment."
+        },
+        {
+          "caption": "At the top, five short theorems. One states the Riemann Hypothesis exactly as Lean's shared math library defines it."
+        },
+        {
+          "caption": "The real target is the generalized version. The original falls out as a corollary."
+        },
+        {
+          "caption": "A text search finds no shortcuts: no unfinished steps, no extra axioms."
+        }
+      ]
+    },
+    {
+      "id": "s11_checks",
+      "title": "The checks, and who did what",
+      "lines": [
+        {
+          "caption": "Within hours, others were checking.",
+          "status": true
+        },
+        {
+          "caption": "As of {asof_spoken}, independent checks report that every file compiles, the main theorems rest only on Lean's three standard axioms, and a second, independently written checker accepts the whole proof.",
+          "status": true
+        },
+        {
+          "caption": "{pending_spoken}",
+          "status": true
+        },
+        {
+          "caption": "Per the note, the work ran from October 6th to November 16th. Alpöge supplied the guiding idea, and Claude outpaced him on the machinery."
+        }
+      ]
+    },
+    {
+      "id": "s12_next",
+      "title": "What nobody has yet",
+      "lines": [
+        {
+          "caption": "What nobody has yet is understanding. No human-readable proof has been released, and Alpöge expects the argument to shrink a lot."
+        },
+        {
+          "caption": "Three takeaways."
+        },
+        {
+          "caption": "The Riemann Hypothesis is about how regular the primes are."
+        },
+        {
+          "caption": "The key idea is a stand-in for derivatives of whole numbers."
+        },
+        {
+          "caption": "And this may be the first great proof a machine checked before any person understood it."
+        }
+      ]
+    }
+  ]
+}

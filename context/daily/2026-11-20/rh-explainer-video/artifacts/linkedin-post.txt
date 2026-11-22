@@ -1,0 +1,35 @@
+I got curious about the claimed proof of the Riemann Hypothesis posted on Nov 20, so I built a 5-minute explainer for myself to understand it. Sharing in case it helps you too.
+
+Built with Claude Code (Opus 5.5 + Fable 5.2). Voice by ElevenLabs.
+
+What happened
+Levent Alpöge, a number theorist at Anthropic, posted a 4-page note saying he and Claude found a proof of the Riemann Hypothesis, and of a broader version (GRH for Dirichlet L-functions). The proof is 17.4 million lines of Lean, a language computers can check, with zero comments. Nobody has a human-readable proof yet.
+
+What RH says
+The primes are about as regular as they could possibly be.
+"Regular" here means: estimate how many primes there are below x with a smooth formula, li(x), and you're never off by much more than √x. (Precisely: at most about √x·log x, for every x. And the error can't be much smaller than √x, so that's the best case.)
+Below a trillion there are about 37.6 billion primes, and the formula misses by only about 38,000.
+Riemann guessed this in 1859. Computers have checked more than 10 trillion zeros. Nobody had proved it.
+
+The idea, per the note
+- In the finite-field version of RH, Stepanov's trick works: build a polynomial that vanishes with high multiplicity
+- Multiplicity needs derivatives
+- You can't differentiate whole numbers (the derivative of 7 is just 0)
+- Workaround: chain "theta lifts", each one mimicking one more order of multiplicity
+- About √X of them. Per the note, that number was Claude's suggestion
+
+What's been checked (as of Nov 21, per Andrew Sutherland's verification page and the Lean community forum)
+- All 175,187 files compile, in several independent builds
+- The 5 main theorems use only Lean's 3 standard axioms
+- Full kernel replay: zero rejections
+- 6+ independent proof checkers accept it
+- One last official comparison run is expected over the weekend
+
+Wild times. Let 'em tokens compound into understanding of all that is and beyond!
+
+(Apologies from me and Claude if any names are mispronounced.)
+
+Sources
+Note: alpo.ge/remark.pdf
+Checks: math.mit.edu/~drew/grh/
+Discussion: Lean Zulip, #general, "Discussion: Alpöge Proves the Riemann Hypothesis"

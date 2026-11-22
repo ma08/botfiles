@@ -1,0 +1,31 @@
+{
+  "name": "explainer-video-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Narrated explainer video built with the explainer-video skill (Remotion)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "draft": "python3 scripts/tts.py --draft",
+    "voice": "python3 scripts/tts.py",
+    "anchors": "python3 scripts/check_anchors.py",
+    "stills": "node scripts/stills.mjs",
+    "render": "remotion render src/index.ts Explainer out/explainer-raw.mp4",
+    "render:captioned": "remotion render src/index.ts ExplainerCaptioned out/explainer-captioned-raw.mp4",
+    "thumbnail": "remotion still src/index.ts Thumbnail out/thumbnail.png --frame=0",
+    "srt": "python3 scripts/make_srt.py"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.545",
+    "@remotion/cli": "4.0.545",
+    "@remotion/google-fonts": "4.0.545",
+    "@remotion/renderer": "4.0.545",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.545"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}

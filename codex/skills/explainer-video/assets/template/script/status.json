@@ -1,0 +1,7 @@
+{
+  "_comment": "Optional. For time-sensitive facts (a claim's verification status, a live count). Lines in script.json can reference these keys as {asof_spoken}; scenes read them via src/data/status.json. Re-check the sources and update this file right before the final render.",
+  "checked_at": "",
+  "asof_spoken": "",
+  "asof_onscreen": "",
+  "sources": []
+}

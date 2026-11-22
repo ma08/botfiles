@@ -1,0 +1,4 @@
+{
+  "note": "Example data for the template scenes. Generate real data for your topic with a script (see the worked example's scripts/gen_data.py) instead of typing numbers by hand.",
+  "primesUnder100": [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
+}

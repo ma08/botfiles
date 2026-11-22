@@ -1,0 +1,4008 @@
+{
+ "fps": 30,
+ "scenes": [
+  {
+   "id": "s01_claim",
+   "title": "The claim",
+   "audio": "audio/s01_claim.mp3",
+   "audioDuration": 23.394,
+   "leadIn": 0.5,
+   "duration": 24.594,
+   "lines": [
+    {
+     "caption": "On November 20th, 2026, the number theorist Levent Alpöge, who works at Anthropic, posted a short note.",
+     "start": 0.0,
+     "end": 7.923
+    },
+    {
+     "caption": "He says he believes that he and Claude, Anthropic's AI, have proved the Riemann Hypothesis and a broader version. He released it only as Lean code, which computers can check.",
+     "start": 8.205,
+     "end": 20.077
+    },
+    {
+     "caption": "Here's what that means, and what's been checked.",
+     "start": 20.277,
+     "end": 23.385
+    }
+   ],
+   "words": [
+    {
+     "text": "On",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "November",
+     "start": 0.196,
+     "end": 0.538
+    },
+    {
+     "text": "20th,",
+     "start": 0.692,
+     "end": 1.231
+    },
+    {
+     "text": "2026,",
+     "start": 1.577,
+     "end": 2.615
+    },
+    {
+     "text": "the",
+     "start": 2.654,
+     "end": 2.769
+    },
+    {
+     "text": "number",
+     "start": 2.813,
+     "end": 3.077
+    },
+    {
+     "text": "theorist",
+     "start": 3.128,
+     "end": 3.538
+    },
+    {
+     "text": "Levent",
+     "start": 3.615,
+     "end": 4.077
+    },
+    {
+     "text": "Alpöge,",
+     "start": 4.18,
+     "end": 5.154
+    },
+    {
+     "text": "who",
+     "start": 5.212,
+     "end": 5.385
+    },
+    {
+     "text": "works",
+     "start": 5.423,
+     "end": 5.615
+    },
+    {
+     "text": "at",
+     "start": 5.641,
+     "end": 5.692
+    },
+    {
+     "text": "Anthropic,",
+     "start": 5.754,
+     "end": 6.692
+    },
+    {
+     "text": "posted",
+     "start": 6.747,
+     "end": 7.077
+    },
+    {
+     "text": "a",
+     "start": 7.115,
+     "end": 7.154
+    },
+    {
+     "text": "short",
+     "start": 7.205,
+     "end": 7.462
+    },
+    {
+     "text": "note.",
+     "start": 7.538,
+     "end": 7.923
+    },
+    {
+     "text": "He",
+     "start": 8.205,
+     "end": 8.769
+    },
+    {
+     "text": "says",
+     "start": 8.815,
+     "end": 9.0
+    },
+    {
+     "text": "he",
+     "start": 9.051,
+     "end": 9.154
+    },
+    {
+     "text": "believes",
+     "start": 9.196,
+     "end": 9.538
+    },
+    {
+     "text": "that",
+     "start": 9.569,
+     "end": 9.692
+    },
+    {
+     "text": "he",
+     "start": 9.769,
+     "end": 9.923
+    },
+    {
+     "text": "and",
+     "start": 9.962,
+     "end": 10.077
+    },
+    {
+     "text": "Claude,",
+     "start": 10.143,
+     "end": 10.923
+    },
+    {
+     "text": "Anthropic's",
+     "start": 10.969,
+     "end": 11.538
+    },
+    {
+     "text": "AI,",
+     "start": 11.692,
+     "end": 12.385
+    },
+    {
+     "text": "have",
+     "start": 12.415,
+     "end": 12.538
+    },
+    {
+     "text": "proved",
+     "start": 12.593,
+     "end": 12.923
+    },
+    {
+     "text": "the",
+     "start": 12.962,
+     "end": 13.077
+    },
+    {
+     "text": "Riemann",
+     "start": 13.115,
+     "end": 13.385
+    },
+    {
+     "text": "Hypothesis",
+     "start": 13.442,
+     "end": 14.308
+    },
+    {
+     "text": "and",
+     "start": 14.385,
+     "end": 14.615
+    },
+    {
+     "text": "a",
+     "start": 14.654,
+     "end": 14.692
+    },
+    {
+     "text": "broader",
+     "start": 14.74,
+     "end": 15.077
+    },
+    {
+     "text": "version.",
+     "start": 15.135,
+     "end": 15.615
+    },
+    {
+     "text": "He",
+     "start": 15.897,
+     "end": 16.462
+    },
+    {
+     "text": "released",
+     "start": 16.504,
+     "end": 16.846
+    },
+    {
+     "text": "it",
+     "start": 16.897,
+     "end": 17.0
+    },
+    {
+     "text": "only",
+     "start": 17.062,
+     "end": 17.308
+    },
+    {
+     "text": "as",
+     "start": 17.359,
+     "end": 17.462
+    },
+    {
+     "text": "Lean",
+     "start": 17.554,
+     "end": 17.923
+    },
+    {
+     "text": "code,",
+     "start": 18.031,
+     "end": 18.769
+    },
+    {
+     "text": "which",
+     "start": 18.795,
+     "end": 18.923
+    },
+    {
+     "text": "computers",
+     "start": 18.969,
+     "end": 19.385
+    },
+    {
+     "text": "can",
+     "start": 19.423,
+     "end": 19.538
+    },
+    {
+     "text": "check.",
+     "start": 19.615,
+     "end": 20.077
+    },
+    {
+     "text": "Here's",
+     "start": 20.277,
+     "end": 21.154
+    },
+    {
+     "text": "what",
+     "start": 21.185,
+     "end": 21.308
+    },
+    {
+     "text": "that",
+     "start": 21.354,
+     "end": 21.538
+    },
+    {
+     "text": "means,",
+     "start": 21.603,
+     "end": 22.0
+    },
+    {
+     "text": "and",
+     "start": 22.096,
+     "end": 22.385
+    },
+    {
+     "text": "what's",
+     "start": 22.415,
+     "end": 22.615
+    },
+    {
+     "text": "been",
+     "start": 22.646,
+     "end": 22.769
+    },
+    {
+     "text": "checked.",
+     "start": 22.837,
+     "end": 23.385
+    }
+   ]
+  },
+  {
+   "id": "s02_primes",
+   "title": "The prime staircase",
+   "audio": "audio/s02_primes.mp3",
+   "audioDuration": 21.629,
+   "leadIn": 0.5,
+   "duration": 22.829,
+   "lines": [
+    {
+     "caption": "Start with the primes. Two, three, five, seven, eleven.",
+     "start": 0.0,
+     "end": 4.846
+    },
+    {
+     "caption": "Count them up to any number x, and you get a staircase. A smooth curve tracks it closely.",
+     "start": 5.013,
+     "end": 11.308
+    },
+    {
+     "caption": "Up to a trillion there are about 37.6 billion primes, and the curve misses by only about thirty-eight thousand.",
+     "start": 11.564,
+     "end": 19.0
+    },
+    {
+     "caption": "Does the fit stay that tight forever?",
+     "start": 19.169,
+     "end": 21.615
+    }
+   ],
+   "words": [
+    {
+     "text": "Start",
+     "start": 0.0,
+     "end": 0.231
+    },
+    {
+     "text": "with",
+     "start": 0.262,
+     "end": 0.385
+    },
+    {
+     "text": "the",
+     "start": 0.404,
+     "end": 0.462
+    },
+    {
+     "text": "primes.",
+     "start": 0.538,
+     "end": 1.077
+    },
+    {
+     "text": "Two,",
+     "start": 1.346,
+     "end": 2.385
+    },
+    {
+     "text": "three,",
+     "start": 2.449,
+     "end": 3.077
+    },
+    {
+     "text": "five,",
+     "start": 3.154,
+     "end": 3.692
+    },
+    {
+     "text": "seven,",
+     "start": 3.757,
+     "end": 4.308
+    },
+    {
+     "text": "eleven.",
+     "start": 4.374,
+     "end": 4.846
+    },
+    {
+     "text": "Count",
+     "start": 5.013,
+     "end": 5.846
+    },
+    {
+     "text": "them",
+     "start": 5.877,
+     "end": 6.0
+    },
+    {
+     "text": "up",
+     "start": 6.051,
+     "end": 6.154
+    },
+    {
+     "text": "to",
+     "start": 6.18,
+     "end": 6.231
+    },
+    {
+     "text": "any",
+     "start": 6.288,
+     "end": 6.462
+    },
+    {
+     "text": "number",
+     "start": 6.506,
+     "end": 6.769
+    },
+    {
+     "text": "x,",
+     "start": 6.962,
+     "end": 7.231
+    },
+    {
+     "text": "and",
+     "start": 7.308,
+     "end": 7.538
+    },
+    {
+     "text": "you",
+     "start": 7.558,
+     "end": 7.615
+    },
+    {
+     "text": "get",
+     "start": 7.654,
+     "end": 7.769
+    },
+    {
+     "text": "a",
+     "start": 7.808,
+     "end": 7.846
+    },
+    {
+     "text": "staircase.",
+     "start": 7.915,
+     "end": 8.615
+    },
+    {
+     "text": "A",
+     "start": 8.962,
+     "end": 9.308
+    },
+    {
+     "text": "smooth",
+     "start": 9.374,
+     "end": 9.769
+    },
+    {
+     "text": "curve",
+     "start": 9.834,
+     "end": 10.154
+    },
+    {
+     "text": "tracks",
+     "start": 10.198,
+     "end": 10.462
+    },
+    {
+     "text": "it",
+     "start": 10.512,
+     "end": 10.615
+    },
+    {
+     "text": "closely.",
+     "start": 10.683,
+     "end": 11.308
+    },
+    {
+     "text": "Up",
+     "start": 11.564,
+     "end": 12.077
+    },
+    {
+     "text": "to",
+     "start": 12.103,
+     "end": 12.154
+    },
+    {
+     "text": "a",
+     "start": 12.192,
+     "end": 12.231
+    },
+    {
+     "text": "trillion",
+     "start": 12.29,
+     "end": 12.769
+    },
+    {
+     "text": "there",
+     "start": 12.82,
+     "end": 13.077
+    },
+    {
+     "text": "are",
+     "start": 13.115,
+     "end": 13.231
+    },
+    {
+     "text": "about",
+     "start": 13.269,
+     "end": 13.462
+    },
+    {
+     "text": "37.6",
+     "start": 13.615,
+     "end": 14.769
+    },
+    {
+     "text": "billion",
+     "start": 14.817,
+     "end": 15.154
+    },
+    {
+     "text": "primes,",
+     "start": 15.241,
+     "end": 15.846
+    },
+    {
+     "text": "and",
+     "start": 15.962,
+     "end": 16.308
+    },
+    {
+     "text": "the",
+     "start": 16.327,
+     "end": 16.385
+    },
+    {
+     "text": "curve",
+     "start": 16.436,
+     "end": 16.692
+    },
+    {
+     "text": "misses",
+     "start": 16.747,
+     "end": 17.077
+    },
+    {
+     "text": "by",
+     "start": 17.128,
+     "end": 17.231
+    },
+    {
+     "text": "only",
+     "start": 17.277,
+     "end": 17.462
+    },
+    {
+     "text": "about",
+     "start": 17.512,
+     "end": 17.769
+    },
+    {
+     "text": "thirty-eight",
+     "start": 17.813,
+     "end": 18.231
+    },
+    {
+     "text": "thousand.",
+     "start": 18.299,
+     "end": 19.0
+    },
+    {
+     "text": "Does",
+     "start": 19.169,
+     "end": 19.846
+    },
+    {
+     "text": "the",
+     "start": 19.885,
+     "end": 20.0
+    },
+    {
+     "text": "fit",
+     "start": 20.058,
+     "end": 20.231
+    },
+    {
+     "text": "stay",
+     "start": 20.292,
+     "end": 20.538
+    },
+    {
+     "text": "that",
+     "start": 20.569,
+     "end": 20.692
+    },
+    {
+     "text": "tight",
+     "start": 20.757,
+     "end": 21.077
+    },
+    {
+     "text": "forever?",
+     "start": 21.125,
+     "end": 21.615
+    }
+   ]
+  },
+  {
+   "id": "s03_zeros",
+   "title": "Zeta and its zeros",
+   "audio": "audio/s03_zeros.mp3",
+   "audioDuration": 26.389,
+   "leadIn": 0.5,
+   "duration": 27.589,
+   "lines": [
+    {
+     "caption": "In 1859, Bernhard Riemann tied that question to one function, called zeta.",
+     "start": 0.0,
+     "end": 5.923
+    },
+    {
+     "caption": "It's built from the whole numbers, and it encodes the primes exactly.",
+     "start": 6.257,
+     "end": 10.615
+    },
+    {
+     "caption": "It has infinitely many zeros in a narrow strip of the complex plane. Riemann guessed they all sit on the strip's center line.",
+     "start": 10.872,
+     "end": 18.923
+    },
+    {
+     "caption": "Computers have checked trillions. All on the line. But checking trillions isn't proving it for every one.",
+     "start": 19.046,
+     "end": 26.385
+    }
+   ],
+   "words": [
+    {
+     "text": "In",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "1859,",
+     "start": 0.231,
+     "end": 1.692
+    },
+    {
+     "text": "Bernhard",
+     "start": 1.754,
+     "end": 2.231
+    },
+    {
+     "text": "Riemann",
+     "start": 2.269,
+     "end": 2.692
+    },
+    {
+     "text": "tied",
+     "start": 2.769,
+     "end": 3.077
+    },
+    {
+     "text": "that",
+     "start": 3.108,
+     "end": 3.231
+    },
+    {
+     "text": "question",
+     "start": 3.299,
+     "end": 3.846
+    },
+    {
+     "text": "to",
+     "start": 3.949,
+     "end": 4.154
+    },
+    {
+     "text": "one",
+     "start": 4.192,
+     "end": 4.308
+    },
+    {
+     "text": "function,",
+     "start": 4.367,
+     "end": 5.115
+    },
+    {
+     "text": "called",
+     "start": 5.154,
+     "end": 5.385
+    },
+    {
+     "text": "zeta.",
+     "start": 5.462,
+     "end": 5.923
+    },
+    {
+     "text": "It's",
+     "start": 6.257,
+     "end": 7.0
+    },
+    {
+     "text": "built",
+     "start": 7.051,
+     "end": 7.308
+    },
+    {
+     "text": "from",
+     "start": 7.338,
+     "end": 7.462
+    },
+    {
+     "text": "the",
+     "start": 7.481,
+     "end": 7.538
+    },
+    {
+     "text": "whole",
+     "start": 7.589,
+     "end": 7.846
+    },
+    {
+     "text": "numbers,",
+     "start": 7.904,
+     "end": 8.538
+    },
+    {
+     "text": "and",
+     "start": 8.577,
+     "end": 8.692
+    },
+    {
+     "text": "it",
+     "start": 8.718,
+     "end": 8.769
+    },
+    {
+     "text": "encodes",
+     "start": 8.846,
+     "end": 9.308
+    },
+    {
+     "text": "the",
+     "start": 9.346,
+     "end": 9.462
+    },
+    {
+     "text": "primes",
+     "start": 9.516,
+     "end": 9.846
+    },
+    {
+     "text": "exactly.",
+     "start": 9.923,
+     "end": 10.615
+    },
+    {
+     "text": "It",
+     "start": 10.872,
+     "end": 11.385
+    },
+    {
+     "text": "has",
+     "start": 11.442,
+     "end": 11.615
+    },
+    {
+     "text": "infinitely",
+     "start": 11.664,
+     "end": 12.154
+    },
+    {
+     "text": "many",
+     "start": 12.2,
+     "end": 12.385
+    },
+    {
+     "text": "zeros",
+     "start": 12.487,
+     "end": 13.0
+    },
+    {
+     "text": "in",
+     "start": 13.051,
+     "end": 13.154
+    },
+    {
+     "text": "a",
+     "start": 13.231,
+     "end": 13.308
+    },
+    {
+     "text": "narrow",
+     "start": 13.352,
+     "end": 13.615
+    },
+    {
+     "text": "strip",
+     "start": 13.68,
+     "end": 14.0
+    },
+    {
+     "text": "of",
+     "start": 14.026,
+     "end": 14.077
+    },
+    {
+     "text": "the",
+     "start": 14.096,
+     "end": 14.154
+    },
+    {
+     "text": "complex",
+     "start": 14.221,
+     "end": 14.692
+    },
+    {
+     "text": "plane.",
+     "start": 14.769,
+     "end": 15.308
+    },
+    {
+     "text": "Riemann",
+     "start": 15.731,
+     "end": 16.462
+    },
+    {
+     "text": "guessed",
+     "start": 16.51,
+     "end": 16.846
+    },
+    {
+     "text": "they",
+     "start": 16.908,
+     "end": 17.154
+    },
+    {
+     "text": "all",
+     "start": 17.192,
+     "end": 17.308
+    },
+    {
+     "text": "sit",
+     "start": 17.365,
+     "end": 17.538
+    },
+    {
+     "text": "on",
+     "start": 17.564,
+     "end": 17.615
+    },
+    {
+     "text": "the",
+     "start": 17.635,
+     "end": 17.692
+    },
+    {
+     "text": "strip's",
+     "start": 17.757,
+     "end": 18.154
+    },
+    {
+     "text": "center",
+     "start": 18.198,
+     "end": 18.462
+    },
+    {
+     "text": "line.",
+     "start": 18.538,
+     "end": 18.923
+    },
+    {
+     "text": "Computers",
+     "start": 19.046,
+     "end": 20.154
+    },
+    {
+     "text": "have",
+     "start": 20.185,
+     "end": 20.308
+    },
+    {
+     "text": "checked",
+     "start": 20.346,
+     "end": 20.615
+    },
+    {
+     "text": "trillions.",
+     "start": 20.666,
+     "end": 21.615
+    },
+    {
+     "text": "All",
+     "start": 21.712,
+     "end": 22.0
+    },
+    {
+     "text": "on",
+     "start": 22.051,
+     "end": 22.154
+    },
+    {
+     "text": "the",
+     "start": 22.173,
+     "end": 22.231
+    },
+    {
+     "text": "line.",
+     "start": 22.323,
+     "end": 22.769
+    },
+    {
+     "text": "But",
+     "start": 23.0,
+     "end": 23.692
+    },
+    {
+     "text": "checking",
+     "start": 23.743,
+     "end": 24.154
+    },
+    {
+     "text": "trillions",
+     "start": 24.205,
+     "end": 24.692
+    },
+    {
+     "text": "isn't",
+     "start": 24.731,
+     "end": 25.0
+    },
+    {
+     "text": "proving",
+     "start": 25.038,
+     "end": 25.308
+    },
+    {
+     "text": "it",
+     "start": 25.334,
+     "end": 25.385
+    },
+    {
+     "text": "for",
+     "start": 25.423,
+     "end": 25.538
+    },
+    {
+     "text": "every",
+     "start": 25.589,
+     "end": 25.846
+    },
+    {
+     "text": "one.",
+     "start": 25.942,
+     "end": 26.385
+    }
+   ]
+  },
+  {
+   "id": "s04_music",
+   "title": "Music of the primes",
+   "audio": "audio/s04_music.mp3",
+   "audioDuration": 22.394,
+   "leadIn": 0.5,
+   "duration": 23.594,
+   "lines": [
+    {
+     "caption": "Each zero adds a wave, and the waves together rebuild the prime staircase.",
+     "start": 0.0,
+     "end": 4.538
+    },
+    {
+     "caption": "The farther a zero sits to the right of the line, the louder its wave grows.",
+     "start": 4.731,
+     "end": 9.692
+    },
+    {
+     "caption": "All on the line means no wave drowns out the rest, and the error stays near the square root of x.",
+     "start": 9.923,
+     "end": 16.154
+    },
+    {
+     "caption": "The generalized version says the same for primes in patterns, like primes ending in 7.",
+     "start": 16.423,
+     "end": 22.385
+    }
+   ],
+   "words": [
+    {
+     "text": "Each",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "zero",
+     "start": 0.246,
+     "end": 0.615
+    },
+    {
+     "text": "adds",
+     "start": 0.677,
+     "end": 0.923
+    },
+    {
+     "text": "a",
+     "start": 0.962,
+     "end": 1.0
+    },
+    {
+     "text": "wave,",
+     "start": 1.092,
+     "end": 1.692
+    },
+    {
+     "text": "and",
+     "start": 1.731,
+     "end": 1.846
+    },
+    {
+     "text": "the",
+     "start": 1.865,
+     "end": 1.923
+    },
+    {
+     "text": "waves",
+     "start": 1.974,
+     "end": 2.231
+    },
+    {
+     "text": "together",
+     "start": 2.282,
+     "end": 2.692
+    },
+    {
+     "text": "rebuild",
+     "start": 2.769,
+     "end": 3.308
+    },
+    {
+     "text": "the",
+     "start": 3.327,
+     "end": 3.385
+    },
+    {
+     "text": "prime",
+     "start": 3.449,
+     "end": 3.769
+    },
+    {
+     "text": "staircase.",
+     "start": 3.838,
+     "end": 4.538
+    },
+    {
+     "text": "The",
+     "start": 4.731,
+     "end": 5.308
+    },
+    {
+     "text": "farther",
+     "start": 5.356,
+     "end": 5.692
+    },
+    {
+     "text": "a",
+     "start": 5.769,
+     "end": 5.846
+    },
+    {
+     "text": "zero",
+     "start": 5.908,
+     "end": 6.154
+    },
+    {
+     "text": "sits",
+     "start": 6.231,
+     "end": 6.538
+    },
+    {
+     "text": "to",
+     "start": 6.589,
+     "end": 6.692
+    },
+    {
+     "text": "the",
+     "start": 6.712,
+     "end": 6.769
+    },
+    {
+     "text": "right",
+     "start": 6.82,
+     "end": 7.077
+    },
+    {
+     "text": "of",
+     "start": 7.103,
+     "end": 7.154
+    },
+    {
+     "text": "the",
+     "start": 7.173,
+     "end": 7.231
+    },
+    {
+     "text": "line,",
+     "start": 7.308,
+     "end": 7.923
+    },
+    {
+     "text": "the",
+     "start": 7.962,
+     "end": 8.077
+    },
+    {
+     "text": "louder",
+     "start": 8.121,
+     "end": 8.385
+    },
+    {
+     "text": "its",
+     "start": 8.442,
+     "end": 8.615
+    },
+    {
+     "text": "wave",
+     "start": 8.677,
+     "end": 8.923
+    },
+    {
+     "text": "grows.",
+     "start": 9.026,
+     "end": 9.692
+    },
+    {
+     "text": "All",
+     "start": 9.923,
+     "end": 10.615
+    },
+    {
+     "text": "on",
+     "start": 10.666,
+     "end": 10.769
+    },
+    {
+     "text": "the",
+     "start": 10.788,
+     "end": 10.846
+    },
+    {
+     "text": "line",
+     "start": 10.923,
+     "end": 11.231
+    },
+    {
+     "text": "means",
+     "start": 11.282,
+     "end": 11.538
+    },
+    {
+     "text": "no",
+     "start": 11.641,
+     "end": 11.846
+    },
+    {
+     "text": "wave",
+     "start": 11.923,
+     "end": 12.231
+    },
+    {
+     "text": "drowns",
+     "start": 12.269,
+     "end": 12.615
+    },
+    {
+     "text": "out",
+     "start": 12.654,
+     "end": 12.769
+    },
+    {
+     "text": "the",
+     "start": 12.808,
+     "end": 12.923
+    },
+    {
+     "text": "rest,",
+     "start": 13.0,
+     "end": 13.692
+    },
+    {
+     "text": "and",
+     "start": 13.731,
+     "end": 13.846
+    },
+    {
+     "text": "the",
+     "start": 13.865,
+     "end": 13.923
+    },
+    {
+     "text": "error",
+     "start": 13.988,
+     "end": 14.308
+    },
+    {
+     "text": "stays",
+     "start": 14.372,
+     "end": 14.692
+    },
+    {
+     "text": "near",
+     "start": 14.738,
+     "end": 14.923
+    },
+    {
+     "text": "the",
+     "start": 14.942,
+     "end": 15.0
+    },
+    {
+     "text": "square",
+     "start": 15.055,
+     "end": 15.385
+    },
+    {
+     "text": "root",
+     "start": 15.431,
+     "end": 15.615
+    },
+    {
+     "text": "of",
+     "start": 15.641,
+     "end": 15.692
+    },
+    {
+     "text": "x.",
+     "start": 15.885,
+     "end": 16.154
+    },
+    {
+     "text": "The",
+     "start": 16.423,
+     "end": 17.231
+    },
+    {
+     "text": "generalized",
+     "start": 17.288,
+     "end": 17.923
+    },
+    {
+     "text": "version",
+     "start": 17.971,
+     "end": 18.308
+    },
+    {
+     "text": "says",
+     "start": 18.369,
+     "end": 18.615
+    },
+    {
+     "text": "the",
+     "start": 18.654,
+     "end": 18.769
+    },
+    {
+     "text": "same",
+     "start": 18.831,
+     "end": 19.077
+    },
+    {
+     "text": "for",
+     "start": 19.115,
+     "end": 19.231
+    },
+    {
+     "text": "primes",
+     "start": 19.297,
+     "end": 19.692
+    },
+    {
+     "text": "in",
+     "start": 19.718,
+     "end": 19.769
+    },
+    {
+     "text": "patterns,",
+     "start": 19.829,
+     "end": 20.692
+    },
+    {
+     "text": "like",
+     "start": 20.738,
+     "end": 20.923
+    },
+    {
+     "text": "primes",
+     "start": 20.989,
+     "end": 21.385
+    },
+    {
+     "text": "ending",
+     "start": 21.429,
+     "end": 21.692
+    },
+    {
+     "text": "in",
+     "start": 21.718,
+     "end": 21.769
+    },
+    {
+     "text": "7.",
+     "start": 21.923,
+     "end": 22.385
+    }
+   ]
+  },
+  {
+   "id": "s05_parallel",
+   "title": "A parallel world",
+   "audio": "audio/s05_parallel.mp3",
+   "audioDuration": 22.94,
+   "leadIn": 0.5,
+   "duration": 24.14,
+   "lines": [
+    {
+     "caption": "There's a parallel world where this is already a theorem: polynomials over finite fields, where the question becomes counting points on curves.",
+     "start": 0.0,
+     "end": 8.538
+    },
+    {
+     "caption": "André Weil proved it there in the 1940s. Pierre Deligne went much further in 1974.",
+     "start": 8.718,
+     "end": 15.846
+    },
+    {
+     "caption": "And in 1969, Sergei Stepanov found an unusually elementary proof for certain curves.",
+     "start": 16.058,
+     "end": 22.923
+    }
+   ],
+   "words": [
+    {
+     "text": "There's",
+     "start": 0.0,
+     "end": 0.231
+    },
+    {
+     "text": "a",
+     "start": 0.269,
+     "end": 0.308
+    },
+    {
+     "text": "parallel",
+     "start": 0.359,
+     "end": 0.769
+    },
+    {
+     "text": "world",
+     "start": 0.834,
+     "end": 1.154
+    },
+    {
+     "text": "where",
+     "start": 1.18,
+     "end": 1.308
+    },
+    {
+     "text": "this",
+     "start": 1.338,
+     "end": 1.462
+    },
+    {
+     "text": "is",
+     "start": 1.512,
+     "end": 1.615
+    },
+    {
+     "text": "already",
+     "start": 1.663,
+     "end": 2.0
+    },
+    {
+     "text": "a",
+     "start": 2.038,
+     "end": 2.077
+    },
+    {
+     "text": "theorem:",
+     "start": 2.144,
+     "end": 3.231
+    },
+    {
+     "text": "polynomials",
+     "start": 3.288,
+     "end": 4.0
+    },
+    {
+     "text": "over",
+     "start": 4.046,
+     "end": 4.231
+    },
+    {
+     "text": "finite",
+     "start": 4.308,
+     "end": 4.769
+    },
+    {
+     "text": "fields,",
+     "start": 4.836,
+     "end": 5.538
+    },
+    {
+     "text": "where",
+     "start": 5.564,
+     "end": 5.692
+    },
+    {
+     "text": "the",
+     "start": 5.712,
+     "end": 5.769
+    },
+    {
+     "text": "question",
+     "start": 5.812,
+     "end": 6.154
+    },
+    {
+     "text": "becomes",
+     "start": 6.221,
+     "end": 6.692
+    },
+    {
+     "text": "counting",
+     "start": 6.761,
+     "end": 7.308
+    },
+    {
+     "text": "points",
+     "start": 7.362,
+     "end": 7.692
+    },
+    {
+     "text": "on",
+     "start": 7.743,
+     "end": 7.846
+    },
+    {
+     "text": "curves.",
+     "start": 7.934,
+     "end": 8.538
+    },
+    {
+     "text": "André",
+     "start": 8.718,
+     "end": 9.615
+    },
+    {
+     "text": "Weil",
+     "start": 9.692,
+     "end": 10.0
+    },
+    {
+     "text": "proved",
+     "start": 10.044,
+     "end": 10.308
+    },
+    {
+     "text": "it",
+     "start": 10.359,
+     "end": 10.462
+    },
+    {
+     "text": "there",
+     "start": 10.5,
+     "end": 10.692
+    },
+    {
+     "text": "in",
+     "start": 10.718,
+     "end": 10.769
+    },
+    {
+     "text": "the",
+     "start": 10.808,
+     "end": 10.923
+    },
+    {
+     "text": "1940s.",
+     "start": 10.924,
+     "end": 11.923
+    },
+    {
+     "text": "Pierre",
+     "start": 12.077,
+     "end": 13.0
+    },
+    {
+     "text": "Deligne",
+     "start": 13.077,
+     "end": 13.615
+    },
+    {
+     "text": "went",
+     "start": 13.662,
+     "end": 13.846
+    },
+    {
+     "text": "much",
+     "start": 13.892,
+     "end": 14.077
+    },
+    {
+     "text": "further",
+     "start": 14.125,
+     "end": 14.462
+    },
+    {
+     "text": "in",
+     "start": 14.512,
+     "end": 14.615
+    },
+    {
+     "text": "1974.",
+     "start": 15.077,
+     "end": 15.846
+    },
+    {
+     "text": "And",
+     "start": 16.058,
+     "end": 16.692
+    },
+    {
+     "text": "in",
+     "start": 16.743,
+     "end": 16.846
+    },
+    {
+     "text": "1969,",
+     "start": 17.231,
+     "end": 18.154
+    },
+    {
+     "text": "Sergei",
+     "start": 18.231,
+     "end": 18.692
+    },
+    {
+     "text": "Stepanov",
+     "start": 18.75,
+     "end": 19.462
+    },
+    {
+     "text": "found",
+     "start": 19.538,
+     "end": 19.923
+    },
+    {
+     "text": "an",
+     "start": 19.949,
+     "end": 20.0
+    },
+    {
+     "text": "unusually",
+     "start": 20.062,
+     "end": 20.615
+    },
+    {
+     "text": "elementary",
+     "start": 20.664,
+     "end": 21.154
+    },
+    {
+     "text": "proof",
+     "start": 21.231,
+     "end": 21.615
+    },
+    {
+     "text": "for",
+     "start": 21.692,
+     "end": 21.923
+    },
+    {
+     "text": "certain",
+     "start": 21.962,
+     "end": 22.231
+    },
+    {
+     "text": "curves.",
+     "start": 22.318,
+     "end": 22.923
+    }
+   ]
+  },
+  {
+   "id": "s06_stepanov",
+   "title": "Stepanov's trick",
+   "audio": "audio/s06_stepanov.mp3",
+   "audioDuration": 20.782,
+   "leadIn": 0.5,
+   "duration": 21.982,
+   "lines": [
+    {
+     "caption": "Stepanov's trick: build a helper polynomial that's zero at every point you want to count.",
+     "start": 0.0,
+     "end": 5.385
+    },
+    {
+     "caption": "Not just zero, but zero many times over.",
+     "start": 5.596,
+     "end": 8.846
+    },
+    {
+     "caption": "A polynomial of limited degree can only have so many roots, counted with multiplicity. So more multiplicity means a tighter count.",
+     "start": 9.231,
+     "end": 18.0
+    },
+    {
+     "caption": "And multiplicity comes from derivatives.",
+     "start": 18.154,
+     "end": 20.769
+    }
+   ],
+   "words": [
+    {
+     "text": "Stepanov's",
+     "start": 0.0,
+     "end": 0.538
+    },
+    {
+     "text": "trick:",
+     "start": 0.603,
+     "end": 1.0
+    },
+    {
+     "text": "build",
+     "start": 1.103,
+     "end": 1.615
+    },
+    {
+     "text": "a",
+     "start": 1.654,
+     "end": 1.692
+    },
+    {
+     "text": "helper",
+     "start": 1.747,
+     "end": 2.077
+    },
+    {
+     "text": "polynomial",
+     "start": 2.147,
+     "end": 2.846
+    },
+    {
+     "text": "that's",
+     "start": 2.923,
+     "end": 3.308
+    },
+    {
+     "text": "zero",
+     "start": 3.385,
+     "end": 3.692
+    },
+    {
+     "text": "at",
+     "start": 3.743,
+     "end": 3.846
+    },
+    {
+     "text": "every",
+     "start": 3.897,
+     "end": 4.154
+    },
+    {
+     "text": "point",
+     "start": 4.205,
+     "end": 4.462
+    },
+    {
+     "text": "you",
+     "start": 4.5,
+     "end": 4.615
+    },
+    {
+     "text": "want",
+     "start": 4.646,
+     "end": 4.769
+    },
+    {
+     "text": "to",
+     "start": 4.795,
+     "end": 4.846
+    },
+    {
+     "text": "count.",
+     "start": 4.923,
+     "end": 5.385
+    },
+    {
+     "text": "Not",
+     "start": 5.596,
+     "end": 6.231
+    },
+    {
+     "text": "just",
+     "start": 6.292,
+     "end": 6.538
+    },
+    {
+     "text": "zero,",
+     "start": 6.615,
+     "end": 7.0
+    },
+    {
+     "text": "but",
+     "start": 7.077,
+     "end": 7.308
+    },
+    {
+     "text": "zero",
+     "start": 7.385,
+     "end": 7.692
+    },
+    {
+     "text": "many",
+     "start": 7.738,
+     "end": 7.923
+    },
+    {
+     "text": "times",
+     "start": 7.987,
+     "end": 8.308
+    },
+    {
+     "text": "over.",
+     "start": 8.385,
+     "end": 8.846
+    },
+    {
+     "text": "A",
+     "start": 9.231,
+     "end": 9.615
+    },
+    {
+     "text": "polynomial",
+     "start": 9.678,
+     "end": 10.308
+    },
+    {
+     "text": "of",
+     "start": 10.359,
+     "end": 10.462
+    },
+    {
+     "text": "limited",
+     "start": 10.51,
+     "end": 10.846
+    },
+    {
+     "text": "degree",
+     "start": 10.912,
+     "end": 11.308
+    },
+    {
+     "text": "can",
+     "start": 11.385,
+     "end": 11.615
+    },
+    {
+     "text": "only",
+     "start": 11.662,
+     "end": 11.846
+    },
+    {
+     "text": "have",
+     "start": 11.892,
+     "end": 12.077
+    },
+    {
+     "text": "so",
+     "start": 12.128,
+     "end": 12.231
+    },
+    {
+     "text": "many",
+     "start": 12.277,
+     "end": 12.462
+    },
+    {
+     "text": "roots,",
+     "start": 12.538,
+     "end": 13.231
+    },
+    {
+     "text": "counted",
+     "start": 13.279,
+     "end": 13.615
+    },
+    {
+     "text": "with",
+     "start": 13.646,
+     "end": 13.769
+    },
+    {
+     "text": "multiplicity.",
+     "start": 13.813,
+     "end": 14.692
+    },
+    {
+     "text": "So",
+     "start": 14.949,
+     "end": 15.462
+    },
+    {
+     "text": "more",
+     "start": 15.523,
+     "end": 15.769
+    },
+    {
+     "text": "multiplicity",
+     "start": 15.824,
+     "end": 16.538
+    },
+    {
+     "text": "means",
+     "start": 16.615,
+     "end": 17.0
+    },
+    {
+     "text": "a",
+     "start": 17.038,
+     "end": 17.077
+    },
+    {
+     "text": "tighter",
+     "start": 17.125,
+     "end": 17.462
+    },
+    {
+     "text": "count.",
+     "start": 17.526,
+     "end": 18.0
+    },
+    {
+     "text": "And",
+     "start": 18.154,
+     "end": 18.615
+    },
+    {
+     "text": "multiplicity",
+     "start": 18.67,
+     "end": 19.385
+    },
+    {
+     "text": "comes",
+     "start": 19.462,
+     "end": 19.846
+    },
+    {
+     "text": "from",
+     "start": 19.877,
+     "end": 20.0
+    },
+    {
+     "text": "derivatives.",
+     "start": 20.058,
+     "end": 20.769
+    }
+   ]
+  },
+  {
+   "id": "s07_wall",
+   "title": "The wall",
+   "audio": "audio/s07_wall.mp3",
+   "audioDuration": 10.323,
+   "leadIn": 0.5,
+   "duration": 11.523,
+   "lines": [
+    {
+     "caption": "That's where the integers push back.",
+     "start": 0.0,
+     "end": 1.616
+    },
+    {
+     "caption": "You can differentiate a polynomial. Differentiate the number seven and you just get zero.",
+     "start": 1.808,
+     "end": 7.538
+    },
+    {
+     "caption": "Alpöge names exactly this gap.",
+     "start": 7.846,
+     "end": 10.308
+    }
+   ],
+   "words": [
+    {
+     "text": "That's",
+     "start": 0.0,
+     "end": 0.269
+    },
+    {
+     "text": "where",
+     "start": 0.288,
+     "end": 0.385
+    },
+    {
+     "text": "the",
+     "start": 0.404,
+     "end": 0.462
+    },
+    {
+     "text": "integers",
+     "start": 0.512,
+     "end": 0.923
+    },
+    {
+     "text": "push",
+     "start": 0.969,
+     "end": 1.154
+    },
+    {
+     "text": "back.",
+     "start": 1.246,
+     "end": 1.616
+    },
+    {
+     "text": "You",
+     "start": 1.808,
+     "end": 2.385
+    },
+    {
+     "text": "can",
+     "start": 2.423,
+     "end": 2.538
+    },
+    {
+     "text": "differentiate",
+     "start": 2.587,
+     "end": 3.231
+    },
+    {
+     "text": "a",
+     "start": 3.269,
+     "end": 3.308
+    },
+    {
+     "text": "polynomial.",
+     "start": 3.37,
+     "end": 4.154
+    },
+    {
+     "text": "Differentiate",
+     "start": 4.246,
+     "end": 5.308
+    },
+    {
+     "text": "the",
+     "start": 5.327,
+     "end": 5.385
+    },
+    {
+     "text": "number",
+     "start": 5.429,
+     "end": 5.692
+    },
+    {
+     "text": "seven",
+     "start": 5.757,
+     "end": 6.077
+    },
+    {
+     "text": "and",
+     "start": 6.154,
+     "end": 6.385
+    },
+    {
+     "text": "you",
+     "start": 6.404,
+     "end": 6.462
+    },
+    {
+     "text": "just",
+     "start": 6.508,
+     "end": 6.692
+    },
+    {
+     "text": "get",
+     "start": 6.75,
+     "end": 6.923
+    },
+    {
+     "text": "zero.",
+     "start": 7.031,
+     "end": 7.538
+    },
+    {
+     "text": "Alpöge",
+     "start": 7.846,
+     "end": 8.846
+    },
+    {
+     "text": "names",
+     "start": 8.897,
+     "end": 9.154
+    },
+    {
+     "text": "exactly",
+     "start": 9.212,
+     "end": 9.615
+    },
+    {
+     "text": "this",
+     "start": 9.662,
+     "end": 9.846
+    },
+    {
+     "text": "gap.",
+     "start": 9.942,
+     "end": 10.308
+    }
+   ]
+  },
+  {
+   "id": "s08_ladder",
+   "title": "The ladder",
+   "audio": "audio/s08_ladder.mp3",
+   "audioDuration": 28.478,
+   "leadIn": 0.5,
+   "duration": 29.678,
+   "lines": [
+    {
+     "caption": "His note describes a way around it.",
+     "start": 0.0,
+     "end": 2.192
+    },
+    {
+     "caption": "A theta lift carries a highly symmetric object from one group of symmetries to another.",
+     "start": 2.442,
+     "end": 7.385
+    },
+    {
+     "caption": "According to the note, each lift mimics one more order of multiplicity. Chain them into a ladder, and every rung buys one more.",
+     "start": 7.5,
+     "end": 16.385
+    },
+    {
+     "caption": "For a sum over primes up to X, he says Claude suggested about the square root of X rungs.",
+     "start": 16.615,
+     "end": 23.231
+    },
+    {
+     "caption": "Alpöge says that line alone should make mathematicians fall out of their chairs.",
+     "start": 23.538,
+     "end": 28.462
+    }
+   ],
+   "words": [
+    {
+     "text": "His",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "note",
+     "start": 0.215,
+     "end": 0.462
+    },
+    {
+     "text": "describes",
+     "start": 0.508,
+     "end": 0.923
+    },
+    {
+     "text": "a",
+     "start": 0.962,
+     "end": 1.0
+    },
+    {
+     "text": "way",
+     "start": 1.038,
+     "end": 1.154
+    },
+    {
+     "text": "around",
+     "start": 1.198,
+     "end": 1.462
+    },
+    {
+     "text": "it.",
+     "start": 1.538,
+     "end": 2.192
+    },
+    {
+     "text": "A",
+     "start": 2.442,
+     "end": 2.692
+    },
+    {
+     "text": "theta",
+     "start": 2.757,
+     "end": 3.077
+    },
+    {
+     "text": "lift",
+     "start": 3.138,
+     "end": 3.385
+    },
+    {
+     "text": "carries",
+     "start": 3.433,
+     "end": 3.769
+    },
+    {
+     "text": "a",
+     "start": 3.808,
+     "end": 3.846
+    },
+    {
+     "text": "highly",
+     "start": 3.89,
+     "end": 4.154
+    },
+    {
+     "text": "symmetric",
+     "start": 4.208,
+     "end": 4.692
+    },
+    {
+     "text": "object",
+     "start": 4.791,
+     "end": 5.385
+    },
+    {
+     "text": "from",
+     "start": 5.431,
+     "end": 5.615
+    },
+    {
+     "text": "one",
+     "start": 5.654,
+     "end": 5.769
+    },
+    {
+     "text": "group",
+     "start": 5.82,
+     "end": 6.077
+    },
+    {
+     "text": "of",
+     "start": 6.103,
+     "end": 6.154
+    },
+    {
+     "text": "symmetries",
+     "start": 6.212,
+     "end": 6.692
+    },
+    {
+     "text": "to",
+     "start": 6.743,
+     "end": 6.846
+    },
+    {
+     "text": "another.",
+     "start": 6.894,
+     "end": 7.385
+    },
+    {
+     "text": "According",
+     "start": 7.5,
+     "end": 8.538
+    },
+    {
+     "text": "to",
+     "start": 8.589,
+     "end": 8.692
+    },
+    {
+     "text": "the",
+     "start": 8.712,
+     "end": 8.769
+    },
+    {
+     "text": "note,",
+     "start": 8.831,
+     "end": 9.462
+    },
+    {
+     "text": "each",
+     "start": 9.508,
+     "end": 9.692
+    },
+    {
+     "text": "lift",
+     "start": 9.769,
+     "end": 10.077
+    },
+    {
+     "text": "mimics",
+     "start": 10.135,
+     "end": 10.615
+    },
+    {
+     "text": "one",
+     "start": 10.673,
+     "end": 10.846
+    },
+    {
+     "text": "more",
+     "start": 10.908,
+     "end": 11.154
+    },
+    {
+     "text": "order",
+     "start": 11.205,
+     "end": 11.462
+    },
+    {
+     "text": "of",
+     "start": 11.487,
+     "end": 11.538
+    },
+    {
+     "text": "multiplicity.",
+     "start": 11.593,
+     "end": 12.538
+    },
+    {
+     "text": "Chain",
+     "start": 12.692,
+     "end": 13.462
+    },
+    {
+     "text": "them",
+     "start": 13.477,
+     "end": 13.538
+    },
+    {
+     "text": "into",
+     "start": 13.6,
+     "end": 13.846
+    },
+    {
+     "text": "a",
+     "start": 13.942,
+     "end": 14.038
+    },
+    {
+     "text": "ladder,",
+     "start": 14.066,
+     "end": 14.538
+    },
+    {
+     "text": "and",
+     "start": 14.577,
+     "end": 14.692
+    },
+    {
+     "text": "every",
+     "start": 14.743,
+     "end": 15.0
+    },
+    {
+     "text": "rung",
+     "start": 15.058,
+     "end": 15.308
+    },
+    {
+     "text": "buys",
+     "start": 15.385,
+     "end": 15.692
+    },
+    {
+     "text": "one",
+     "start": 15.731,
+     "end": 15.846
+    },
+    {
+     "text": "more.",
+     "start": 15.938,
+     "end": 16.385
+    },
+    {
+     "text": "For",
+     "start": 16.615,
+     "end": 17.308
+    },
+    {
+     "text": "a",
+     "start": 17.385,
+     "end": 17.462
+    },
+    {
+     "text": "sum",
+     "start": 17.538,
+     "end": 17.769
+    },
+    {
+     "text": "over",
+     "start": 17.815,
+     "end": 18.0
+    },
+    {
+     "text": "primes",
+     "start": 18.077,
+     "end": 18.538
+    },
+    {
+     "text": "up",
+     "start": 18.589,
+     "end": 18.692
+    },
+    {
+     "text": "to",
+     "start": 18.743,
+     "end": 18.846
+    },
+    {
+     "text": "X,",
+     "start": 19.038,
+     "end": 19.538
+    },
+    {
+     "text": "he",
+     "start": 19.615,
+     "end": 19.769
+    },
+    {
+     "text": "says",
+     "start": 19.846,
+     "end": 20.154
+    },
+    {
+     "text": "Claude",
+     "start": 20.22,
+     "end": 20.615
+    },
+    {
+     "text": "suggested",
+     "start": 20.669,
+     "end": 21.154
+    },
+    {
+     "text": "about",
+     "start": 21.192,
+     "end": 21.385
+    },
+    {
+     "text": "the",
+     "start": 21.404,
+     "end": 21.462
+    },
+    {
+     "text": "square",
+     "start": 21.516,
+     "end": 21.846
+    },
+    {
+     "text": "root",
+     "start": 21.892,
+     "end": 22.077
+    },
+    {
+     "text": "of",
+     "start": 22.128,
+     "end": 22.231
+    },
+    {
+     "text": "X",
+     "start": 22.423,
+     "end": 22.615
+    },
+    {
+     "text": "rungs.",
+     "start": 22.673,
+     "end": 23.231
+    },
+    {
+     "text": "Alpöge",
+     "start": 23.538,
+     "end": 24.538
+    },
+    {
+     "text": "says",
+     "start": 24.6,
+     "end": 24.846
+    },
+    {
+     "text": "that",
+     "start": 24.877,
+     "end": 25.0
+    },
+    {
+     "text": "line",
+     "start": 25.062,
+     "end": 25.308
+    },
+    {
+     "text": "alone",
+     "start": 25.385,
+     "end": 25.769
+    },
+    {
+     "text": "should",
+     "start": 25.824,
+     "end": 26.154
+    },
+    {
+     "text": "make",
+     "start": 26.185,
+     "end": 26.308
+    },
+    {
+     "text": "mathematicians",
+     "start": 26.363,
+     "end": 27.077
+    },
+    {
+     "text": "fall",
+     "start": 27.138,
+     "end": 27.385
+    },
+    {
+     "text": "out",
+     "start": 27.423,
+     "end": 27.538
+    },
+    {
+     "text": "of",
+     "start": 27.564,
+     "end": 27.615
+    },
+    {
+     "text": "their",
+     "start": 27.641,
+     "end": 27.769
+    },
+    {
+     "text": "chairs.",
+     "start": 27.846,
+     "end": 28.462
+    }
+   ]
+  },
+  {
+   "id": "s09_toy_and_end",
+   "title": "The toy, and the ending",
+   "audio": "audio/s09_toy_and_end.mp3",
+   "audioDuration": 26.084,
+   "leadIn": 0.5,
+   "duration": 27.284,
+   "lines": [
+    {
+     "caption": "He says the ladder grew out of a toy: his new, unpublished proof of Weil's theorem that uses nothing but signs.",
+     "start": 0.0,
+     "end": 6.615
+    },
+    {
+     "caption": "Early readers on the Lean forum report they can't find that toy in the released code.",
+     "start": 6.808,
+     "end": 12.077
+    },
+    {
+     "caption": "What can be read so far is the ending. A classical argument of Landau's turns a one-sided bound on a smoothed prime count into a ban on zeros right of the line. Symmetry covers the left.",
+     "start": 12.246,
+     "end": 26.077
+    }
+   ],
+   "words": [
+    {
+     "text": "He",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "says",
+     "start": 0.2,
+     "end": 0.385
+    },
+    {
+     "text": "the",
+     "start": 0.404,
+     "end": 0.462
+    },
+    {
+     "text": "ladder",
+     "start": 0.506,
+     "end": 0.769
+    },
+    {
+     "text": "grew",
+     "start": 0.815,
+     "end": 1.0
+    },
+    {
+     "text": "out",
+     "start": 1.058,
+     "end": 1.231
+    },
+    {
+     "text": "of",
+     "start": 1.257,
+     "end": 1.308
+    },
+    {
+     "text": "a",
+     "start": 1.346,
+     "end": 1.385
+    },
+    {
+     "text": "toy:",
+     "start": 1.5,
+     "end": 2.308
+    },
+    {
+     "text": "his",
+     "start": 2.346,
+     "end": 2.462
+    },
+    {
+     "text": "new,",
+     "start": 2.538,
+     "end": 2.846
+    },
+    {
+     "text": "unpublished",
+     "start": 2.897,
+     "end": 3.462
+    },
+    {
+     "text": "proof",
+     "start": 3.526,
+     "end": 3.846
+    },
+    {
+     "text": "of",
+     "start": 3.872,
+     "end": 3.923
+    },
+    {
+     "text": "Weil's",
+     "start": 4.0,
+     "end": 4.308
+    },
+    {
+     "text": "theorem",
+     "start": 4.365,
+     "end": 4.769
+    },
+    {
+     "text": "that",
+     "start": 4.831,
+     "end": 5.077
+    },
+    {
+     "text": "uses",
+     "start": 5.154,
+     "end": 5.462
+    },
+    {
+     "text": "nothing",
+     "start": 5.5,
+     "end": 5.769
+    },
+    {
+     "text": "but",
+     "start": 5.827,
+     "end": 6.0
+    },
+    {
+     "text": "signs.",
+     "start": 6.089,
+     "end": 6.615
+    },
+    {
+     "text": "Early",
+     "start": 6.808,
+     "end": 7.769
+    },
+    {
+     "text": "readers",
+     "start": 7.817,
+     "end": 8.154
+    },
+    {
+     "text": "on",
+     "start": 8.205,
+     "end": 8.308
+    },
+    {
+     "text": "the",
+     "start": 8.327,
+     "end": 8.385
+    },
+    {
+     "text": "Lean",
+     "start": 8.446,
+     "end": 8.692
+    },
+    {
+     "text": "forum",
+     "start": 8.757,
+     "end": 9.077
+    },
+    {
+     "text": "report",
+     "start": 9.164,
+     "end": 9.692
+    },
+    {
+     "text": "they",
+     "start": 9.738,
+     "end": 9.923
+    },
+    {
+     "text": "can't",
+     "start": 9.962,
+     "end": 10.154
+    },
+    {
+     "text": "find",
+     "start": 10.215,
+     "end": 10.462
+    },
+    {
+     "text": "that",
+     "start": 10.492,
+     "end": 10.615
+    },
+    {
+     "text": "toy",
+     "start": 10.712,
+     "end": 11.0
+    },
+    {
+     "text": "in",
+     "start": 11.026,
+     "end": 11.077
+    },
+    {
+     "text": "the",
+     "start": 11.096,
+     "end": 11.154
+    },
+    {
+     "text": "released",
+     "start": 11.196,
+     "end": 11.538
+    },
+    {
+     "text": "code.",
+     "start": 11.631,
+     "end": 12.077
+    },
+    {
+     "text": "What",
+     "start": 12.246,
+     "end": 12.923
+    },
+    {
+     "text": "can",
+     "start": 12.962,
+     "end": 13.077
+    },
+    {
+     "text": "be",
+     "start": 13.103,
+     "end": 13.154
+    },
+    {
+     "text": "read",
+     "start": 13.215,
+     "end": 13.462
+    },
+    {
+     "text": "so",
+     "start": 13.538,
+     "end": 13.692
+    },
+    {
+     "text": "far",
+     "start": 13.769,
+     "end": 14.0
+    },
+    {
+     "text": "is",
+     "start": 14.077,
+     "end": 14.231
+    },
+    {
+     "text": "the",
+     "start": 14.269,
+     "end": 14.385
+    },
+    {
+     "text": "ending.",
+     "start": 14.439,
+     "end": 14.923
+    },
+    {
+     "text": "A",
+     "start": 15.308,
+     "end": 15.692
+    },
+    {
+     "text": "classical",
+     "start": 15.738,
+     "end": 16.154
+    },
+    {
+     "text": "argument",
+     "start": 16.213,
+     "end": 16.692
+    },
+    {
+     "text": "of",
+     "start": 16.718,
+     "end": 16.769
+    },
+    {
+     "text": "Landau's",
+     "start": 16.846,
+     "end": 17.692
+    },
+    {
+     "text": "turns",
+     "start": 17.757,
+     "end": 18.077
+    },
+    {
+     "text": "a",
+     "start": 18.115,
+     "end": 18.154
+    },
+    {
+     "text": "one-sided",
+     "start": 18.231,
+     "end": 18.923
+    },
+    {
+     "text": "bound",
+     "start": 19.0,
+     "end": 19.385
+    },
+    {
+     "text": "on",
+     "start": 19.411,
+     "end": 19.462
+    },
+    {
+     "text": "a",
+     "start": 19.5,
+     "end": 19.538
+    },
+    {
+     "text": "smoothed",
+     "start": 19.598,
+     "end": 20.077
+    },
+    {
+     "text": "prime",
+     "start": 20.154,
+     "end": 20.538
+    },
+    {
+     "text": "count",
+     "start": 20.628,
+     "end": 21.077
+    },
+    {
+     "text": "into",
+     "start": 21.154,
+     "end": 21.462
+    },
+    {
+     "text": "a",
+     "start": 21.538,
+     "end": 21.615
+    },
+    {
+     "text": "ban",
+     "start": 21.692,
+     "end": 21.923
+    },
+    {
+     "text": "on",
+     "start": 21.974,
+     "end": 22.077
+    },
+    {
+     "text": "zeros",
+     "start": 22.18,
+     "end": 22.692
+    },
+    {
+     "text": "right",
+     "start": 22.743,
+     "end": 23.0
+    },
+    {
+     "text": "of",
+     "start": 23.051,
+     "end": 23.154
+    },
+    {
+     "text": "the",
+     "start": 23.173,
+     "end": 23.231
+    },
+    {
+     "text": "line.",
+     "start": 23.323,
+     "end": 24.192
+    },
+    {
+     "text": "Symmetry",
+     "start": 24.317,
+     "end": 25.077
+    },
+    {
+     "text": "covers",
+     "start": 25.121,
+     "end": 25.385
+    },
+    {
+     "text": "the",
+     "start": 25.404,
+     "end": 25.462
+    },
+    {
+     "text": "left.",
+     "start": 25.554,
+     "end": 26.077
+    }
+   ]
+  },
+  {
+   "id": "s10_box",
+   "title": "What's in the box",
+   "audio": "audio/s10_box.mp3",
+   "audioDuration": 30.087,
+   "leadIn": 0.5,
+   "duration": 31.287,
+   "lines": [
+    {
+     "caption": "What he posted: seventeen million lines of Lean, in 175,000 files, without a single comment.",
+     "start": 0.0,
+     "end": 7.462
+    },
+    {
+     "caption": "At the top, five short theorems. One states the Riemann Hypothesis exactly as Lean's shared math library defines it.",
+     "start": 7.743,
+     "end": 16.077
+    },
+    {
+     "caption": "In the code, the generalized version comes first. The original falls out as a corollary.",
+     "start": 16.359,
+     "end": 22.385
+    },
+    {
+     "caption": "A text search of the code finds no declared shortcuts: no unfinished steps, no added axioms.",
+     "start": 22.769,
+     "end": 30.077
+    }
+   ],
+   "words": [
+    {
+     "text": "What",
+     "start": 0.0,
+     "end": 0.154
+    },
+    {
+     "text": "he",
+     "start": 0.18,
+     "end": 0.231
+    },
+    {
+     "text": "posted:",
+     "start": 0.308,
+     "end": 1.346
+    },
+    {
+     "text": "seventeen",
+     "start": 1.404,
+     "end": 1.923
+    },
+    {
+     "text": "million",
+     "start": 1.971,
+     "end": 2.308
+    },
+    {
+     "text": "lines",
+     "start": 2.372,
+     "end": 2.692
+    },
+    {
+     "text": "of",
+     "start": 2.718,
+     "end": 2.769
+    },
+    {
+     "text": "Lean,",
+     "start": 2.846,
+     "end": 3.462
+    },
+    {
+     "text": "in",
+     "start": 3.512,
+     "end": 3.615
+    },
+    {
+     "text": "175,000",
+     "start": 3.692,
+     "end": 5.308
+    },
+    {
+     "text": "files,",
+     "start": 5.385,
+     "end": 6.154
+    },
+    {
+     "text": "without",
+     "start": 6.192,
+     "end": 6.462
+    },
+    {
+     "text": "a",
+     "start": 6.5,
+     "end": 6.538
+    },
+    {
+     "text": "single",
+     "start": 6.593,
+     "end": 6.923
+    },
+    {
+     "text": "comment.",
+     "start": 6.981,
+     "end": 7.462
+    },
+    {
+     "text": "At",
+     "start": 7.743,
+     "end": 8.308
+    },
+    {
+     "text": "the",
+     "start": 8.327,
+     "end": 8.385
+    },
+    {
+     "text": "top,",
+     "start": 8.481,
+     "end": 9.0
+    },
+    {
+     "text": "five",
+     "start": 9.077,
+     "end": 9.385
+    },
+    {
+     "text": "short",
+     "start": 9.436,
+     "end": 9.692
+    },
+    {
+     "text": "theorems.",
+     "start": 9.731,
+     "end": 10.385
+    },
+    {
+     "text": "One",
+     "start": 10.635,
+     "end": 11.385
+    },
+    {
+     "text": "states",
+     "start": 11.439,
+     "end": 11.769
+    },
+    {
+     "text": "the",
+     "start": 11.808,
+     "end": 11.923
+    },
+    {
+     "text": "Riemann",
+     "start": 11.962,
+     "end": 12.231
+    },
+    {
+     "text": "Hypothesis",
+     "start": 12.288,
+     "end": 12.923
+    },
+    {
+     "text": "exactly",
+     "start": 13.019,
+     "end": 13.692
+    },
+    {
+     "text": "as",
+     "start": 13.743,
+     "end": 13.846
+    },
+    {
+     "text": "Lean's",
+     "start": 13.923,
+     "end": 14.385
+    },
+    {
+     "text": "shared",
+     "start": 14.429,
+     "end": 14.692
+    },
+    {
+     "text": "math",
+     "start": 14.754,
+     "end": 15.0
+    },
+    {
+     "text": "library",
+     "start": 15.048,
+     "end": 15.385
+    },
+    {
+     "text": "defines",
+     "start": 15.442,
+     "end": 15.846
+    },
+    {
+     "text": "it.",
+     "start": 15.897,
+     "end": 16.077
+    },
+    {
+     "text": "In",
+     "start": 16.359,
+     "end": 16.923
+    },
+    {
+     "text": "the",
+     "start": 16.942,
+     "end": 17.0
+    },
+    {
+     "text": "code,",
+     "start": 17.092,
+     "end": 17.692
+    },
+    {
+     "text": "the",
+     "start": 17.712,
+     "end": 17.769
+    },
+    {
+     "text": "generalized",
+     "start": 17.827,
+     "end": 18.462
+    },
+    {
+     "text": "version",
+     "start": 18.51,
+     "end": 18.846
+    },
+    {
+     "text": "comes",
+     "start": 18.897,
+     "end": 19.154
+    },
+    {
+     "text": "first.",
+     "start": 19.231,
+     "end": 19.692
+    },
+    {
+     "text": "The",
+     "start": 19.885,
+     "end": 20.462
+    },
+    {
+     "text": "original",
+     "start": 20.512,
+     "end": 20.923
+    },
+    {
+     "text": "falls",
+     "start": 20.988,
+     "end": 21.308
+    },
+    {
+     "text": "out",
+     "start": 21.365,
+     "end": 21.538
+    },
+    {
+     "text": "as",
+     "start": 21.564,
+     "end": 21.615
+    },
+    {
+     "text": "a",
+     "start": 21.654,
+     "end": 21.692
+    },
+    {
+     "text": "corollary.",
+     "start": 21.75,
+     "end": 22.385
+    },
+    {
+     "text": "A",
+     "start": 22.769,
+     "end": 23.154
+    },
+    {
+     "text": "text",
+     "start": 23.246,
+     "end": 23.615
+    },
+    {
+     "text": "search",
+     "start": 23.66,
+     "end": 23.923
+    },
+    {
+     "text": "of",
+     "start": 23.949,
+     "end": 24.0
+    },
+    {
+     "text": "the",
+     "start": 24.019,
+     "end": 24.077
+    },
+    {
+     "text": "code",
+     "start": 24.154,
+     "end": 24.462
+    },
+    {
+     "text": "finds",
+     "start": 24.564,
+     "end": 25.077
+    },
+    {
+     "text": "no",
+     "start": 25.128,
+     "end": 25.231
+    },
+    {
+     "text": "declared",
+     "start": 25.29,
+     "end": 25.769
+    },
+    {
+     "text": "shortcuts:",
+     "start": 25.831,
+     "end": 27.077
+    },
+    {
+     "text": "no",
+     "start": 27.154,
+     "end": 27.308
+    },
+    {
+     "text": "unfinished",
+     "start": 27.37,
+     "end": 28.0
+    },
+    {
+     "text": "steps,",
+     "start": 28.077,
+     "end": 28.692
+    },
+    {
+     "text": "no",
+     "start": 28.769,
+     "end": 28.923
+    },
+    {
+     "text": "added",
+     "start": 28.987,
+     "end": 29.308
+    },
+    {
+     "text": "axioms.",
+     "start": 29.411,
+     "end": 30.077
+    }
+   ]
+  },
+  {
+   "id": "s11_checks",
+   "title": "The checks, and the note's timeline",
+   "audio": "audio/s11_checks.mp3",
+   "audioDuration": 32.155,
+   "leadIn": 0.5,
+   "duration": 33.355,
+   "lines": [
+    {
+     "caption": "Within hours, others were checking.",
+     "start": 0.0,
+     "end": 2.154,
+     "status": true
+    },
+    {
+     "caption": "As of the evening of November 20th, independent checks report that every file compiles, the main theorems rest only on Lean's three standard axioms, and at least six independent proof checkers accept the whole proof.",
+     "start": 2.334,
+     "end": 15.769,
+     "status": true
+    },
+    {
+     "caption": "One last official comparison run is expected to finish over the weekend.",
+     "start": 16.058,
+     "end": 20.923,
+     "status": true
+    },
+    {
+     "caption": "The note's timeline runs from October 6th to November 16th. Alpöge says he supplied the guiding idea, and that Claude far outpaced him near the finish.",
+     "start": 21.135,
+     "end": 32.154
+    }
+   ],
+   "words": [
+    {
+     "text": "Within",
+     "start": 0.0,
+     "end": 0.231
+    },
+    {
+     "text": "hours,",
+     "start": 0.295,
+     "end": 0.692
+    },
+    {
+     "text": "others",
+     "start": 0.737,
+     "end": 1.0
+    },
+    {
+     "text": "were",
+     "start": 1.031,
+     "end": 1.154
+    },
+    {
+     "text": "checking.",
+     "start": 1.205,
+     "end": 2.154
+    },
+    {
+     "text": "As",
+     "start": 2.334,
+     "end": 2.692
+    },
+    {
+     "text": "of",
+     "start": 2.743,
+     "end": 2.846
+    },
+    {
+     "text": "the",
+     "start": 2.865,
+     "end": 2.923
+    },
+    {
+     "text": "evening",
+     "start": 2.981,
+     "end": 3.385
+    },
+    {
+     "text": "of",
+     "start": 3.411,
+     "end": 3.462
+    },
+    {
+     "text": "November",
+     "start": 3.504,
+     "end": 3.846
+    },
+    {
+     "text": "20th,",
+     "start": 3.923,
+     "end": 4.769
+    },
+    {
+     "text": "independent",
+     "start": 4.82,
+     "end": 5.385
+    },
+    {
+     "text": "checks",
+     "start": 5.451,
+     "end": 5.846
+    },
+    {
+     "text": "report",
+     "start": 5.901,
+     "end": 6.231
+    },
+    {
+     "text": "that",
+     "start": 6.262,
+     "end": 6.385
+    },
+    {
+     "text": "every",
+     "start": 6.436,
+     "end": 6.692
+    },
+    {
+     "text": "file",
+     "start": 6.769,
+     "end": 7.077
+    },
+    {
+     "text": "compiles,",
+     "start": 7.123,
+     "end": 8.077
+    },
+    {
+     "text": "the",
+     "start": 8.115,
+     "end": 8.231
+    },
+    {
+     "text": "main",
+     "start": 8.277,
+     "end": 8.462
+    },
+    {
+     "text": "theorems",
+     "start": 8.519,
+     "end": 9.0
+    },
+    {
+     "text": "rest",
+     "start": 9.062,
+     "end": 9.308
+    },
+    {
+     "text": "only",
+     "start": 9.385,
+     "end": 9.692
+    },
+    {
+     "text": "on",
+     "start": 9.743,
+     "end": 9.846
+    },
+    {
+     "text": "Lean's",
+     "start": 9.923,
+     "end": 10.385
+    },
+    {
+     "text": "three",
+     "start": 10.436,
+     "end": 10.692
+    },
+    {
+     "text": "standard",
+     "start": 10.743,
+     "end": 11.154
+    },
+    {
+     "text": "axioms,",
+     "start": 11.231,
+     "end": 11.846
+    },
+    {
+     "text": "and",
+     "start": 11.942,
+     "end": 12.231
+    },
+    {
+     "text": "at",
+     "start": 12.282,
+     "end": 12.385
+    },
+    {
+     "text": "least",
+     "start": 12.436,
+     "end": 12.692
+    },
+    {
+     "text": "six",
+     "start": 12.788,
+     "end": 13.077
+    },
+    {
+     "text": "independent",
+     "start": 13.128,
+     "end": 13.692
+    },
+    {
+     "text": "proof",
+     "start": 13.743,
+     "end": 14.0
+    },
+    {
+     "text": "checkers",
+     "start": 14.038,
+     "end": 14.385
+    },
+    {
+     "text": "accept",
+     "start": 14.462,
+     "end": 14.923
+    },
+    {
+     "text": "the",
+     "start": 14.942,
+     "end": 15.0
+    },
+    {
+     "text": "whole",
+     "start": 15.051,
+     "end": 15.308
+    },
+    {
+     "text": "proof.",
+     "start": 15.372,
+     "end": 15.769
+    },
+    {
+     "text": "One",
+     "start": 16.058,
+     "end": 16.923
+    },
+    {
+     "text": "last",
+     "start": 17.0,
+     "end": 17.308
+    },
+    {
+     "text": "official",
+     "start": 17.342,
+     "end": 17.615
+    },
+    {
+     "text": "comparison",
+     "start": 17.678,
+     "end": 18.308
+    },
+    {
+     "text": "run",
+     "start": 18.385,
+     "end": 18.615
+    },
+    {
+     "text": "is",
+     "start": 18.718,
+     "end": 18.923
+    },
+    {
+     "text": "expected",
+     "start": 18.974,
+     "end": 19.385
+    },
+    {
+     "text": "to",
+     "start": 19.436,
+     "end": 19.538
+    },
+    {
+     "text": "finish",
+     "start": 19.583,
+     "end": 19.846
+    },
+    {
+     "text": "over",
+     "start": 19.892,
+     "end": 20.077
+    },
+    {
+     "text": "the",
+     "start": 20.096,
+     "end": 20.154
+    },
+    {
+     "text": "weekend.",
+     "start": 20.231,
+     "end": 20.923
+    },
+    {
+     "text": "The",
+     "start": 21.135,
+     "end": 21.769
+    },
+    {
+     "text": "note's",
+     "start": 21.831,
+     "end": 22.154
+    },
+    {
+     "text": "timeline",
+     "start": 22.222,
+     "end": 22.769
+    },
+    {
+     "text": "runs",
+     "start": 22.892,
+     "end": 23.385
+    },
+    {
+     "text": "from",
+     "start": 23.415,
+     "end": 23.538
+    },
+    {
+     "text": "October",
+     "start": 23.596,
+     "end": 24.0
+    },
+    {
+     "text": "6th",
+     "start": 24.154,
+     "end": 24.462
+    },
+    {
+     "text": "to",
+     "start": 24.538,
+     "end": 24.692
+    },
+    {
+     "text": "November",
+     "start": 24.735,
+     "end": 25.077
+    },
+    {
+     "text": "16th.",
+     "start": 25.154,
+     "end": 25.846
+    },
+    {
+     "text": "Alpöge",
+     "start": 26.205,
+     "end": 27.385
+    },
+    {
+     "text": "says",
+     "start": 27.431,
+     "end": 27.615
+    },
+    {
+     "text": "he",
+     "start": 27.666,
+     "end": 27.769
+    },
+    {
+     "text": "supplied",
+     "start": 27.82,
+     "end": 28.231
+    },
+    {
+     "text": "the",
+     "start": 28.25,
+     "end": 28.308
+    },
+    {
+     "text": "guiding",
+     "start": 28.356,
+     "end": 28.692
+    },
+    {
+     "text": "idea,",
+     "start": 28.8,
+     "end": 29.308
+    },
+    {
+     "text": "and",
+     "start": 29.404,
+     "end": 29.692
+    },
+    {
+     "text": "that",
+     "start": 29.708,
+     "end": 29.769
+    },
+    {
+     "text": "Claude",
+     "start": 29.846,
+     "end": 30.308
+    },
+    {
+     "text": "far",
+     "start": 30.365,
+     "end": 30.538
+    },
+    {
+     "text": "outpaced",
+     "start": 30.615,
+     "end": 31.077
+    },
+    {
+     "text": "him",
+     "start": 31.115,
+     "end": 31.231
+    },
+    {
+     "text": "near",
+     "start": 31.277,
+     "end": 31.462
+    },
+    {
+     "text": "the",
+     "start": 31.481,
+     "end": 31.538
+    },
+    {
+     "text": "finish.",
+     "start": 31.605,
+     "end": 32.154
+    }
+   ]
+  },
+  {
+   "id": "s12_next",
+   "title": "What's still missing",
+   "audio": "audio/s12_next.mp3",
+   "audioDuration": 25.627,
+   "leadIn": 0.5,
+   "duration": 30.127,
+   "lines": [
+    {
+     "caption": "What's still missing is an explanation people can follow. No human-readable proof has been released, and Alpöge expects the argument to shrink a lot.",
+     "start": 0.0,
+     "end": 8.692
+    },
+    {
+     "caption": "Three takeaways.",
+     "start": 8.872,
+     "end": 10.885
+    },
+    {
+     "caption": "The Riemann Hypothesis is about how regular the primes are.",
+     "start": 10.99,
+     "end": 14.462
+    },
+    {
+     "caption": "The note's key idea is a stand-in for derivatives of whole numbers.",
+     "start": 14.654,
+     "end": 18.846
+    },
+    {
+     "caption": "And if it holds up, this may be one of the first major proofs a machine checked before anyone could fully explain it.",
+     "start": 19.0,
+     "end": 25.615
+    }
+   ],
+   "words": [
+    {
+     "text": "What's",
+     "start": 0.0,
+     "end": 0.308
+    },
+    {
+     "text": "still",
+     "start": 0.334,
+     "end": 0.462
+    },
+    {
+     "text": "missing",
+     "start": 0.519,
+     "end": 0.923
+    },
+    {
+     "text": "is",
+     "start": 0.974,
+     "end": 1.077
+    },
+    {
+     "text": "an",
+     "start": 1.103,
+     "end": 1.154
+    },
+    {
+     "text": "explanation",
+     "start": 1.218,
+     "end": 1.923
+    },
+    {
+     "text": "people",
+     "start": 1.967,
+     "end": 2.231
+    },
+    {
+     "text": "can",
+     "start": 2.269,
+     "end": 2.385
+    },
+    {
+     "text": "follow.",
+     "start": 2.451,
+     "end": 2.923
+    },
+    {
+     "text": "No",
+     "start": 3.205,
+     "end": 3.769
+    },
+    {
+     "text": "human-readable",
+     "start": 3.834,
+     "end": 4.538
+    },
+    {
+     "text": "proof",
+     "start": 4.603,
+     "end": 4.923
+    },
+    {
+     "text": "has",
+     "start": 4.962,
+     "end": 5.077
+    },
+    {
+     "text": "been",
+     "start": 5.108,
+     "end": 5.231
+    },
+    {
+     "text": "released,",
+     "start": 5.282,
+     "end": 6.0
+    },
+    {
+     "text": "and",
+     "start": 6.038,
+     "end": 6.154
+    },
+    {
+     "text": "Alpöge",
+     "start": 6.205,
+     "end": 6.615
+    },
+    {
+     "text": "expects",
+     "start": 6.673,
+     "end": 7.077
+    },
+    {
+     "text": "the",
+     "start": 7.115,
+     "end": 7.231
+    },
+    {
+     "text": "argument",
+     "start": 7.282,
+     "end": 7.692
+    },
+    {
+     "text": "to",
+     "start": 7.718,
+     "end": 7.769
+    },
+    {
+     "text": "shrink",
+     "start": 7.824,
+     "end": 8.154
+    },
+    {
+     "text": "a",
+     "start": 8.192,
+     "end": 8.231
+    },
+    {
+     "text": "lot.",
+     "start": 8.308,
+     "end": 8.692
+    },
+    {
+     "text": "Three",
+     "start": 8.872,
+     "end": 9.769
+    },
+    {
+     "text": "takeaways.",
+     "start": 9.831,
+     "end": 10.885
+    },
+    {
+     "text": "The",
+     "start": 10.99,
+     "end": 11.308
+    },
+    {
+     "text": "Riemann",
+     "start": 11.385,
+     "end": 11.692
+    },
+    {
+     "text": "Hypothesis",
+     "start": 11.75,
+     "end": 12.462
+    },
+    {
+     "text": "is",
+     "start": 12.512,
+     "end": 12.615
+    },
+    {
+     "text": "about",
+     "start": 12.654,
+     "end": 12.846
+    },
+    {
+     "text": "how",
+     "start": 12.904,
+     "end": 13.077
+    },
+    {
+     "text": "regular",
+     "start": 13.125,
+     "end": 13.462
+    },
+    {
+     "text": "the",
+     "start": 13.5,
+     "end": 13.615
+    },
+    {
+     "text": "primes",
+     "start": 13.682,
+     "end": 14.077
+    },
+    {
+     "text": "are.",
+     "start": 14.135,
+     "end": 14.462
+    },
+    {
+     "text": "The",
+     "start": 14.654,
+     "end": 15.231
+    },
+    {
+     "text": "note's",
+     "start": 15.292,
+     "end": 15.615
+    },
+    {
+     "text": "key",
+     "start": 15.654,
+     "end": 15.769
+    },
+    {
+     "text": "idea",
+     "start": 15.877,
+     "end": 16.308
+    },
+    {
+     "text": "is",
+     "start": 16.359,
+     "end": 16.462
+    },
+    {
+     "text": "a",
+     "start": 16.538,
+     "end": 16.615
+    },
+    {
+     "text": "stand-in",
+     "start": 16.666,
+     "end": 17.077
+    },
+    {
+     "text": "for",
+     "start": 17.115,
+     "end": 17.231
+    },
+    {
+     "text": "derivatives",
+     "start": 17.282,
+     "end": 17.846
+    },
+    {
+     "text": "of",
+     "start": 17.872,
+     "end": 17.923
+    },
+    {
+     "text": "whole",
+     "start": 17.974,
+     "end": 18.231
+    },
+    {
+     "text": "numbers.",
+     "start": 18.288,
+     "end": 18.846
+    },
+    {
+     "text": "And",
+     "start": 19.0,
+     "end": 19.462
+    },
+    {
+     "text": "if",
+     "start": 19.512,
+     "end": 19.615
+    },
+    {
+     "text": "it",
+     "start": 19.641,
+     "end": 19.692
+    },
+    {
+     "text": "holds",
+     "start": 19.743,
+     "end": 20.0
+    },
+    {
+     "text": "up,",
+     "start": 20.077,
+     "end": 20.462
+    },
+    {
+     "text": "this",
+     "start": 20.508,
+     "end": 20.692
+    },
+    {
+     "text": "may",
+     "start": 20.731,
+     "end": 20.846
+    },
+    {
+     "text": "be",
+     "start": 20.897,
+     "end": 21.0
+    },
+    {
+     "text": "one",
+     "start": 21.019,
+     "end": 21.077
+    },
+    {
+     "text": "of",
+     "start": 21.128,
+     "end": 21.231
+    },
+    {
+     "text": "the",
+     "start": 21.269,
+     "end": 21.385
+    },
+    {
+     "text": "first",
+     "start": 21.436,
+     "end": 21.692
+    },
+    {
+     "text": "major",
+     "start": 21.757,
+     "end": 22.077
+    },
+    {
+     "text": "proofs",
+     "start": 22.143,
+     "end": 22.538
+    },
+    {
+     "text": "a",
+     "start": 22.577,
+     "end": 22.615
+    },
+    {
+     "text": "machine",
+     "start": 22.673,
+     "end": 23.077
+    },
+    {
+     "text": "checked",
+     "start": 23.135,
+     "end": 23.538
+    },
+    {
+     "text": "before",
+     "start": 23.615,
+     "end": 24.077
+    },
+    {
+     "text": "anyone",
+     "start": 24.132,
+     "end": 24.462
+    },
+    {
+     "text": "could",
+     "start": 24.5,
+     "end": 24.692
+    },
+    {
+     "text": "fully",
+     "start": 24.731,
+     "end": 24.923
+    },
+    {
+     "text": "explain",
+     "start": 24.971,
+     "end": 25.308
+    },
+    {
+     "text": "it.",
+     "start": 25.385,
+     "end": 25.615
+    }
+   ]
+  }
+ ],
+ "totalSeconds": 307.98
+}

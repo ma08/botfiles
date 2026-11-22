@@ -1,0 +1,46 @@
+{
+ "checked_at_pst": "2026-11-20 ~6:55pm PST",
+ "asof_spoken": "the evening of November 20th",
+ "asof_onscreen": "Status as of Nov 20, 2026, 6:55pm PST",
+ "pending_spoken": "One last official comparison run is expected to finish over the weekend.",
+ "pending_detail": "lake comparator --paranoid (Lean's own kernels on the exported proof)",
+ "checks": [
+  {
+   "label": "Every file compiles",
+   "value": "175,187 of 175,187 · several independent builds",
+   "state": "pass"
+  },
+  {
+   "label": "Axioms used",
+   "value": "only Lean's 3 standard ones",
+   "state": "pass"
+  },
+  {
+   "label": "Statement is Mathlib's RH",
+   "value": "confirmed by an independent comparison tool",
+   "state": "pass"
+  },
+  {
+   "label": "Independent proof checkers",
+   "value": "6+ accept the full proof",
+   "state": "pass"
+  },
+  {
+   "label": "Official comparator run",
+   "value": "expected over the weekend",
+   "state": "pending"
+  },
+  {
+   "label": "Human-readable proof",
+   "value": "not released",
+   "state": "missing"
+  }
+ ],
+ "checkers_named": "nanoda · con-leche · con-agua · Pestka · nanoclo · tenet",
+ "sources": [
+  "https://math.mit.edu/~drew/grh/ (Andrew Sutherland, MIT; checks run with Claude Code; page updated 2026-11-20 22:05 UTC)",
+  "Lean Zulip #general > Discussion: Alpöge Proves the Riemann Hypothesis (read to 6:24pm PST)"
+ ],
+ "onscreen_footnote": "Checks by Andrew Sutherland (MIT), Szymon Teżewski and others on the Lean forum. Some run with AI assistance; verdicts come from the proof checkers.",
+ "onscreen_footnote_2": "A pass relies on the checkers and on Mathlib's definitions."
+}

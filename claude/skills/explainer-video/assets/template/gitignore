@@ -1,0 +1,5 @@
+node_modules
+out
+.DS_Store
+public/audio/*.raw.mp3
+script/.tts_cache.json

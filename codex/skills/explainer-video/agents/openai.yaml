@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explainer Video"
+  short_description: "Narrated, animated explainer videos with Remotion"
+  default_prompt: "Use $explainer-video to research a topic and produce a narrated, word-synced animated explainer video with captions, an honest framing of any unverified claims, and a thumbnail."

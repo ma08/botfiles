@@ -831,6 +831,10 @@ After running `setup.sh`:
 - Codex skills are available at `~/.codex/skills/` (backed by `codex/skills/`)
 - Codex **system** skills under `~/.codex/skills/.system/` are machine-managed and intentionally git-ignored in this repo (to allow version/platform differences across machines)
 
+### Explainer Video Skill
+
+`explainer-video` (in both `claude/skills/` and `codex/skills/`) turns sources into a narrated, animated explainer video: research and accuracy review, script, AI voiceover with word-synced animation in Remotion, QA, render, thumbnail and social copy. It ships a Remotion template with four theme presets and a no-key draft mode. Example: [a 5-minute explainer of a claimed Riemann Hypothesis proof](https://x.com/curious_queue/status/2124124652192862458), with its full source, generated audio, review history and a "how it was made" writeup in [`context/daily/2026-11-20/rh-explainer-video/`](context/daily/2026-11-20/rh-explainer-video/). See [`claude/skills/explainer-video/README.md`](claude/skills/explainer-video/README.md).
+
 ### Tracked Task Lifecycle Skills
 
 Shared workflow skills now cover the full tracked-task lifecycle:
