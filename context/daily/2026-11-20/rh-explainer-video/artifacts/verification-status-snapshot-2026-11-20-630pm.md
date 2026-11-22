@@ -25,7 +25,7 @@ Caveats on page unchanged (unsandboxed build; trust rests on the kernels and Mat
 - Andrew Sutherland, 3:25pm: he doesn't see any realistic scenario in which the proof does not imply Mathlib's statement of RH; people should satisfy themselves that the formal statement is right.
 - Sutherland, 3:41pm: running `lake comparator --paranoid`; expected to finish over the weekend; "no doubts about the outcome."
 - Understanding: no human-readable proof released. Several community efforts to informalize (Principia Math, a 126-page AI-drafted preprint, a "riemann-review" repo, Tau Ceti roadmaps). Several participants describe the code as very hard to read ("obfuscated" in style). Toy proof (qN = M^k + R) still reported absent from the released Lean; no update.
-- Side context, not for the video: a separate 940-page human GRH proof by Alessandro Masullo was announced the same day (Ravi Vakil's blog); a Zulip participant says it was shown to be wrong. Not investigated.
+- Side context, not for the video: a separate human proof of GRH by Alessandro Masullo was announced the same day (https://math216.wordpress.com/2026/11/20/hurried-announcement-alessandro-masullo-grh/). Not assessed here.
 
 ## Implication for the video
 Machine verification: effectively complete by community consensus; only the official `lake comparator --paranoid` run is pending (weekend). Human understanding: not yet. New on-screen/narrated status: "six separately written proof checkers accept it"; pending: "the last official comparison run is expected over the weekend".

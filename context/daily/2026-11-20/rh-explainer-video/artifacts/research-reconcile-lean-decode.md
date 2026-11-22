@@ -36,19 +36,8 @@ Nothing was compiled or executed. Paths below are relative to `lean/src/`.
 
 **[VERBATIM-LEAN]** `Formalism/Statement.lean`:
 
-```lean
-def LamF {N : ℕ} (χ : DirichletCharacter ℂ N) (n : ℕ) : ℝ :=
-  Λ n * (1 + (χ n).re)
-
-def S {N : ℕ} (χ : DirichletCharacter ℂ N) (x : ℝ) : ℝ :=
-  ∑ n ∈ Finset.Icc 1 ⌊x⌋₊, LamF χ n * (x / n - 1)
-
-def gammaF {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) : ℝ :=
-  Real.eulerMascheroniConstant +
-    (deriv (DirichletCharacter.LFunction χ) 1 / DirichletCharacter.LFunction χ 1).re
-
-def G {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) (x : ℝ) : ℝ :=
-  S χ x - x * Real.log x + (1 + gammaF χ) * x
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 In ordinary notation:
@@ -57,13 +46,8 @@ In ordinary notation:
 
 **[VERBATIM-LEAN]** `Formalism/StatementOC.lean` splits this into a zeta part and a character part:
 
-```lean
-def Sz (x : ℝ) : ℝ := ∑ n ∈ Finset.Icc 1 ⌊x⌋₊, Λ n * (x / n - 1)
-
-def Gz (x : ℝ) : ℝ := Sz x - x * Real.log x + (1 + Real.eulerMascheroniConstant) * x
-
-def Gchi {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) (x : ℝ) : ℝ :=
-  Schi χ x + (deriv (DirichletCharacter.LFunction χ) 1 / DirichletCharacter.LFunction χ 1).re * x
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 So `G χ x = Gz x + Gchi χ x` (by unfolding; I didn't find that identity stated as a lemma, so treat it as [READ], though it is immediate).
@@ -82,10 +66,8 @@ The archive contains the same idea ("a one-sided power bound on the smoothed sum
 
 **[VERBATIM-LEAN]** `Formalism/Statement.lean`:
 
-```lean
-def RHofG {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) : Prop :=
-  (∀ ε : ℝ, 0 < ε → ∃ C : ℝ, ∀ x : ℝ, 1 ≤ x → -C * x ^ ((1 : ℝ) / 2 + ε) ≤ G χ x) →
-  RiemannHypothesis ∧ ∀ s : ℂ, 1 / 2 < s.re → DirichletCharacter.LFunction χ s ≠ 0
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Direction: a **lower** bound, G(χ, x) ≥ −C·x^(1/2+ε). `LandauStep` and `LandauStepEps` in the same file have the same shape with a general σ₀, for a nontrivial real-valued χ, with the extra hypothesis that L(σ, χ) ≠ 0 for real σ in (σ₀, 1).
@@ -98,22 +80,16 @@ Status: the identifiers `LandauStep`, `LandauStepEps` and `RHofG` occur **only i
 
 **[VERBATIM-LEAN]** `Formalism/StatementU.lean` (definition) and `Formalism/ZetaNonvanishing/ZetaLandau.lean` line 258 (`theorem zetaLandau : ZetaLandau`):
 
-```lean
-def ZetaLandau : Prop :=
-  ∀ s₀ : ℝ, (s₀ = 1 ∨ s₀ = -1) → ∀ θ : ℝ, 0 < θ → θ < 1 →
-  (∃ C x₀ : ℝ, ∀ x : ℝ, x₀ ≤ x → s₀ * Gz x ≤ C * x ^ θ) →
-  ∀ s : ℂ, θ < s.re → riemannZeta s ≠ 0
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Direction: **either** sign (s₀ = ±1). A bound on Gz from above, or from below, by C·x^θ is enough. The proof body calls `landau_Z landauEq mellinSgen mellinElem zetaRealNonvanish`, i.e. a Landau-lemma argument on a Mellin transform, using that ζ has no real zeros in (0, 1).
 
 **[VERBATIM-LEAN]** `Formalism/SizeWindowBrackets/PowerBoundGivesRiemannHypothesis.lean` (definition) and `.../ChainSlopeWindows/RiemannHypothesisOfPowerBound.lean` line 13 (`theorem riemann_hypothesis_of_power_bound : PowerBoundGivesRiemannHypothesis`):
 
-```lean
-def PowerBoundGivesRiemannHypothesis : Prop :=
-  ∀ C ε₁ : ℝ, 0 < ε₁ →
-    (∀ ε : ℝ, 0 < ε → ε < ε₁ → ∃ x₀ : ℝ, ∀ x : ℝ, x₀ ≤ x → Gz x ≤ x ^ (1 / 2 + C * ε)) →
-    RiemannHypothesis
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Direction: an **upper** bound on Gz. The proof is 25 readable lines: `zetaLandauEps` gives ζ(s) ≠ 0 for Re s > 1/2, then `riemannHypothesis_of_zero_free_halfPlane` (functional equation) gives Mathlib's `RiemannHypothesis`.
@@ -126,13 +102,8 @@ Is (b) on Main's path? **Not shown.** `riemann_hypothesis_of_power_bound` has on
 
 **[VERBATIM-LEAN]** `Formalism/SharpRestriction/RamificationFrobenius/TotientGaloisClasses/ExplicitFormulaErrorOfHostConditions.lean`:
 
-```lean
-def wt (ψ : PChar) : ℝ := if Λ.psK = some ψ then 1 else (3 * (Λ.o : ℝ) + 1)⁻¹
-
-def Gm (y : ℝ) : ℝ := Formalism.Gz y + ∑ ψ ∈ Λ.Nt, Λ.wt ψ * (An.gChi ψ.χ y).re
-
-def ChebyshevGrowthImpliesZeroFree : Prop :=
-  ∀ θ : ℝ, 0 < θ → θ < 1 → ∀ y0 : ℝ, (∀ y ≥ y0, Λ.Gm y ≤ y ^ θ) → Λ.ZeroFreeAbove θ
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Here `Λ` is a `Level`: a finite set `KEPT` of primitive Dirichlet characters containing the trivial one and closed under inverse (`PrimePairSizeCondition.lean`). `Nt` is `KEPT` minus the trivial character. `gChi` is the character analogue of `Gz` (**[VERBATIM-LEAN]** `.../TotientGaloisClasses/Analytic.lean`: `sumLamChi χ y + (y : ℂ) * logDerivativeAtOne χ`). `ZeroFreeAbove θ` means every L(s, ψ) with ψ in `KEPT` is nonzero for Re s > θ.
@@ -143,18 +114,14 @@ Proved: `theorem zero_free_of_Chebyshev_growth (Lv : Level) : Lv.ChebyshevGrowth
 
 The form Main's path actually calls is a "windowed" variant. **[VERBATIM-LEAN]** `.../TotientGaloisClasses/Window.lean`:
 
-```lean
-def HasWindows (S : Set ℝ) (la : ℝ) : Prop :=
-  ∀ y : ℝ, ∃ Y : ℝ, y ≤ Y ∧ ∀ x : ℝ, Y ≤ x → x ≤ Y ^ la → x ∈ S
-
-def FormBAt (la : ℝ) : Prop :=
-  ∀ θ : ℝ, 0 < θ → θ < 1 → HasWindows {x | Λ.Gm x ≤ x ^ θ} la → Λ.ZeroFreeAbove θ
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 That is: the bound `Gm x ≤ x^θ` need not hold for all large x. It is enough that it holds on windows [Y, Y^la] starting arbitrarily far out. The matching supply statement (**[VERBATIM-LEAN]** `.../TopWin.lean`, `ChebyshevInequalityOnWindows`) ends in
 
-```lean
-∃ x1 : ℝ, ∀ x ≥ x1, x ∈ (core Fm).Win → Λ.Gm x ≤ x ^ ((1 : ℝ) / 2 + (eD + eL + 7) * eps)
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 and `theorem level_of_tiedWin` (same file, 14 lines, read in full) combines the two to get `Λ.ZeroFreeLevel`, which is `ZeroFreeAbove (1/2)`.
@@ -239,16 +206,8 @@ Verdict labels: **resolved-by-verbatim-read**, **suggested-by-names-only**, **un
 
 **[VERBATIM-LEAN]** `Formalism/BehrendSets/Statement.lean`:
 
-```lean
-def BehrendFree (K : ℕ) (T : Finset ℕ) : Prop :=
-  ∀ α β γ : ℤ, α ≠ 0 → β ≠ 0 → γ ≠ 0 → α + β + γ = 0 →
-    |α| ≤ (K : ℤ) → |β| ≤ (K : ℤ) → |γ| ≤ (K : ℤ) →
-    ∀ x₁ ∈ T, ∀ x₂ ∈ T, ∀ x₃ ∈ T,
-      α * (x₁ : ℤ) + β * (x₂ : ℤ) + γ * (x₃ : ℤ) = 0 → x₁ = x₂ ∧ x₂ = x₃
-
-def BehrendBound : Prop := ∃ C : ℝ, 0 < C ∧ ∀ K N : ℕ, 1 ≤ K → 1 ≤ N →
-  ∃ T : Finset ℕ, T ⊆ range N ∧ BehrendFree K T ∧
-    (N : ℝ) * Real.exp (-C * Real.sqrt (Real.log N * Real.log ((K : ℝ) + 1))) ≤ (T.card : ℝ)
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Why this settles it:
@@ -262,10 +221,8 @@ Caveat: `BehrendBound` and `BehrendFree` occur only in `BehrendSets/Statement.le
 
 [READ] on the note's phrase "precise choice of the Iwasawa tower, specifically using Behrend": the same file defines, right above `BehrendFree`,
 
-```lean
-abbrev OrdGrp (s : ℕ) : Type :=
-  (ZMod (2 ^ (s + 2)))ˣ ⧸ Subgroup.zpowers (-1 : (ZMod (2 ^ (s + 2)))ˣ)
-def OrdCard : Prop := ∀ s : ℕ, Nat.card (OrdGrp s) = 2 ^ s ∧ IsCyclic (OrdGrp s)
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 and Frobenius elements `frob s l` in it. **[BG]** (Z/2^(s+2))ˣ/±1 is the Galois group of the real 2^(s+2)-th cyclotomic field over Q, cyclic of order 2^s. So the Behrend-type "thick" sets are subsets of the Galois group of a layer of the 2-power cyclotomic tower, chosen so that Frobenius orbits meet them rarely (`WindowTwo`: at most 2 hits per window). That fits the note's phrase well. It is still my reading of how the pieces relate.
@@ -274,9 +231,8 @@ and Frobenius elements `frob s l` in it. **[BG]** (Z/2^(s+2))ˣ/±1 is the Galoi
 
 **[VERBATIM-LEAN]** `Formalism/BehrendSets/StatementE.lean`:
 
-```lean
-def vand {r : ℕ} (u : Fin r → ℝ) : ℝ := ∏ i : Fin r, ∏ j ∈ Finset.Ioi i, (u i - u j)
-def dimV {r : ℕ} (u : Fin r → ℝ) : ℝ := vand u / ∏ i : Fin r, ((i : ℕ).factorial : ℝ)
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 **[BG]** A Vandermonde product divided by ∏ i! is the Weyl dimension formula for an irreducible representation of U(r). The same file's `CountIdentity` compares `mass (k+m−1) · ∏ dimV(w ρ)` with `mass k · ∏ dimV(u ρ)`, where `mass` obeys a recursion with factors `(r−1)! · (v/π)^r`. That is the shape of a mass formula for unitary groups times Weyl dimensions, with `m` steps between rank k and rank k+m−1. This is the closest thing I found to item 9's "Chowla-Selberg, Weyl, and Siegel mass". The name "Weyl" does not appear, and I didn't check where `CountIdentity` is used. So: the dimension-formula reading (my original guess) is now supported by a formula read verbatim, not confirmed.
@@ -285,10 +241,8 @@ def dimV {r : ℕ} (u : Fin r → ℝ) : ℝ := vand u / ∏ i : Fin r, ((i : �
 
 **[VERBATIM-LEAN]** `Statements.lean` (whole file is 16 lines). The four GRH-type statements all quantify over `(N : ℕ) [NeZero N] (χ : DirichletCharacter ℂ N)` and use Mathlib's `DirichletCharacter.LFunction`. For example:
 
-```lean
-def DirichletLNonvanishingRightOfHalf : Prop :=
-  ∀ (N : ℕ) [NeZero N] (χ : DirichletCharacter ℂ N) (s : ℂ),
-    1 / 2 < s.re → (χ ≠ 1 ∨ s ≠ 1) → DirichletCharacter.LFunction χ s ≠ 0
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 So "GRH" here means: all Dirichlet L-functions, every modulus, every character. No Dedekind zeta functions, no Hecke L-functions. **[STATUS-PAGE]** Sutherland's page says the same. **[NOTE]** ERH is described as expected "with more time", so it is not claimed. Convention A of the decode (GRH = Dirichlet, ERH = number fields) is the one in force.
@@ -297,14 +251,8 @@ So "GRH" here means: all Dirichlet L-functions, every modulus, every character. 
 
 **[VERBATIM-LEAN]** `Development/AutomorphicArithmetic/CharacterBoxes/ExistsPageN.lean` (quoted in `research-lean-main-statements.lean`, section 12):
 
-```lean
-def VVle (E : Type) [Field E] [NumberField E] (t : ℕ) (B : ℝ) : Prop :=
-  ∀ (Ω : Type) ... (ld : ∀ (p : ℕ) [Fact p.Prime], Formalism.GaloisCohomology.LData E Ω p),
-    (∀ (p : ℕ) [Fact p.Prime] (e : ℕ), 0 < e → e < t → Formalism.GaloisCohomology.shaLen (ld p) (e : ℤ) ≠ ⊤) ∧
-    ∀ S : Finset Nat.Primes,
-      ∑ l ∈ S, Real.log (l : ℕ) * ∑ e ∈ Finset.Ico 1 t, (... shaLen ... (e : ℤ)).toNat ≤ B
-
-def VWin : Prop := ∀ ψ : PChar, VWinAt ψ 401
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 What is verbatim: `VWin` is a hypothesis of the final assembly (`plugWin (hG) (hV : VWin) ...`), and it is discharged by a theorem (`vwin_of_row`), not assumed. Its content is: for certain number fields E, a quantity `shaLen` indexed by a prime and an integer twist e is finite for 0 < e < t, and Σ_l log l · Σ_e shaLen ≤ B. In use, t is about x^401 and B is √(exp(x^ε)) (`VAt`).
@@ -317,15 +265,8 @@ So for the script: "the proof needs, and the Lean contains a proof of, a quantit
 
 **[VERBATIM-LEAN]** same file:
 
-```lean
-def IsChiField (ψ : PChar) (e q d : ℕ) (E : Type) [Field E] [NumberField E] : Prop :=
-  ∃ (N : ℕ) (_ : NeZero N) (j : E →ₐ[ℚ] CyclotomicField N ℚ) (ζ : CyclotomicField N ℚ),
-    2 ^ (e + 2) ∣ N ∧ ψ.N ∣ N ∧ q ∣ N ∧ d ∣ N ∧ IsPrimitiveRoot ζ N ∧ ...
-      ((∀ x : E, τ (j x) = j x) ↔
-        (a ≡ 1 [MOD 2 ^ (e + 2)] ∨ a + 1 ≡ 0 [MOD 2 ^ (e + 2)]) ∧ ψ.val a = 1 ∧
-          jacobiSym (a : ℤ) q = 1 ∧ jacobiSym (a : ℤ) d = 1)
-
-def PageN (eps x : ℝ) (e : ℕ) : Prop := x ^ (2 + 8 * eps) ≤ (2 : ℝ) ^ e ∧ (2 : ℝ) ^ e ≤ 2 * x ^ (2 + 8 * eps)
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 Reading the Galois condition: E is the subfield of a cyclotomic field fixed by the automorphisms ζ ↦ ζ^a with a ≡ ±1 mod 2^(e+2), ψ(a) = 1, and a a square modulo two auxiliary primes q and d. **[BG]** So E is the compositum of the real 2^(e+2)-th cyclotomic field, the field cut out by ψ, and two quadratic fields. `PageN` ties the level to x: 2^e is about x^(2+8ε). `WinPair` requires q ≡ 3 mod 8 and d ≡ 7 mod 16.
@@ -336,8 +277,8 @@ Resolved: the Lean's tower is the **2-power cyclotomic tower** (the cyclotomic Z
 
 **[VERBATIM-LEAN]** `Formalism/SizeWindowBrackets/GrowthBoundGivesRiemannHypothesis.lean`, inside `SizeWindows`:
 
-```lean
-x ^ ((1 : ℝ) / 2 - ε) ≤ m ∧ (m : ℝ) ≤ x ^ ((1 : ℝ) / 2 + ε / 2) ∧
+```text
+[verbatim Lean excerpt omitted from the public copy. The archive is the author's work, published via https://alpo.ge/remark.pdf; the prose around this block describes what it says.]
 ```
 
 So a natural-number parameter `m` of size about √x sits in the size conditions of the RH-only endgame, and `m` indexes `w : H → Fin m → E0 × H → ℝ`. The directory is called `ChainSlopeWindows` and a predicate on Main's path is called `ChainTied`. It is tempting to say "there is the chain of length √X". I can't support that: I don't know what `m` counts, this file is the track not shown to be on Main's path, and "Chain" in a machine-generated name is weak evidence. **Keep off screen.** If the user wants it checked, the place to look is where `SizeWindows` is instantiated (`SChain.lean`, `PChain.lean`, `FixedEpsilonConcreteGrowthBound.lean`).

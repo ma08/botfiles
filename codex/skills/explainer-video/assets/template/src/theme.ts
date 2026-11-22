@@ -1,12 +1,12 @@
-import {loadFont as loadInstrumentSerif} from '@remotion/google-fonts/InstrumentSerif';
-import {loadFont as loadInter} from '@remotion/google-fonts/Inter';
-import {loadFont as loadJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
-import {loadFont as loadCormorant} from '@remotion/google-fonts/CormorantGaramond';
-import {loadFont as loadDMSans} from '@remotion/google-fonts/DMSans';
-import {loadFont as loadDMMono} from '@remotion/google-fonts/DMMono';
-import {loadFont as loadNewsreader} from '@remotion/google-fonts/Newsreader';
-import {loadFont as loadPlexSans} from '@remotion/google-fonts/IBMPlexSans';
-import {loadFont as loadPlexMono} from '@remotion/google-fonts/IBMPlexMono';
+import {loadFont as loadInstrumentSerif, getInfo as infoInstrumentSerif} from '@remotion/google-fonts/InstrumentSerif';
+import {loadFont as loadInter, getInfo as infoInter} from '@remotion/google-fonts/Inter';
+import {loadFont as loadJetBrainsMono, getInfo as infoJetBrainsMono} from '@remotion/google-fonts/JetBrainsMono';
+import {loadFont as loadCormorant, getInfo as infoCormorant} from '@remotion/google-fonts/CormorantGaramond';
+import {loadFont as loadDMSans, getInfo as infoDMSans} from '@remotion/google-fonts/DMSans';
+import {loadFont as loadDMMono, getInfo as infoDMMono} from '@remotion/google-fonts/DMMono';
+import {loadFont as loadNewsreader, getInfo as infoNewsreader} from '@remotion/google-fonts/Newsreader';
+import {loadFont as loadPlexSans, getInfo as infoPlexSans} from '@remotion/google-fonts/IBMPlexSans';
+import {loadFont as loadPlexMono, getInfo as infoPlexMono} from '@remotion/google-fonts/IBMPlexMono';
 
 /**
  * Theme presets. Pick one with PRESET below (scripts/new_project.py --theme rewrites that line),
@@ -62,38 +62,42 @@ const PALETTES: Record<PresetName, Palette> = {
   },
 };
 
-// All character subsets load (Greek, symbols, extended Latin). Display serifs often lack math glyphs such as √ ∑ ∏;
-// use the components in src/components/Math.tsx for radicals and fractions instead of relying on font fallback.
+// Load Latin, extended Latin, Greek and math symbol subsets where each font has them (fewer network requests than all
+// subsets). Display serifs often lack math glyphs such as √ ∑ ∏; use src/components/Math.tsx for radicals and fractions.
+const WANTED_SUBSETS = ['latin', 'latin-ext', 'greek', 'symbols2'];
+// Filtered from the font's own subset list, so always valid; cast because each font types its subsets differently.
+const subsetsOf = (info: () => {subsets: string[]}) => info().subsets.filter((x) => WANTED_SUBSETS.includes(x)) as never[];
+
 const loadFontsFor = (p: PresetName): FontSet => {
   switch (p) {
     case 'zone-night':
       return {
-        display: loadCormorant('italic', {weights: ['400', '500']}).fontFamily,
+        display: loadCormorant('italic', {weights: ['400', '500'], subsets: subsetsOf(infoCormorant)}).fontFamily,
         displayStyle: 'italic',
-        body: loadDMSans('normal', {weights: ['300', '400', '500']}).fontFamily,
-        mono: loadDMMono('normal', {weights: ['400']}).fontFamily,
+        body: loadDMSans('normal', {weights: ['300', '400', '500'], subsets: subsetsOf(infoDMSans)}).fontFamily,
+        mono: loadDMMono('normal', {weights: ['400'], subsets: subsetsOf(infoDMMono)}).fontFamily,
       };
     case 'paper':
       return {
-        display: loadNewsreader('italic', {weights: ['400', '500']}).fontFamily,
+        display: loadNewsreader('italic', {weights: ['400', '500'], subsets: subsetsOf(infoNewsreader)}).fontFamily,
         displayStyle: 'italic',
-        body: loadPlexSans('normal', {weights: ['300', '400', '500']}).fontFamily,
-        mono: loadPlexMono('normal', {weights: ['400']}).fontFamily,
+        body: loadPlexSans('normal', {weights: ['300', '400', '500'], subsets: subsetsOf(infoPlexSans)}).fontFamily,
+        mono: loadPlexMono('normal', {weights: ['400'], subsets: subsetsOf(infoPlexMono)}).fontFamily,
       };
     case 'observatory':
       return {
-        display: loadInstrumentSerif('italic', {weights: ['400']}).fontFamily,
+        display: loadInstrumentSerif('italic', {weights: ['400'], subsets: subsetsOf(infoInstrumentSerif)}).fontFamily,
         displayStyle: 'italic',
-        body: loadPlexSans('normal', {weights: ['300', '400', '500']}).fontFamily,
-        mono: loadPlexMono('normal', {weights: ['400']}).fontFamily,
+        body: loadPlexSans('normal', {weights: ['300', '400', '500'], subsets: subsetsOf(infoPlexSans)}).fontFamily,
+        mono: loadPlexMono('normal', {weights: ['400'], subsets: subsetsOf(infoPlexMono)}).fontFamily,
       };
     case 'ink':
     default:
       return {
-        display: loadInstrumentSerif('normal', {weights: ['400']}).fontFamily,
+        display: loadInstrumentSerif('normal', {weights: ['400'], subsets: subsetsOf(infoInstrumentSerif)}).fontFamily,
         displayStyle: 'normal',
-        body: loadInter('normal', {weights: ['300', '400', '500']}).fontFamily,
-        mono: loadJetBrainsMono('normal', {weights: ['400']}).fontFamily,
+        body: loadInter('normal', {weights: ['300', '400', '500'], subsets: subsetsOf(infoInter)}).fontFamily,
+        mono: loadJetBrainsMono('normal', {weights: ['400'], subsets: subsetsOf(infoJetBrainsMono)}).fontFamily,
       };
   }
 };

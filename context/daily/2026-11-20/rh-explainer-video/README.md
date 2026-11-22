@@ -154,4 +154,4 @@ python3 scripts/make_srt.py
 - **Rendering:** Remotion, https://www.remotion.dev. Check its licence before reusing commercially: https://www.remotion.dev/license.
 - **Voice and music:** ElevenLabs (AI-generated; disclosed on the end card).
 - **Fonts:** Cormorant Garamond, DM Sans and DM Mono from Google Fonts, loaded through `@remotion/google-fonts`.
-- **Code and writeup:** written by AI agents under Sourya Kakarla's direction. MIT licensed with the rest of this repo, except third-party material cited above.
+- **Licence scope:** the code and prose in this folder were written by AI agents under Sourya Kakarla's direction and are MIT licensed with the rest of this repo. Not covered by that licence: the generated narration and music in `project/public/` (made with ElevenLabs, whose terms apply), and quoted third-party material (the note, short Lean excerpts from the author's archive, Mathlib, and quotes from public pages and forum posts), which remains its authors'.
