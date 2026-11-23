@@ -166,14 +166,14 @@ Treat context as sufficient when you can already identify:
 - a plausible first-pass implementation or investigation plan
 
 If critical planning context is still missing:
-- Ask one focused question at a time with `request_user_input`.
+- Ask one focused question at a time using the active harness's interactive question tool (`ask_question` in Antigravity, `request_user_input` in Codex, or `AskUserQuestion` in Claude Code).
 - Put the currently recommended option first and include short tradeoff descriptions.
 - Prefer answering questions by inspecting code, docs, tracker history, or saved task artifacts instead of asking the user.
 - Save substantive answers as additional Markdown notes under `user_inputs/`.
 
 ### Step 10: Draft the First-Pass Plan and Ask for Approval
 - Update `status.md` with the current state and a `## Proposed Plan` section before asking for implementation approval.
-- Present the plan review using `request_user_input` instead of a plain-text “should I continue?” follow-up.
+- Present the plan review using the active harness's interactive question tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) instead of a plain-text “should I continue?” follow-up.
 - Include these options at minimum:
   - `Approve plan`
   - `Grill more`
@@ -202,7 +202,7 @@ The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`
 - Tracker Human ID: <ZON-8|owner/repo#123|none>
 - Tracker Title: <title|none>
 - Machine: <SYSTEM_NAME|hostname|unknown>
-- Coding Agent: <codex|claude|unknown>
+- Coding Agent: <codex|claude|antigravity|unknown>
 - Agent Session ID: <id|none>
 - Task Folder: </abs/task/folder|none>
 - Task Status Path: </abs/task/status.md|none>

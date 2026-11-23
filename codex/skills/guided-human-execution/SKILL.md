@@ -43,7 +43,7 @@ Keep each step short and concrete. A good step usually includes:
 - **Stop condition:** what should make the user pause and report back.
 - **Confirmation request:** ask the user to reply when done, or choose between options.
 
-Use `request_user_input` when available for meaningful choices with 2-3 concrete options. For simple "do this and tell me when done" confirmations, a concise plain-text prompt is usually better.
+Use the active harness's interactive question tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) when available for meaningful choices with 2-3 concrete options. For simple "do this and tell me when done" confirmations, a concise plain-text prompt is usually better.
 
 ## Safety Gates
 

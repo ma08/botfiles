@@ -1,10 +1,10 @@
 ---
 name: continue-task
 description: >-
-  Take over an interrupted tracked task from a previous Codex or Claude
-  session by resolving the existing task home from a tracker ref, task slug,
-  status file, or zellij session, then syncing the status file to the current
-  session and reading the status plus transcript tail before continuing.
+  Take over an interrupted tracked task from a previous Codex, Claude, or
+  Antigravity session by resolving the existing task home from a tracker ref,
+  task slug, status file, or zellij session, then syncing the status file to the
+  current session and reading the status plus transcript tail before continuing.
 ---
 
 # Continue Task

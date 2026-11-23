@@ -1,11 +1,11 @@
 ---
 name: create-goal-plan
-description: Create a short Markdown goal-plan file for Codex CLI `/goal` usage. Use when the user asks to create, distill, or prepare a Codex goal plan from an existing task, accepted plan, status file, grill-me result, bug report, implementation plan, or when they want a crisp objective file for a long-running Codex goal.
+description: Create a short Markdown goal-plan file for `/goal` usage (Codex CLI or Antigravity). Use when the user asks to create, distill, or prepare a goal plan from an existing task, accepted plan, status file, grill-me result, bug report, implementation plan, or when they want a crisp objective file for a long-running autonomous goal.
 ---
 
 # Create Goal Plan
 
-Create a compact Markdown file that Codex can consume with `/goal <path>`. The file is a goal handoff, not the canonical planning document.
+Create a compact Markdown file that a coding agent can consume with `/goal <path>`. The file is a goal handoff, not the canonical planning document.
 
 Keep heavy planning in the active task `status.md`, `## Accepted Plans`, or dedicated plan artifacts. The goal plan should cite those paths and compress the work into one concrete outcome plus the minimum context, constraints, process, and verification criteria.
 
@@ -61,7 +61,7 @@ Done when:
 
 - Make the first line an outcome with a verb and a concrete end state.
 - Cite the full plan/status path in `Context` when one exists.
-- Include only context the next Codex agent needs to start correctly.
+- Include only context the next coding agent needs to start correctly.
 - Include explicit "do not change" constraints when the task touches a dirty worktree, live system, public content, data deletion, migrations, secrets, auth, or external APIs.
 - Prefer repo-local validation commands from existing docs over invented checks.
 - Mention live API/network/destructive-operation boundaries when relevant.

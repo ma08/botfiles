@@ -66,7 +66,9 @@ exception.
   user to repaste the card.
 - Mark `working` only when investigation actually begins.
 - For a needed choice, record `waiting_user` with the exact question and two or
-  three concrete options, then use `request_user_input` in the same turn.
+  three concrete options, then use the active harness's interactive question
+  tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) in the same
+  turn.
 - For a concrete result, record `outcome_ready`. Record `completed` only when
   the requested work and verification are complete.
 - Use `--result-file` for long results.

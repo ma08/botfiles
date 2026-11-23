@@ -113,12 +113,13 @@ Only offer the combined commit-and-close option for changes you can scope
 clearly. If unrelated or ambiguous dirty files are mixed in, show the scoped file
 set and ask before staging anything.
 
-For post-merge branch cleanup, prefer `request_user_input` when available if a
-checkout has dirty tracked changes, untracked files that may conflict, unmerged
-local commits, or multiple plausible default branches. Offer explicit choices to
-switch to the updated default branch now, preserve the branch and skip switching,
-or pause for manual cleanup. If `request_user_input` is unavailable, ask the same
-approval question concisely in chat.
+For post-merge branch cleanup, prefer the active harness's interactive question
+tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) when available
+if a checkout has dirty tracked changes, untracked files that may conflict,
+unmerged local commits, or multiple plausible default branches. Offer explicit
+choices to switch to the updated default branch now, preserve the branch and
+skip switching, or pause for manual cleanup. If no interactive question tool is
+available, ask the same approval question concisely in chat.
 
 ## Step 4: Execute closeout in a safe order
 

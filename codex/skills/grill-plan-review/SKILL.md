@@ -12,7 +12,9 @@ approval trail.
    Resolve discoverable facts yourself instead of asking the user.
 2. Extract only decisions that materially change scope, safety, cost,
    reversibility, sequencing, validation, or stopping conditions.
-3. Use `request_user_input` for one focused decision at a time with 2-3
+3. Use the active harness's interactive multiple-choice question tool
+   (`ask_question` in Antigravity, `request_user_input` in Codex, or
+   `AskUserQuestion` in Claude Code) for one focused decision at a time with 2-3
    concrete options. Put the recommended option first, label it
    `(Recommended)`, and explain its rationale and tradeoff in the description.
 4. After every answer, state the locked implication in one or two sentences,

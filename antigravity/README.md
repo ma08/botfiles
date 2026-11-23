@@ -1,13 +1,15 @@
 # Antigravity Global Config
 
-Shared global skill registration and lifecycle notification hooks for Google Antigravity (`~/.gemini/config/`).
+Shared global instructions, modular rules, skill registration, and lifecycle notification hooks for Google Antigravity (`~/.gemini/config/`).
 
 ## Layout & Symlinks
 
-`setup.sh` creates four symlinks inside `~/.gemini/config/`:
+`setup.sh` creates six symlinks inside `~/.gemini/config/`:
 
+- `~/.gemini/config/AGENTS.md` -> `antigravity/AGENTS.md` (core always-on global instructions, kept strictly under Antigravity's 24,000-byte per-file limit)
+- `~/.gemini/config/rules` -> `antigravity/rules/` (modular `trigger: model_decision` domain playbooks for Oracle, cross-session orchestration, and diagrams/browser automation)
 - `~/.gemini/config/botfiles-skills` -> `codex/skills/` (kept under a non-default name so it does not auto-load at priority 3 or collide with personal `~/.gemini/config/skills/`)
-- `~/.gemini/config/skills.json` -> `antigravity/skills.json` (loads `botfiles-skills` at priority 5 so workspace skills, installed plugins, and built-ins always take precedence, with explicit exclusions for Codex-only or plugin-overlapping skills)
+- `~/.gemini/config/skills.json` -> `antigravity/skills.json` (loads `botfiles-skills` via relative path with explicit exclusions for harness-specific or plugin-overlapping skills)
 - `~/.gemini/config/hooks` -> `antigravity/hooks/`
 - `~/.gemini/config/hooks.json` -> `antigravity/hooks.json`
 

@@ -1,24 +1,24 @@
 ---
-name: sync-codex-claude-skills
-description: Compare, audit drift, and sync skills between botfiles-style visible skill trees (`claude/skills`, `codex/skills`) or hidden project-local skill trees (`.claude/skills`, `.codex/skills`), and sync local Codex skills against upstream skill repositories such as OpenAI curated skills or the Oracle skill with protected local forks. Use when the user asks to keep skills aligned across Claude and Codex, compare local skills to upstream, sync all or selected skills, or identify where drift exists.
+name: sync-agent-skills
+description: Compare, audit drift, and sync skills across coding-agent skill trees (botfiles-style visible `claude/skills` and `codex/skills` loaded by Codex and Antigravity via `antigravity/skills.json`, or hidden project-local `.claude/skills`, `.codex/skills`, and `.agents/skills`), and sync local canonical skills against upstream skill repositories such as OpenAI curated skills or the Oracle skill with protected local forks. Use when the user asks to keep skills aligned across Claude, Codex, and Antigravity, compare local skills to upstream, sync all or selected skills, or identify where drift exists.
 ---
 
-# Sync Codex Claude Skills
+# Sync Agent Skills
 
-Compare skill directories across Claude and Codex, and compare local Codex skills against upstream skill repositories. Use dry-run first, then apply only the changes you intend.
+Compare skill directories across Claude, Codex, and Antigravity (which loads `botfiles/codex/skills` through `antigravity/skills.json`), and compare local canonical skills against upstream skill repositories. Use dry-run first, then apply only the changes you intend.
 
 ## Script
 
 Use:
 
 ```bash
-python ~/pro/botfiles/codex/skills/sync-codex-claude-skills/scripts/sync_skills.py ...
+python ~/pro/botfiles/codex/skills/sync-agent-skills/scripts/sync_skills.py ...
 ```
 
 For upstream curated sync:
 
 ```bash
-python ~/pro/botfiles/codex/skills/sync-codex-claude-skills/scripts/sync_upstream_skills.py ...
+python ~/pro/botfiles/codex/skills/sync-agent-skills/scripts/sync_upstream_skills.py ...
 ```
 
 The script auto-discovers repo root from the current directory. It supports both the botfiles/global visible layout (`claude/skills`, `codex/skills`) and the normal hidden project-local layout (`.claude/skills`, `.codex/skills`). If needed, pass an explicit root:
@@ -33,7 +33,7 @@ The upstream sync script uses `upstream_sync_policy.json` in this skill director
 
 - For ordinary project-local skills, prefer `.claude/skills` and `.codex/skills`.
 - Treat visible `claude/skills` and `codex/skills` as the botfiles/global exception unless a repo clearly documents a different convention.
-- Botfiles uses visible skill directories because user-level global skill paths are symlinked there for source control and easier inspection.
+- Botfiles uses visible skill directories because user-level global skill paths are symlinked there for source control and easier inspection. Antigravity loads `codex/skills` directly through `~/.gemini/config/skills.json` (`botfiles-skills`, with explicit exclusions in `antigravity/skills.json`), so updating `codex/skills` updates Codex and Antigravity together.
 
 ## Workflow A: Claude <-> Codex
 
@@ -151,7 +151,7 @@ Without `--force-protected`, a protected drifted skill is reported as `skip-prot
 
 ## Workflow C: Oracle Upstream Drift Check
 
-The Oracle skill is derived from `steipete/oracle:skills/oracle`, but it is a protected local workflow fork because it carries local GPT-5.5 Pro browser defaults and fallback policy. Use this workflow to check drift against upstream. Do not overwrite the local Oracle skill unless you are intentionally refreshing from upstream and then reapplying the local policy.
+The Oracle skill is derived from `steipete/oracle:skills/oracle`, but it is a protected local workflow fork because it carries local GPT-6 Astra + Pro browser defaults and fallback policy. Use this workflow to check drift against upstream. Do not overwrite the local Oracle skill unless you are intentionally refreshing from upstream and then reapplying the local policy.
 
 ### 1. Check Oracle drift
 
@@ -180,7 +180,7 @@ python scripts/sync_upstream_skills.py \
   sync --skills oracle --force-protected --apply
 ```
 
-This replaces `codex/skills/oracle` from upstream and mirrors the changed Oracle skill into `claude/skills/oracle`. Afterward, reapply the local GPT-5.5 Pro browser defaults, validate both skill copies, and re-check the Oracle awaiter agents and global instructions for drift.
+This replaces `codex/skills/oracle` from upstream and mirrors the changed Oracle skill into `claude/skills/oracle`. Afterward, reapply the local GPT-6 Astra + Pro browser defaults, validate both skill copies, and re-check the Oracle awaiter agents and global instructions (Codex, Claude, and Antigravity `rules/oracle-workflow.md`) for drift.
 
 ## Post-Sync Checks
 

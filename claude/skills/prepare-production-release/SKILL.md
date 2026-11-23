@@ -45,7 +45,7 @@ Discover project facts from `AGENTS.md`, `CLAUDE.md`, README files, build/packag
 
 ### 2. Run a short decision intake
 
-Inspect discoverable facts first. Then ask only decision questions, one at a time, in a `grill-me` style. Use `request_user_input` when available, put the recommended option first, and state the locked implication after each answer.
+Inspect discoverable facts first. Then ask only decision questions, one at a time, in a `grill-me` style. Use the active harness's interactive question tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) when available, put the recommended option first, and state the locked implication after each answer.
 
 Normally ask 5 to 7 questions. Keep the total below 10 unless a newly discovered material risk requires one more decision. Cover:
 

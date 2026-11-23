@@ -9,9 +9,10 @@
 - `codex/` stores the portable Codex system base, explicit profile overrides,
   custom agents, synced skills, and global instructions
   (`config.system.toml`, `*.config.toml`, `agents/`, `skills/`, `AGENTS.md`).
-- `antigravity/` stores global Google Antigravity `skills.json` (exposing shared
-  `codex/skills` at priority 5 with exclusions) and `hooks.json`/`hooks/` for
-  shared turn-completion and `ask_question` notifications (`~/.gemini/config/`).
+- `antigravity/` stores global Google Antigravity instructions (`AGENTS.md`),
+  modular `rules/*.md` (`model_decision` playbooks), `skills.json` (exposing
+  shared `codex/skills` with exclusions), and `hooks.json`/`hooks/` for shared
+  turn-completion and `ask_question` notifications (`~/.gemini/config/`).
 - `secrets/` contains centralized secret templates (`templates/`) and local runtime secret files (`local/`, git-ignored).
 - `codex/skills/.system/` is machine-managed and git-ignored (may vary by OS/Codex version).
 - `.botrc` sources centralized secrets from `secrets/local/*.rc` for your shell.

@@ -30,7 +30,7 @@ The runbook is the complete live collection, card, ingestion, approval, and publ
 - Treat every active or paused automation target as a protected destination.
 - Do not let a card or interactive work request preempt a scheduled run.
 - Represent owner decisions as durable cards with grounded evidence and concrete options. Do not perform the external action during this run.
-- Do not call `request_user_input` in scheduled mode. Manual mode may explain a genuine blocker, but it must not transfer work to a scheduled task.
+- Do not call an interactive question tool (`request_user_input`, `ask_question`, or `AskUserQuestion`) in scheduled mode. Manual mode may explain a genuine blocker, but it must not transfer work to a scheduled task.
 
 ## Run one bounded collection
 

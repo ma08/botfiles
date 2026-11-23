@@ -632,6 +632,26 @@ def resolve_claude_transcript_path(
     return "none"
 
 
+def resolve_antigravity_transcript_path(agent_session_id: str) -> str:
+    normalized = (agent_session_id or "").strip()
+    if not normalized or normalized == "none":
+        return "none"
+    for root_name in ("antigravity", "antigravity-cli", "antigravity-ide"):
+        candidate = (
+            Path.home()
+            / ".gemini"
+            / root_name
+            / "brain"
+            / normalized
+            / ".system_generated"
+            / "logs"
+            / "transcript.jsonl"
+        )
+        if candidate.is_file():
+            return str(candidate.resolve())
+    return "none"
+
+
 def resolve_transcript_path(
     coding_agent: str,
     agent_session_id: str,
@@ -647,6 +667,8 @@ def resolve_transcript_path(
         return resolve_codex_transcript_path(normalized_session_id, env)
     if normalized_agent == "claude":
         return resolve_claude_transcript_path(normalized_session_id, project_root=project_root)
+    if normalized_agent == "antigravity":
+        return resolve_antigravity_transcript_path(normalized_session_id)
     return "none"
 
 
@@ -1219,6 +1241,8 @@ def build_github_authorship_byline(coding_agent: str) -> str | None:
         return "_Written by Codex via the developer's authenticated GitHub account._"
     if normalized == "claude":
         return "_Written by Claude Code via the developer's authenticated GitHub account._"
+    if normalized == "antigravity":
+        return "_Written by Antigravity via the developer's authenticated GitHub account._"
     return None
 
 

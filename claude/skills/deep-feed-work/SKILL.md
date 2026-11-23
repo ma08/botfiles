@@ -154,7 +154,9 @@ Use the canonical request, constraints, evidence, and links. Do not ask the
 user to repaste the card. Collaborate normally:
 
 - For a needed choice, record `waiting_user` with the exact question and two or
-  three concrete options, then use `request_user_input` in the same turn.
+  three concrete options, then use the active harness's interactive question
+  tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) in the same
+  turn.
 - For a concrete partial result, record `outcome_ready` with the result.
 - Record `completed` only when the requested work and relevant verification are
   actually complete.

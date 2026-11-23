@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Deep Feed"
+  short_description: "Collect sources and publish a fresh edition"
+  default_prompt: "Use $run-deep-feed to collect current source deltas and publish a fresh Deep Feed edition now."

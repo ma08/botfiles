@@ -1,12 +1,12 @@
 ---
 name: grill-me
-description: Interview the user relentlessly about a plan, design, or decision using Codex's interactive `request_user_input` tool until you reach shared understanding. Use when the user wants to stress-test a plan, get grilled on their design, or says "grill me".
+description: Interview the user relentlessly about a plan, design, or decision using the active harness's interactive question tool (`ask_question`, `request_user_input`, or `AskUserQuestion`) until you reach shared understanding. Use when the user wants to stress-test a plan, get grilled on their design, or says "grill me".
 source: personal
 ---
 
-Use `request_user_input` to interview me relentlessly about every aspect of this plan until we reach a shared understanding.
+Use the active harness's interactive multiple-choice question tool (`ask_question` in Antigravity, `request_user_input` in Codex, or `AskUserQuestion` in Claude Code) to interview me relentlessly about every aspect of this plan until we reach a shared understanding.
 
-- Use `request_user_input` instead of plain-text questions whenever you need my input.
+- Use the interactive question tool instead of plain-text questions whenever you need my input.
 - Ask one focused question at a time with 2-3 concrete options. Put your recommended answer first and explain the tradeoff briefly in the option descriptions. Let the built-in free-form `Other` path handle answers that do not fit the choices.
 - After each answer, state the implication of that choice, give your current recommendation, and move to the next unresolved branch in the decision tree.
 - Keep digging into goals, constraints, failure modes, sequencing, ownership, and validation until the important ambiguities are resolved.

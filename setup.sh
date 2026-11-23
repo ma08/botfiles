@@ -237,7 +237,7 @@ backup_existing() {
             "$HOME/.local/bin/zotero-mcp-route.bak.$(date +%Y%m%d%H%M%S)"
     fi
 
-    for agy_item in skills.json botfiles-skills hooks.json hooks; do
+    for agy_item in AGENTS.md rules skills.json botfiles-skills hooks.json hooks; do
         agy_path="$GEMINI_CONFIG_DIR/$agy_item"
         if [ -e "$agy_path" ] && [ ! -L "$agy_path" ]; then
             echo "  Backing up antigravity $agy_item"
@@ -353,6 +353,12 @@ create_symlinks() {
 
     safe_symlink "$SCRIPT_DIR/bin/zotero-mcp-route" \
         "$HOME/.local/bin/zotero-mcp-route" "~/.local/bin/zotero-mcp-route"
+
+    safe_symlink "$SCRIPT_DIR/antigravity/AGENTS.md" \
+        "$GEMINI_CONFIG_DIR/AGENTS.md" "antigravity AGENTS.md"
+
+    safe_symlink "$SCRIPT_DIR/antigravity/rules" \
+        "$GEMINI_CONFIG_DIR/rules" "antigravity rules/"
 
     safe_symlink "$SCRIPT_DIR/codex/skills" \
         "$GEMINI_CONFIG_DIR/botfiles-skills" "antigravity botfiles-skills/"
@@ -747,7 +753,7 @@ main() {
     echo ""
     echo "Claude Code configuration is now symlinked to botfiles."
     echo "Codex skills, profiles, and AGENTS.md are now symlinked to botfiles."
-    echo "Antigravity skills.json and notification hooks are now symlinked to botfiles."
+    echo "Antigravity AGENTS.md, rules/, skills.json, and notification hooks are now symlinked to botfiles."
     echo "Existing Codex user config was preserved; a missing local overlay was created."
     echo "Zellij config is now symlinked to botfiles."
     echo "Oracle, Oracle VM, and Zotero wrappers are now symlinked into ~/.local/bin."

@@ -61,8 +61,8 @@ What this does:
 - Recomputes:
   - Primary tracker kind/url/human ID/title
   - Machine (`SYSTEM_NAME` -> hostname -> `unknown`)
-  - Coding agent (`codex|claude|unknown`)
-  - Agent session ID (for example `CODEX_THREAD_ID` when available)
+  - Coding agent (`codex|claude|antigravity|unknown`)
+  - Agent session ID (for example `CODEX_THREAD_ID`, Claude session ID, or Antigravity conversation ID when available)
   - Task folder / task status path / transcript path
   - Workspace path
   - Zellij session (`ZELLIJ_SESSION_NAME` or `none`)
@@ -104,7 +104,7 @@ The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`
 - Tracker Human ID: <ZON-8|owner/repo#123|none>
 - Tracker Title: <title|none>
 - Machine: <SYSTEM_NAME|hostname|unknown>
-- Coding Agent: <codex|claude|unknown>
+- Coding Agent: <codex|claude|antigravity|unknown>
 - Agent Session ID: <id|none>
 - Task Folder: </abs/task/folder|none>
 - Task Status Path: </abs/task/status.md|none>
@@ -133,10 +133,10 @@ The full tracker-aware contract lives in [`docs/task-status-tracker-contract.md`
 <!-- LIVE-SESSION:START -->
 ## Live Session
 
-_Written by Codex via the developer's authenticated GitHub account._
+_Written by <Codex|Claude Code|Antigravity> via the developer's authenticated GitHub account._
 
 - Machine: `machine-name`
-- Coding Agent: `codex|claude|unknown`
+- Coding Agent: `codex|claude|antigravity|unknown`
 - Agent Session ID: `id|none`
 - Transcript Path: `/abs/path/to/transcript`|`none`
 - Zellij Session: `session|none`

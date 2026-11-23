@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--github-issue-url", help="Explicit GitHub issue URL override.")
     parser.add_argument("--workspace-path", help="Explicit workspace/project root path override.")
     parser.add_argument("--machine", help="Explicit machine name override.")
-    parser.add_argument("--coding-agent", help="Explicit coding-agent name override (e.g. codex, claude).")
+    parser.add_argument("--coding-agent", help="Explicit coding-agent name override (e.g. codex, claude, antigravity).")
     parser.add_argument("--agent-session-id", help="Explicit coding-agent session id override.")
     parser.add_argument("--zellij-session", help="Explicit zellij session override.")
     parser.add_argument("--zellij-link", help="Explicit zellij link override.")
