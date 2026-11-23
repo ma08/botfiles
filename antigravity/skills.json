@@ -1,7 +1,7 @@
 {
   "entries": [
     {
-      "path": "~/.gemini/config/botfiles-skills",
+      "path": "botfiles-skills",
       "exclude": [
         "_shared",
         "chronicle",
