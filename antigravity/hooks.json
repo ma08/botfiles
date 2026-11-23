@@ -1,0 +1,23 @@
+{
+  "botfiles-notify": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "./hooks/run-antigravity-notify.sh",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/run-antigravity-notify.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

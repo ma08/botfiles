@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "path": "~/.gemini/config/botfiles-skills",
+      "exclude": [
+        "_shared",
+        "chronicle",
+        "hatch-pet",
+        "linear",
+        "notion-research-documentation",
+        "rename-active-codex-threads"
+      ]
+    }
+  ]
+}

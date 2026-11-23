@@ -21,6 +21,9 @@ claude/hooks/__pycache__/
 claude/hooks/*.py[oc]
 claude/hooks/hooks.log
 
+# Claude Code runtime skill sync cache
+claude/skills/synced/
+
 # Codex secrets
 codex/.azure_codex_config_rc
 codex/.openai_codex_config_rc

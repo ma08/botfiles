@@ -9,6 +9,9 @@
 - `codex/` stores the portable Codex system base, explicit profile overrides,
   custom agents, synced skills, and global instructions
   (`config.system.toml`, `*.config.toml`, `agents/`, `skills/`, `AGENTS.md`).
+- `antigravity/` stores global Google Antigravity `skills.json` (exposing shared
+  `codex/skills` at priority 5 with exclusions) and `hooks.json`/`hooks/` for
+  shared turn-completion and `ask_question` notifications (`~/.gemini/config/`).
 - `secrets/` contains centralized secret templates (`templates/`) and local runtime secret files (`local/`, git-ignored).
 - `codex/skills/.system/` is machine-managed and git-ignored (may vary by OS/Codex version).
 - `.botrc` sources centralized secrets from `secrets/local/*.rc` for your shell.
@@ -32,6 +35,7 @@
 - `cd claude/hooks && uv run python test_whatsapp.py` sends a manual WhatsApp test message.
 - `cd claude/hooks && uv run python ~/pro/botfiles/codex/hooks/codex_notification.py '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` sends a Codex-style test notification.
 - `~/pro/botfiles/codex/hooks/run-codex-notify.sh '{"type":"agent-turn-complete","last-assistant-message":"Codex test message"}'` tests the same notify wrapper used by `codex/config.system.toml`.
+- `printf '%s\n' '{"hookEventName":"Stop","terminationReason":"NO_TOOL_CALL","fullyIdle":true,"conversationId":"test-conv-1234"}' | ~/pro/botfiles/antigravity/hooks/run-antigravity-notify.sh --sync` tests the Antigravity notification hook wrapper used by `antigravity/hooks.json`.
 - `source ~/pro/botfiles/.botrc` loads shared Claude/Codex environment variables.
 
 ## Coding Style & Naming Conventions
