@@ -1,0 +1,442 @@
+#!/usr/bin/env bash
+# colab-account — Multi-account, keyring-free wrapper for google-colab-cli (`colab`).
+#
+# Mirrors `gws-account`: keeps per-alias authorized-user OAuth credentials in
+# 0600 files under ~/.config/colab-cli/accounts/<alias>.json and routes `colab`
+# through GOOGLE_APPLICATION_CREDENTIALS + `--auth=adc` + isolated per-alias
+# session state (~/.config/colab-cli/account-state/<alias>/sessions.json).
+#
+# This avoids:
+#   1. Linux SecretService / macOS Keychain lockups in SSH & headless agent runs
+#   2. Clobbering machine-wide `~/.config/gcloud/application_default_credentials.json`
+#   3. Cross-account session state collisions
+
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  colab-account <alias> <colab-subcommand-and-args...>
+  colab-account <alias> login [--local-server | --remote] [--login-hint EMAIL] [--expect-email EMAIL] [--url-file PATH] [--timeout SEC]
+  colab-account <alias> ccu-info [--json]
+  colab-account <alias> stop --all
+  colab-account --list
+
+Examples:
+  colab-account personal login --login-hint <you>@gmail.com --expect-email <you>@gmail.com
+  colab-account personal whoami
+  colab-account personal ccu-info
+  colab-account personal usage
+  colab-account personal sessions
+  colab-account personal run --gpu T4 train.py
+  colab-account personal stop --all
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 64
+fi
+
+colab_bin="${COLAB_BIN:-$(command -v colab || true)}"
+if [[ -z "$colab_bin" && -x "$HOME/.local/bin/colab" ]]; then
+  colab_bin="$HOME/.local/bin/colab"
+fi
+if [[ -z "$colab_bin" || ! -x "$colab_bin" ]]; then
+  echo "Error: google-colab-cli ('colab') is not installed or not on PATH." >&2
+  echo "Install it first with: uv tool install google-colab-cli" >&2
+  exit 127
+fi
+
+colab_py="$(head -n 1 "$colab_bin" | sed -n 's/^#!//p')"
+if [[ -z "$colab_py" || ! -x "$colab_py" ]]; then
+  colab_py="$(command -v python3)"
+fi
+
+accounts_dir="${COLAB_ACCOUNTS_DIR:-$HOME/.config/colab-cli/accounts}"
+state_root="${COLAB_ACCOUNT_STATE_DIR:-$HOME/.config/colab-cli/account-state}"
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ "$1" == "--list" ]]; then
+  mkdir -p "$accounts_dir"
+  chmod 700 "$accounts_dir" 2>/dev/null || true
+  shopt -s nullglob
+  files=("$accounts_dir"/*.json)
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "No colab-account aliases configured in $accounts_dir"
+    exit 0
+  fi
+  for f in "${files[@]}"; do
+    alias_item="$(basename "$f" .json)"
+    meta_file="$state_root/$alias_item/account-meta.json"
+    email_label="unknown"
+    if [[ -f "$meta_file" ]]; then
+      email_label="$("$colab_py" - "$meta_file" <<'PY'
+import json, pathlib, sys
+try:
+    d = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    print(d.get("email") or "unknown")
+except Exception:
+    print("unknown")
+PY
+)"
+    fi
+    echo "$alias_item ($email_label) -> $f"
+  done
+  exit 0
+fi
+
+if [[ $# -lt 2 ]]; then
+  usage
+  exit 64
+fi
+
+alias_name="$1"
+shift
+
+if [[ ! "$alias_name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+  echo "Error: invalid alias name '$alias_name' (use letters, digits, '.', '_', '-')." >&2
+  exit 64
+fi
+
+credentials_file="$accounts_dir/$alias_name.json"
+state_dir="$state_root/$alias_name"
+normalized_adc="$state_dir/adc.json"
+sessions_file="$state_dir/sessions.json"
+meta_file="$state_dir/account-meta.json"
+
+if [[ "$1" == "login" ]]; then
+  shift
+  mkdir -p "$accounts_dir" "$state_dir"
+  chmod 700 "$accounts_dir" "$state_dir"
+
+  exec "$colab_py" - "$alias_name" "$credentials_file" "$meta_file" "$@" <<'PY'
+import argparse
+from importlib import resources
+import json
+import os
+import pathlib
+import sys
+import urllib.parse
+import wsgiref.simple_server
+import wsgiref.util
+
+import requests
+from google_auth_oauthlib.flow import InstalledAppFlow
+from colab_cli.auth import PUBLIC_SCOPES, REMOTE_REDIRECT_URI
+
+
+def main() -> int:
+    alias_name = sys.argv[1]
+    cred_path = pathlib.Path(sys.argv[2])
+    meta_path = pathlib.Path(sys.argv[3])
+    parser = argparse.ArgumentParser(prog=f"colab-account {alias_name} login")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--local-server",
+        action="store_true",
+        help="Listen on http://localhost:<port>/ for OAuth redirect (no code copy-paste).",
+    )
+    mode.add_argument(
+        "--remote",
+        action="store_true",
+        help="Use remote copy-paste authorization URL flow.",
+    )
+    parser.add_argument("--login-hint", default=None, help="Google email hint for consent screen.")
+    parser.add_argument("--expect-email", default=None, help="Require authorized account to match this email.")
+    parser.add_argument("--url-file", default=None, help="Write authorization URL to this file (0600).")
+    parser.add_argument("--port", type=int, default=0, help="Localhost callback port for --local-server (default: 0).")
+    parser.add_argument("--timeout", type=int, default=300, help="Timeout in seconds for --local-server (default: 300).")
+    args = parser.parse_args(sys.argv[4:])
+
+    client_config_path = pathlib.Path(os.path.expanduser("~/.colab-cli-oauth-config.json"))
+    if client_config_path.is_file():
+        client_config = json.loads(client_config_path.read_text())
+    else:
+        client_config = json.loads(
+            resources.files("colab_cli").joinpath("oauth_config.json").read_text()
+        )
+
+    use_local = args.local_server or (not args.remote and bool(os.environ.get("DISPLAY")))
+    auth_kwargs = {"prompt": "consent", "access_type": "offline"}
+    if args.login_hint:
+        auth_kwargs["login_hint"] = args.login_hint
+
+    flow = InstalledAppFlow.from_client_config(client_config, list(PUBLIC_SCOPES))
+
+    if use_local:
+        received: dict[str, str] = {}
+
+        class _QuietHandler(wsgiref.simple_server.WSGIRequestHandler):
+            def log_message(self, format, *log_args):
+                return
+
+        def _app(environ, start_response):
+            received["uri"] = wsgiref.util.request_uri(environ)
+            start_response("200 OK", [("Content-Type", "text/html; charset=utf-8")])
+            return [
+                b"<html><body style='font-family:sans-serif;padding:2rem;'>"
+                b"<h2>Colab CLI authorization received.</h2>"
+                b"<p>You may close this browser tab and return to your terminal/agent.</p>"
+                b"</body></html>"
+            ]
+
+        httpd = wsgiref.simple_server.make_server(
+            "127.0.0.1", args.port, _app, handler_class=_QuietHandler
+        )
+        httpd.timeout = args.timeout
+        port = httpd.server_port
+        flow.redirect_uri = f"http://localhost:{port}/"
+        auth_url, _ = flow.authorization_url(**auth_kwargs)
+
+        if args.url_file:
+            url_p = pathlib.Path(args.url_file)
+            url_p.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(url_p), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(auth_url + "\n")
+
+        print(f"\n[colab-account:{alias_name}] Open this URL in a browser signed into the target Google account:\n", file=sys.stderr)
+        print(f"  {auth_url}\n", file=sys.stderr, flush=True)
+        print(f"[colab-account:{alias_name}] Waiting up to {args.timeout}s for callback on http://localhost:{port}/ ...", file=sys.stderr, flush=True)
+
+        try:
+            httpd.handle_request()
+        finally:
+            httpd.server_close()
+
+        callback_uri = received.get("uri")
+        if not callback_uri:
+            print(f"Error: timed out after {args.timeout}s waiting for OAuth callback.", file=sys.stderr)
+            return 1
+        parsed = urllib.parse.urlparse(callback_uri)
+        qs = urllib.parse.parse_qs(parsed.query)
+        if "error" in qs:
+            print(f"Error from OAuth callback: {qs['error'][0]}", file=sys.stderr)
+            return 1
+        code_list = qs.get("code")
+        if not code_list:
+            print("Error: OAuth callback did not contain an authorization code.", file=sys.stderr)
+            return 1
+        code = code_list[0]
+    else:
+        flow.redirect_uri = REMOTE_REDIRECT_URI
+        auth_kwargs["token_usage"] = "remote"
+        auth_url, _ = flow.authorization_url(**auth_kwargs)
+        if args.url_file:
+            url_p = pathlib.Path(args.url_file)
+            url_p.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(url_p), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(auth_url + "\n")
+        print(f"\n[colab-account:{alias_name}] Visit this URL in any browser:\n", file=sys.stderr)
+        print(f"  {auth_url}\n", file=sys.stderr, flush=True)
+        print("After approving, paste the authorization code shown by Google.", file=sys.stderr)
+        code = input("Authorization code: ").strip()
+
+    flow.oauth2session.scope = None
+    token = flow.fetch_token(code=code)
+    flow.oauth2session.scope = token.get("scope")
+    creds = flow.credentials
+
+    if not creds.refresh_token:
+        print("Error: Google did not return a refresh_token. Re-run login with prompt=consent.", file=sys.stderr)
+        return 1
+
+    # Verify account email before persisting.
+    userinfo_resp = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {creds.token}"},
+        timeout=15,
+    )
+    email = None
+    if userinfo_resp.ok:
+        email = userinfo_resp.json().get("email")
+
+    if args.expect_email and email and email.lower() != args.expect_email.lower():
+        print(
+            f"Error: expected Google account '{args.expect_email}', but browser authorized '{email}'. Aborting without saving.",
+            file=sys.stderr,
+        )
+        return 2
+
+    payload = json.loads(creds.to_json())
+    payload["type"] = "authorized_user"
+
+    tmp_cred = cred_path.parent / f".{cred_path.name}.tmp.{os.getpid()}"
+    fd = os.open(str(tmp_cred), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        json.dump(payload, fh, indent=2)
+        fh.write("\n")
+    os.replace(tmp_cred, cred_path)
+
+    meta = {
+        "alias": alias_name,
+        "email": email,
+        "scopes": sorted(list(creds.scopes or [])),
+    }
+    tmp_meta = meta_path.parent / f".{meta_path.name}.tmp.{os.getpid()}"
+    fd_m = os.open(str(tmp_meta), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd_m, "w") as fh:
+        json.dump(meta, fh, indent=2)
+        fh.write("\n")
+    os.replace(tmp_meta, meta_path)
+
+    print(f"[colab-account:{alias_name}] Authorized successfully as {email or 'unknown'} -> {cred_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+PY
+fi
+
+if [[ ! -f "$credentials_file" ]]; then
+  echo "Missing credentials for colab-account alias '$alias_name': $credentials_file" >&2
+  echo "Initialize this account on this machine first with:" >&2
+  echo "  colab-account $alias_name login" >&2
+  exit 66
+fi
+
+mkdir -p "$state_dir"
+chmod 700 "$state_dir"
+
+"$colab_py" - "$credentials_file" "$normalized_adc" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+src = pathlib.Path(sys.argv[1])
+dst = pathlib.Path(sys.argv[2])
+data = json.loads(src.read_text())
+data.setdefault("type", "authorized_user")
+data.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+
+tmp = dst.parent / f".{dst.name}.tmp.{os.getpid()}"
+fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as fh:
+    json.dump(data, fh)
+os.replace(tmp, dst)
+PY
+
+export GOOGLE_APPLICATION_CREDENTIALS="$normalized_adc"
+
+if [[ "$1" == "ccu-info" ]]; then
+  shift
+  json_mode="0"
+  if [[ "${1:-}" == "--json" ]]; then
+    json_mode="1"
+  fi
+  exec "$colab_py" - "$json_mode" <<'PY'
+import json
+import sys
+from colab_cli.auth import AuthProvider, get_credentials
+
+json_mode = sys.argv[1] == "1"
+sess = get_credentials(provider=AuthProvider.ADC)
+resp = sess.get(
+    "https://colab.research.google.com/tun/m/ccu-info",
+    params={"authuser": "0"},
+    headers={"Accept": "application/json", "X-Colab-Client-Agent": "colab-cli"},
+    timeout=20,
+)
+resp.raise_for_status()
+body = resp.text
+if body.startswith(")]}'\n"):
+    body = body[5:]
+data = json.loads(body)
+if json_mode:
+    print(json.dumps(data, indent=2, sort_keys=True))
+else:
+    print(f"Paid/Plan Balance: {data.get('currentBalance', data.get('paidComputeUnitsBalance', 'N/A'))} CCUs")
+    print(f"Hourly Burn Rate:  {data.get('consumptionRateHourly', 0)} CCU/hr")
+    print(f"Active Sessions:   {data.get('assignmentsCount', 0)}")
+    if "subscriptionTier" in data:
+        print(f"Subscription Tier: {data.get('subscriptionTier')}")
+    if "eligibleGpus" in data:
+        print(f"Eligible GPUs:     {', '.join(data.get('eligibleGpus') or []) or 'none'}")
+    if "eligibleTpus" in data:
+        print(f"Eligible TPUs:     {', '.join(data.get('eligibleTpus') or []) or 'none'}")
+    if "freeCcuInfo" in data:
+        print(f"Free Quota Info:   {json.dumps(data.get('freeCcuInfo'))}")
+    extra_keys = sorted(set(data.keys()) - {
+        "currentBalance", "paidComputeUnitsBalance", "consumptionRateHourly",
+        "assignmentsCount", "subscriptionTier", "eligibleGpus", "eligibleTpus", "freeCcuInfo"
+    })
+    if extra_keys:
+        print("Other Fields:      " + json.dumps({k: data[k] for k in extra_keys}))
+PY
+fi
+
+if [[ "$1" == "stop" && "${2:-}" == "--all" ]]; then
+  exec "$colab_py" - "$sessions_file" <<'PY'
+import pathlib
+import sys
+from colab_cli.auth import AuthProvider, get_credentials
+from colab_cli.client import Client, Prod
+from colab_cli.history import HistoryLogger
+from colab_cli.runtime import ColabRuntime
+from colab_cli.state import StateStore
+
+sessions_path = pathlib.Path(sys.argv[1])
+store = StateStore(str(sessions_path))
+history = HistoryLogger(str(sessions_path.parent / "history"))
+auth_session = get_credentials(provider=AuthProvider.ADC)
+client = Client(Prod(), auth_session)
+
+server_assignments = client.list_assignments()
+if not server_assignments:
+    for name in list(store.list().keys()):
+        store.remove(name)
+    print("[colab-account] No active sessions.")
+    raise SystemExit(0)
+
+local_by_endpoint = {s.endpoint: (name, s) for name, s in store.list().items()}
+stopped = 0
+for a in server_assignments:
+    local_entry = local_by_endpoint.get(a.endpoint)
+    label = local_entry[0] if local_entry else a.endpoint
+    print(f"[colab-account] Stopping session '{label}' ({a.accelerator.value})...")
+    if local_entry:
+        _, s = local_entry
+        try:
+            ColabRuntime(s.url, s.token, kernel_id=s.kernel_id).stop(shutdown_kernel=True)
+        except Exception:
+            pass
+        store.remove(local_entry[0])
+        history.log_event(local_entry[0], "session_terminated", {"reason": "stop_all"})
+    client.unassign(a.endpoint)
+    stopped += 1
+
+print(f"[colab-account] Stopped {stopped} session(s).")
+PY
+fi
+
+# Check whether caller already supplied --config or --auth
+has_config="0"
+has_auth="0"
+for arg in "$@"; do
+  case "$arg" in
+    --config|--config=*) has_config="1" ;;
+    --auth|--auth=*) has_auth="1" ;;
+  esac
+done
+
+global_args=()
+if [[ "$has_auth" == "0" ]]; then
+  global_args+=(--auth=adc)
+fi
+if [[ "$has_config" == "0" ]]; then
+  if [[ -n "${COLAB_SESSION_CONFIG:-}" ]]; then
+    global_args+=(--config "$COLAB_SESSION_CONFIG")
+  else
+    global_args+=(--config "$sessions_file")
+  fi
+fi
+
+exec "$colab_bin" "${global_args[@]}" "$@"
