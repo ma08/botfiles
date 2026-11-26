@@ -56,6 +56,12 @@ If the user explicitly requests raw Codex/yolo, use:
 start-zellij-session-for-task --project-root "<project-root>" --no-codex-app-notify <ISSUE-ID>
 ```
 
+If the user explicitly asks to launch a new Antigravity conversation (when `ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CSRF_TOKEN` are available):
+
+```bash
+antigravity-conversation create --current-project --title "<ISSUE-ID>: <Title>" --prompt "/start-new-task <ISSUE-ID>"
+```
+
 5. Verify the launch:
    - Confirm `zellij list-sessions` or helper output includes the session.
    - Run:

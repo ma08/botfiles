@@ -67,7 +67,10 @@ repeat with `--sync-github-issue`.
 3. Read the resolved `status.md` first. Treat task metadata and the local status recap as the source of truth.
 4. Use only a short transcript tail as fallback for the final pre-interruption context or when the status file is stale. Do not read the full transcript by default.
 5. Adopt the task into the current session by running `sync_task_metadata.py` against the resolved status file. This should make later `get-task-details` and `save-task-status` calls point at the resumed task.
-6. When running inside Codex Desktop and `codex_app.set_thread_title` is available, rename the calling thread after adoption; omit `threadId`. Use `<Tracker Human ID>: <Tracker Title>`, or `[no ticker]: <clear natural-language title>` when no tracker exists. Do not edit Codex SQLite/JSONL state or ask for a UI refresh. Outside Codex Desktop, or when the native tool is unavailable, skip the rename instead of emulating it.
+6. Rename the calling session after adoption when a supported interface is available:
+   - Inside Codex Desktop (`codex_app.set_thread_title` available): rename the calling thread without `threadId` using `<Tracker Human ID>: <Tracker Title>`, or `[no ticker]: <clear natural-language title>` when no tracker exists. Do not edit Codex SQLite/JSONL state or ask for a UI refresh.
+   - Inside Antigravity (`ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CONVERSATION_ID` set): run `antigravity-conversation rename --title "<Tracker Human ID>: <Tracker Title>"` (or `[no ticker]: <clear natural-language title>`).
+   - Otherwise skip the rename instead of emulating it.
 7. If the resolved task home lives in another repo, treat that workspace path as canonical before making code changes. Do not create a duplicate task folder unless the user explicitly wants a forked task history.
 8. After adoption, update the status file with a brief takeover note, refreshed current state, and the next planned step.
 9. If no tracked task home exists, fall back to `start-new-task` instead of fabricating resume context.

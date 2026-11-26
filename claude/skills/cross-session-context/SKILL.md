@@ -54,6 +54,11 @@ Codex Desktop thread path, when `codex_app` tools are available:
 4. If task metadata also exists, still run `get-cross-session-context` for the
    status file, tracker metadata, transcript path, and zellij diagnostics.
 
+Antigravity conversation path, when `ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CSRF_TOKEN` are available:
+
+1. Run `get-cross-session-context --project-root "<project-root>" <target> --include-transcript-tail 4` first when a tracked task exists; for `coding_agent: antigravity`, it reads Antigravity's `transcript.jsonl` and inspects live `ConversationService` title and run state automatically.
+2. Use `antigravity-conversation list --current-project` or `antigravity-conversation get --conversation-id <id>` to inspect conversation metadata and run state directly.
+
 ## Behavior
 
 - Target by tracker ref or task slug first. Use explicit session overrides only

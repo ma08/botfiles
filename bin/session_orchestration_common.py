@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 BOTFILES_ROOT = Path(__file__).resolve().parent.parent
 TASK_STATUS_SCRIPTS = (
@@ -563,6 +565,52 @@ def inspect_session_target(
     )
 
 
+def inspect_antigravity_conversation(
+    conversation_id: str,
+    *,
+    env: dict[str, str] | None = None,
+    timeout_seconds: int = 3,
+) -> dict[str, Any] | None:
+    normalized = (conversation_id or "").strip()
+    if not normalized or normalized == TRACKER_KIND_NONE:
+        return None
+    source = env if env is not None else os.environ
+    address = source.get("ANTIGRAVITY_LS_ADDRESS", "").strip()
+    csrf_token = source.get("ANTIGRAVITY_CSRF_TOKEN", "").strip()
+    if not address or not csrf_token:
+        return None
+
+    req = Request(
+        f"http://{address}/product.v1.ConversationService/GetConversation",
+        data=json.dumps({"conversationId": normalized}).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Connect-Protocol-Version": "1",
+            "x-antigravity-csrf-token": csrf_token,
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            payload = json.loads(resp.read().decode("utf-8") or "{}")
+    except (HTTPError, URLError, OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(payload, dict) or not payload.get("id"):
+        return None
+
+    metadata = payload.get("metadata") or {}
+    annotations = payload.get("annotations") or {}
+    state = payload.get("state") or {}
+    return {
+        "id": str(payload.get("id") or "").strip(),
+        "title": str(annotations.get("title") or "").strip(),
+        "summary": str(state.get("summary") or "").strip(),
+        "run_state": str(state.get("runState") or "").strip(),
+        "project_id": str(metadata.get("projectId") or "").strip(),
+        "update_time": str(state.get("updateTime") or "").strip(),
+    }
+
+
 def extract_transcript_messages(
     transcript_path: str,
     *,
@@ -629,6 +677,22 @@ def extract_transcript_messages(
                 stripped = message.strip()
                 if stripped:
                     text_parts.append(stripped)
+        elif event.get("type") == "USER_INPUT":
+            role = "user"
+            timestamp = str(event.get("created_at") or "")
+            raw_content = str(event.get("content") or "").strip()
+            if raw_content.startswith("<USER_REQUEST>"):
+                raw_content = raw_content[len("<USER_REQUEST>") :].strip()
+            if raw_content.endswith("</USER_REQUEST>"):
+                raw_content = raw_content[: -len("</USER_REQUEST>")].strip()
+            if raw_content:
+                text_parts.append(raw_content)
+        elif event.get("type") == "PLANNER_RESPONSE":
+            role = "assistant"
+            timestamp = str(event.get("created_at") or "")
+            raw_content = str(event.get("content") or "").strip()
+            if raw_content:
+                text_parts.append(raw_content)
         elif path.name == "history.jsonl":
             if agent_session_id and str(event.get("sessionId") or "").strip() != agent_session_id:
                 continue

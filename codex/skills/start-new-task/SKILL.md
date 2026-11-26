@@ -84,14 +84,15 @@ Skip this step only when:
 - the user explicitly asks for a different tracking destination,
 - or Linear creation is blocked and degraded local-only mode is the only viable path.
 
-### Step 2B: Set the Codex Desktop Thread Title
-When running inside Codex Desktop and `codex_app.set_thread_title` is available:
-
-1. Rename the calling thread after tracker context is resolved; omit `threadId`.
-2. Use `<Tracker Human ID>: <Tracker Title>`, or `[no ticker]: <clear natural-language title>` when no tracker exists.
-3. Do not edit Codex SQLite/JSONL state or ask the user to refresh the UI.
-
-Outside Codex Desktop, or when the native tool is unavailable, skip this step instead of emulating the rename.
+### Step 2B: Set the Calling Session Title (Codex Desktop / Antigravity)
+- **Codex Desktop** (`codex_app.set_thread_title` is available):
+  1. Rename the calling thread after tracker context is resolved; omit `threadId`.
+  2. Use `<Tracker Human ID>: <Tracker Title>`, or `[no ticker]: <clear natural-language title>` when no tracker exists.
+  3. Do not edit Codex SQLite/JSONL state or ask the user to refresh the UI.
+- **Antigravity** (`ANTIGRAVITY_LS_ADDRESS` and `ANTIGRAVITY_CONVERSATION_ID` are set):
+  1. Rename the calling conversation after tracker context is resolved:
+     `antigravity-conversation rename --title "<Tracker Human ID>: <Tracker Title>"` (or `[no ticker]: <clear natural-language title>` when no tracker exists).
+- Outside Codex Desktop and Antigravity, or when the native interface is unavailable, skip this step instead of emulating the rename.
 
 ### Step 3: Slug and Folder Naming
 - If the primary tracker is GitHub, slug format is `repo-issue-<number>-<title>`.

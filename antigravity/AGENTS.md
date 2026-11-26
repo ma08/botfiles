@@ -113,7 +113,7 @@ These are user-level instructions for Google Antigravity shared across projects 
   - Default root: `context/daily/YYYY-MM-DD/<HH>h<MM>m<SS>sPST-<task-slug>/` (override per project via `task-status-root:` in project `AGENTS.md` or `CLAUDE.md`). Slugs are lowercase, hyphenated, and under 50 characters. Legacy folders without time prefixes continue to work unchanged.
   - Use PST explicitly for all task timestamps (`TZ=America/Los_Angeles date`), formatted as `YYYY-MM-DD ~HH:MMam/pm PST`.
   - Machine identity comes from `SYSTEM_NAME` and `BOT_MACHINE_SSH_ALIAS` in `~/pro/botfiles/secrets/local/machine.rc`.
-  - When invoking the shared `sync_task_metadata.py` helper from Antigravity, pass `--coding-agent antigravity` (and the active Conversation ID as `--agent-session-id` when known) so task metadata, transcript path resolution, and GitHub live-session bylines identify Antigravity accurately.
+  - `task_status_common.py` auto-detects Antigravity via `ANTIGRAVITY_CONVERSATION_ID` / `ANTIGRAVITY_AGENT` and resolves its `transcript.jsonl`. Pass `--coding-agent antigravity` (and `--agent-session-id <id>`) to `sync_task_metadata.py` only as a fallback when those env vars are absent.
 
 ### Plan Acceptance Persistence (Required)
 

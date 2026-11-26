@@ -338,6 +338,10 @@ def resolve_agent_name(
     explicit = source.get("CODING_AGENT", "").strip().lower()
     if explicit:
         return explicit
+    if source.get("ANTIGRAVITY_CONVERSATION_ID", "").strip() or parse_bool(
+        source.get("ANTIGRAVITY_AGENT"), default=False
+    ):
+        return "antigravity"
     if source.get("CODEX_THREAD_ID", "").strip() or source.get("CODEX_SESSION_ID", "").strip():
         return "codex"
     if source.get("CLAUDE_CODE_SESSION_ID", "").strip() or source.get("CLAUDE_SESSION_ID", "").strip():
@@ -415,13 +419,20 @@ def resolve_agent_session_id(
     project_root: str | None = None,
 ) -> str:
     source = env or {}
+    explicit_agent_session_id = source.get("AGENT_SESSION_ID", "").strip()
+    if explicit_agent_session_id:
+        return explicit_agent_session_id
+    if resolve_agent_name(source, default_agent="unknown") == "antigravity":
+        antigravity_id = source.get("ANTIGRAVITY_CONVERSATION_ID", "").strip()
+        if antigravity_id:
+            return antigravity_id
     for key in (
         "CODEX_THREAD_ID",
         "CODEX_SESSION_ID",
-        "AGENT_SESSION_ID",
         "HERMES_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CLAUDE_SESSION_ID",
+        "ANTIGRAVITY_CONVERSATION_ID",
         "SESSION_ID",
     ):
         value = source.get(key, "").strip()
@@ -632,10 +643,26 @@ def resolve_claude_transcript_path(
     return "none"
 
 
-def resolve_antigravity_transcript_path(agent_session_id: str) -> str:
+def resolve_antigravity_transcript_path(
+    agent_session_id: str,
+    env: dict[str, str] | None = None,
+) -> str:
     normalized = (agent_session_id or "").strip()
     if not normalized or normalized == "none":
         return "none"
+    source = env if env is not None else os.environ
+    app_data_dir = source.get("ANTIGRAVITY_APP_DATA_DIR", "").strip()
+    if app_data_dir:
+        candidate = (
+            Path(app_data_dir).expanduser()
+            / "brain"
+            / normalized
+            / ".system_generated"
+            / "logs"
+            / "transcript.jsonl"
+        )
+        if candidate.is_file():
+            return str(candidate.resolve())
     for root_name in ("antigravity", "antigravity-cli", "antigravity-ide"):
         candidate = (
             Path.home()
@@ -668,7 +695,7 @@ def resolve_transcript_path(
     if normalized_agent == "claude":
         return resolve_claude_transcript_path(normalized_session_id, project_root=project_root)
     if normalized_agent == "antigravity":
-        return resolve_antigravity_transcript_path(normalized_session_id)
+        return resolve_antigravity_transcript_path(normalized_session_id, env=env)
     return "none"
 
 

@@ -1,13 +1,13 @@
 # Task-Status Tracker Contract
 
-This document defines the shared tracker-aware contract for `botfiles` task-status workflows across Codex and Claude.
+This document defines the shared tracker-aware contract for `botfiles` task-status workflows across Codex, Claude, and Antigravity.
 
 ## Locked Defaults
 
 - `tracker_kind` can be `linear`, `github`, or `none`.
 - When both Linear and GitHub references exist, Linear is the primary tracker.
 - New logic should prefer the common tracker fields first and treat GitHub-only fields as compatibility data.
-- The same tracker-linked task should be consumable from both Codex and Claude task-status flows without field-name drift.
+- The same tracker-linked task should be consumable from Codex, Claude, and Antigravity task-status flows without field-name drift.
 
 ## Task Metadata Block
 
@@ -23,11 +23,11 @@ Code should treat the snake_case field names below as canonical, even though the
 | `tracker_human_id` | `Tracker Human ID` | Human identifier such as `ZON-8` or `owner/repo#123`. |
 | `tracker_title` | `Tracker Title` | Best-effort tracker title. |
 | `machine` | `Machine` | `SYSTEM_NAME`, hostname fallback, or `unknown`. |
-| `coding_agent` | `Coding Agent` | Usually `codex` or `claude`. |
-| `agent_session_id` | `Agent Session ID` | Session identifier for the active run. |
+| `coding_agent` | `Coding Agent` | Usually `codex`, `claude`, or `antigravity` (auto-detected via `ANTIGRAVITY_CONVERSATION_ID` / `ANTIGRAVITY_AGENT`). |
+| `agent_session_id` | `Agent Session ID` | Session or conversation identifier for the active run. |
 | `task_folder` | `Task Folder` | Absolute path to the local task folder. |
 | `task_status_path` | `Task Status Path` | Absolute path to `status.md` or legacy `README.md`. |
-| `transcript_path` | `Transcript Path` | Absolute transcript path when the agent can resolve one. |
+| `transcript_path` | `Transcript Path` | Absolute transcript path when the agent can resolve one (including Antigravity `transcript.jsonl` under `ANTIGRAVITY_APP_DATA_DIR` or `~/.gemini/antigravity*/brain/<id>/.system_generated/logs/`). |
 | `last_synced_at` | `Last Synced` | PST timestamp for the last metadata sync. |
 
 ### Common Optional Fields

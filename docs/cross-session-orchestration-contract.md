@@ -1,8 +1,9 @@
 # Cross-Session Orchestration Contract
 
 These helpers define the v1 contract for non-Symphony cross-session work in
-regular Codex and Claude sessions. They also document the Codex Desktop
-app-thread transport when the runtime exposes `codex_app` tools.
+regular Codex, Claude, and Antigravity sessions. They also document the Codex
+Desktop app-thread transport when the runtime exposes `codex_app` tools and the
+local Antigravity `ConversationService` surface.
 
 ## Target Resolution
 
@@ -30,8 +31,12 @@ guessing.
 - Codex Desktop `read_thread` status and turn summaries when the target is an
   app thread and `codex_app` tools are available
 
-Transcript fallback supports Codex session JSONL, Claude per-session JSONL, and
-Claude `history.jsonl` fallback filtered by session id when available.
+Transcript fallback supports Codex session JSONL, Claude per-session JSONL,
+Claude `history.jsonl` fallback filtered by session id when available, and
+Antigravity `transcript.jsonl` (`USER_INPUT` and `PLANNER_RESPONSE` events).
+When `coding_agent` is `antigravity` and `ANTIGRAVITY_LS_ADDRESS` /
+`ANTIGRAVITY_CSRF_TOKEN` are set, `get-cross-session-context` also queries
+`GetConversation` for live title, run state, and project ID.
 
 Codex Desktop thread context is app-level context. It is useful for current turn
 status and summaries, but it does not replace task status files for tracked
@@ -50,6 +55,13 @@ Use the highest-level supported transport available in the current runtime:
 - Codex CLI or Claude Code -> Codex Desktop thread: no universal first-class
   transport is assumed. Use an explicit supported bridge if one is available, or
   ask the user to send from a Codex Desktop thread.
+- Antigravity -> zellij-backed terminal session: use `send-zellij-message`.
+- Antigravity -> new Antigravity conversation: use `antigravity-conversation create`
+  to start a conversation with an optional initial prompt. Follow-up prompt
+  delivery into an existing top-level Antigravity conversation is not exposed by
+  `ConversationService`; fail closed and ask the user in the UI instead of
+  mutating internal state. Use `invoke_subagent` / `send_message` only for
+  in-turn subagents.
 
 Do not treat local Codex app SQLite state, JSONL logs, or notification proxy
 state as a prompt-injection API. Those may be valid for read-only diagnostics or

@@ -62,7 +62,7 @@ What this does:
   - Primary tracker kind/url/human ID/title
   - Machine (`SYSTEM_NAME` -> hostname -> `unknown`)
   - Coding agent (`codex|claude|antigravity|unknown`)
-  - Agent session ID (for example `CODEX_THREAD_ID`, Claude session ID, or Antigravity conversation ID when available)
+  - Agent session ID (auto-detected from `CODEX_THREAD_ID`, Claude session ID, or `ANTIGRAVITY_CONVERSATION_ID` when available)
   - Task folder / task status path / transcript path
   - Workspace path
   - Zellij session (`ZELLIJ_SESSION_NAME` or `none`)

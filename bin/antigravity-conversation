@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""CLI helper for Antigravity local ConversationService over Connect HTTP+JSON."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+def _require_connection_env(env: dict[str, str] | None = None) -> tuple[str, str]:
+    source = env if env is not None else os.environ
+    address = source.get("ANTIGRAVITY_LS_ADDRESS", "").strip()
+    csrf_token = source.get("ANTIGRAVITY_CSRF_TOKEN", "").strip()
+    if not address or not csrf_token:
+        missing = []
+        if not address:
+            missing.append("ANTIGRAVITY_LS_ADDRESS")
+        if not csrf_token:
+            missing.append("ANTIGRAVITY_CSRF_TOKEN")
+        raise RuntimeError(
+            "Antigravity ConversationService unavailable; missing environment variable(s): "
+            + ", ".join(missing)
+        )
+    return address, csrf_token
+
+
+def call_conversation_service(
+    method: str,
+    payload: dict[str, Any],
+    *,
+    env: dict[str, str] | None = None,
+    timeout_seconds: int = 10,
+) -> dict[str, Any]:
+    address, csrf_token = _require_connection_env(env)
+    url = f"http://{address}/product.v1.ConversationService/{method}"
+    req = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Connect-Protocol-Version": "1",
+            "x-antigravity-csrf-token": csrf_token,
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=timeout_seconds) as resp:
+            raw = resp.read().decode("utf-8")
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"ConversationService.{method} failed with HTTP {exc.code}: {body or exc.reason}"
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(
+            f"ConversationService.{method} connection failed: {exc.reason}"
+        ) from exc
+
+    try:
+        data = json.loads(raw or "{}")
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"ConversationService.{method} returned invalid JSON: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise RuntimeError(f"ConversationService.{method} returned unexpected payload type")
+    return data
+
+
+def _extract_summary_fields(conv: dict[str, Any]) -> dict[str, Any]:
+    metadata = conv.get("metadata") or {}
+    annotations = conv.get("annotations") or {}
+    state = conv.get("state") or {}
+    title = str(annotations.get("title") or "").strip()
+    summary = str(state.get("summary") or "").strip()
+    return {
+        "id": str(conv.get("id") or "").strip(),
+        "title": title,
+        "summary": summary,
+        "run_state": str(state.get("runState") or "").strip(),
+        "project_id": str(metadata.get("projectId") or "").strip(),
+        "update_time": str(state.get("updateTime") or "").strip(),
+    }
+
+
+def _print_conversation(conv: dict[str, Any]) -> None:
+    fields = _extract_summary_fields(conv)
+    display_title = fields["title"] or fields["summary"] or "(untitled)"
+    print(f"ID: {fields['id'] or 'none'}")
+    print(f"Title: {display_title}")
+    if fields["title"] and fields["summary"]:
+        print(f"Summary: {fields['summary']}")
+    print(f"Run State: {fields['run_state'] or 'unknown'}")
+    print(f"Project ID: {fields['project_id'] or 'none'}")
+    if fields["update_time"]:
+        print(f"Updated: {fields['update_time']}")
+
+
+def _resolve_conversation_id(explicit: str | None, env: dict[str, str]) -> str:
+    conv_id = (explicit or env.get("ANTIGRAVITY_CONVERSATION_ID", "")).strip()
+    if not conv_id:
+        raise RuntimeError(
+            "Conversation ID required: pass --conversation-id or set ANTIGRAVITY_CONVERSATION_ID"
+        )
+    return conv_id
+
+
+def _resolve_project_id(
+    explicit_project_id: str | None,
+    use_current_project: bool,
+    env: dict[str, str],
+) -> str | None:
+    if explicit_project_id:
+        return explicit_project_id.strip()
+    if use_current_project:
+        project_id = env.get("ANTIGRAVITY_PROJECT_ID", "").strip()
+        if not project_id:
+            raise RuntimeError(
+                "--current-project requested, but ANTIGRAVITY_PROJECT_ID is not set"
+            )
+        return project_id
+    return None
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    get_parser = subparsers.add_parser("get", help="Get metadata and run state for a conversation.")
+    get_parser.add_argument("--conversation-id", help="Target conversation ID (defaults to $ANTIGRAVITY_CONVERSATION_ID).")
+    get_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    rename_parser = subparsers.add_parser("rename", help="Update the title annotation on a conversation.")
+    rename_parser.add_argument("--conversation-id", help="Target conversation ID (defaults to $ANTIGRAVITY_CONVERSATION_ID).")
+    rename_parser.add_argument("--title", required=True, help="New conversation title.")
+    rename_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    list_parser = subparsers.add_parser("list", help="List conversations.")
+    list_parser.add_argument("--project-id", help="Filter to conversations in this project ID.")
+    list_parser.add_argument("--current-project", action="store_true", help="Filter to $ANTIGRAVITY_PROJECT_ID.")
+    list_parser.add_argument("--query", help="Case-insensitive substring filter over id, title, and summary.")
+    list_parser.add_argument("--include-archived", action="store_true", help="Include archived conversations.")
+    list_parser.add_argument("--limit", type=int, default=20, help="Maximum conversations to fetch/display (1-100).")
+    list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    create_parser = subparsers.add_parser("create", help="Create a new conversation (optionally with an initial prompt).")
+    create_parser.add_argument("--project-id", help="Project ID for the new conversation.")
+    create_parser.add_argument("--current-project", action="store_true", help="Use $ANTIGRAVITY_PROJECT_ID.")
+    create_parser.add_argument("--title", help="Conversation title.")
+    create_parser.add_argument("--model", help="Model tier alias (flash_lite, flash, pro) or model ID.")
+    create_parser.add_argument("--tag", action="append", default=[], help="Client tag (repeatable).")
+    create_parser.add_argument("--prompt", help="Optional initial prompt text.")
+    create_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    return parser.parse_args(argv)
+
+
+def run_cli(argv: list[str] | None = None, *, env: dict[str, str] | None = None) -> int:
+    args = parse_args(argv)
+    source_env = dict(env if env is not None else os.environ)
+
+    try:
+        if args.command == "get":
+            conv_id = _resolve_conversation_id(args.conversation_id, source_env)
+            data = call_conversation_service("GetConversation", {"conversationId": conv_id}, env=source_env)
+            if args.json:
+                print(json.dumps(data, indent=2, sort_keys=True))
+            else:
+                _print_conversation(data)
+            return 0
+
+        if args.command == "rename":
+            conv_id = _resolve_conversation_id(args.conversation_id, source_env)
+            data = call_conversation_service(
+                "UpdateConversation",
+                {
+                    "conversationId": conv_id,
+                    "annotations": {"title": args.title},
+                },
+                env=source_env,
+            )
+            if args.json:
+                print(json.dumps(data, indent=2, sort_keys=True))
+            else:
+                _print_conversation(data)
+            return 0
+
+        if args.command == "list":
+            limit = max(1, min(args.limit, 100))
+            payload: dict[str, Any] = {
+                "pageSize": limit,
+                "includeArchived": bool(args.include_archived),
+            }
+            project_id = _resolve_project_id(args.project_id, args.current_project, source_env)
+            if project_id:
+                payload["projectId"] = project_id
+            data = call_conversation_service("ListConversations", payload, env=source_env)
+            conversations = list(data.get("conversations") or [])
+            if args.query:
+                needle = args.query.strip().lower()
+                filtered = []
+                for conv in conversations:
+                    fields = _extract_summary_fields(conv)
+                    haystack = " ".join([fields["id"], fields["title"], fields["summary"]]).lower()
+                    if needle in haystack:
+                        filtered.append(conv)
+                conversations = filtered
+            conversations = conversations[:limit]
+            if args.json:
+                out = dict(data)
+                out["conversations"] = conversations
+                print(json.dumps(out, indent=2, sort_keys=True))
+            else:
+                if not conversations:
+                    print("No matching Antigravity conversations found.")
+                for idx, conv in enumerate(conversations):
+                    if idx > 0:
+                        print("---")
+                    _print_conversation(conv)
+            return 0
+
+        if args.command == "create":
+            payload = {}
+            project_id = _resolve_project_id(args.project_id, args.current_project, source_env)
+            if project_id:
+                payload["projectId"] = project_id
+            if args.title:
+                payload["title"] = args.title
+            if args.model:
+                payload["model"] = args.model
+            if args.tag:
+                payload["tags"] = list(args.tag)
+            if args.prompt:
+                payload["prompt"] = [{"text": args.prompt}]
+            data = call_conversation_service("CreateConversation", payload, env=source_env)
+            if args.json:
+                print(json.dumps(data, indent=2, sort_keys=True))
+            else:
+                conv = data.get("conversation") if isinstance(data.get("conversation"), dict) else data
+                _print_conversation(conv)
+            return 0
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    return 1
+
+
+def main() -> int:
+    return run_cli()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

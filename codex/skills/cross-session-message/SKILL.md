@@ -56,6 +56,18 @@ Codex Desktop thread path, when `codex_app` tools are available:
 5. Omit `model` and `thinking` unless the user explicitly asks to override the
    destination thread's settings.
 
+Antigravity conversation path and boundary:
+
+- From an Antigravity session, zellij-backed Codex/Claude sessions can still be
+  messaged normally via `send-zellij-message`.
+- Launching a new Antigravity conversation with an initial prompt is supported
+  via `antigravity-conversation create --current-project --title "..." --prompt "..."`.
+- `ConversationService` does not expose a follow-up send endpoint into an
+  already-created top-level Antigravity conversation. Fail closed instead of
+  mutating Antigravity files or internal state; use `invoke_subagent` /
+  `send_message` only for in-turn subagents, or ask the user to send the
+  follow-up in the target Antigravity UI tab.
+
 ## Behavior
 
 - Run the preview first. The helper is dry-run by default.
